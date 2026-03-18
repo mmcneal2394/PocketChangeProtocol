@@ -1,0 +1,54 @@
+version: "3.8"
+
+services:
+  # Managed Postgres Database for the SaaS Platform
+  # (In a true production setting, use AWS RDS or Supabase, but this provides a fallback)
+  postgres:
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-supersecret}
+      POSTGRES_DB: ${POSTGRES_DB:-pcprotocol_prod}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata_prod:/var/lib/postgresql/data
+    networks:
+      - saas_net
+
+  # NATS Core Messaging Bus
+  nats:
+    image: nats:2.9-alpine
+    restart: always
+    ports:
+      - "4222:4222"
+      - "8222:8222" # Management UI
+    networks:
+      - saas_net
+
+  # The High-Performance Rust Arbitrage Engine
+  arbitrage-engine:
+    build: 
+      context: .
+      dockerfile: ./engine-worker/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - nats
+    environment:
+      - RUST_LOG=info
+      - DATABASE_URL=postgres://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-supersecret}@postgres:5432/${POSTGRES_DB:-pcprotocol_prod}
+      - NATS_URL=nats://nats:4222
+      # CRITICAL: Production SOL RPCs must be injected via a .env file on the VPS
+      # - SOLANA_RPC_URL=${SOLANA_RPC_URL}
+      # - JITO_BLOCK_ENGINE_URL=${JITO_BLOCK_ENGINE_URL}
+    networks:
+      - saas_net
+
+volumes:
+  pgdata_prod:
+
+networks:
+  saas_net:
+    driver: bridge

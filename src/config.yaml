@@ -1,0 +1,48 @@
+# Global Bot Settings
+data_sources:
+  price_feed:
+    mode: "live"   # or "simulated"
+    simulated:
+      strategy: "random_walk"   # or "historical_replay", "constant"
+      seed: 42
+    live:
+      raydium_rpc: "https://api.mainnet-beta.solana.com"
+      bitget_api_key: "..."
+  market_cap:
+    mode: "simulated"
+    simulated:
+      value: 10000000   # fixed for testing
+
+bot:
+  rpc_url: "https://mainnet.helius-rpc.com/?api-key=df082a16-aebf-4ec4-8ad6-86abfa06c8fc"
+  dry_run: false
+  max_loss_per_hour_percent: 5.0 # Circuit breaker
+
+# Configurable Modular Execution Engines
+strategies:
+  triangular:
+    enabled: true
+    min_profit_usd: 2.0
+    allowed_dexes: ["raydium", "orca", "meteora"]
+    cooldown_seconds: 5
+
+  cross_dex:
+    enabled: true
+    pairs: ["SOL/USDC", "RAY/USDC", "WIF/SOL"]
+    min_profit_percent: 0.5
+    allowed_dexes: ["raydium", "orca", "lifinity"]
+    cooldown_seconds: 3
+
+  statistical:
+    enabled: false
+    pairs: ["SOL/JitoSOL"]
+    z_score_threshold: 2.5
+    mean_reversion_period_hrs: 24
+    cooldown_seconds: 10
+    
+  funding_rate:
+    enabled: false
+    symbols: ["SOL", "BONK"]
+    min_funding_spread: 0.05
+    exchanges: ["drift", "mango"]
+    cooldown_seconds: 60

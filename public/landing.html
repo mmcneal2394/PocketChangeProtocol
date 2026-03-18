@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ArbitraSaaS - Next-Gen Solana Arbitrage Platform</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #8a2be2;
+            --secondary: #00e5ff;
+            --bg: #0f0f13;
+            --text: #e0e0e0;
+        }
+        body { margin: 0; font-family: 'Inter', sans-serif; background-color: var(--bg); color: var(--text); overflow-x: hidden; }
+        header { display: flex; justify-content: space-between; padding: 24px 64px; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .logo { font-size: 1.5rem; font-weight: 800; background: linear-gradient(90deg, var(--primary), var(--secondary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .hero { text-align: center; padding: 120px 24px; max-width: 800px; margin: 0 auto; }
+        .hero h1 { font-size: 4rem; margin-bottom: 24px; line-height: 1.1; }
+        .hero p { font-size: 1.25rem; color: #9090a0; margin-bottom: 48px; }
+        .cta-btn { background: linear-gradient(135deg, var(--primary), var(--secondary)); color: #fff; padding: 16px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 1.1rem; border: none; cursor: pointer; display: inline-block; transition: transform 0.2s; }
+        .cta-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(138,43,226,0.3); }
+        .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 32px; padding: 64px; max-width: 1200px; margin: 0 auto; }
+        .feature-card { background: rgba(26,26,36,0.8); padding: 32px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.05); text-align: center; }
+        .feature-card h3 { color: #fff; font-size: 1.5rem; margin-bottom: 16px; }
+        .feature-card p { color: #9090a0; line-height: 1.6; }
+        .glow { position: absolute; width: 400px; height: 400px; background: var(--primary); filter: blur(120px); opacity: 0.2; border-radius: 50%; z-index: -1; }
+    </style>
+</head>
+<body>
+    <div class="glow" style="top: -100px; left: -100px;"></div>
+    <div class="glow" style="bottom: -100px; right: -100px; background: var(--secondary);"></div>
+
+    <header>
+        <div class="logo">ArbitraSaaS</div>
+        <nav style="display: flex; gap: 24px;">
+            <a href="#" style="color: var(--text); text-decoration: none; font-weight: 600;">Features</a>
+            <a href="#" style="color: var(--text); text-decoration: none; font-weight: 600;">Pricing</a>
+            <a href="/login" style="color: var(--primary); text-decoration: none; font-weight: 600;">Login</a>
+        </nav>
+    </header>
+
+    <section class="hero">
+        <h1>Automated Yield Generation on Solana</h1>
+        <p>Connect your wallet and let our ultra-low latency, multi-tenant AI arbitrage engine capture MEV and spread opportunities automatically while you sleep.</p>
+        <a href="/" class="cta-btn">Start 14-Day Free Trial</a>
+    </section>
+
+    <section class="features">
+        <div class="feature-card">
+            <h3>Lightning Fast</h3>
+            <p>Built in Rust directly to the Solana RPC, identifying structural arbitrage discrepancies across Jupiter and Raydium in sub-50ms.</p>
+        </div>
+        <div class="feature-card">
+            <h3>Secure by Design</h3>
+            <p>Your keys are encrypted locally and stored in HSM-backed KMS. We can't access your raw funds.</p>
+        </div>
+        <div class="feature-card">
+            <h3>Enterprise Analytics</h3>
+            <p>Gain access to powerful time-series dashboards. Track every micro-transaction and gas fee.</p>
+        </div>
+    </section>
+
+    <footer style="text-align: center; padding: 48px; color: #9090a0; border-top: 1px solid rgba(255,255,255,0.05);">
+        &copy; 2026 ArbitraSaaS Inc. All rights reserved.
+    </footer>
+</body>
+</html>

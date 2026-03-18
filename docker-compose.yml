@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  # The AI Strategy Agent (Telegram/X)
+  ai-agent:
+    build:
+      context: .
+      dockerfile: scripts/Dockerfile
+    container_name: pcp-ai-agent
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./engine-worker/telemetry.jsonl:/app/engine-worker/telemetry.jsonl
+    depends_on:
+      - engine
+    networks:
+      - pcp-network
+
+  # The High-Frequency Rust Arbitrage Engine
+  engine:
+    build:
+      context: ./engine-worker
+      dockerfile: Dockerfile
+    container_name: pcp-rust-engine
+    network_mode: host
+    restart: unless-stopped
+    env_file:
+      - ./engine-worker/.env
+    volumes:
+      - ./engine-worker/telemetry.jsonl:/app/telemetry.jsonl
+networks:
+  pcp-network:
+    driver: bridge

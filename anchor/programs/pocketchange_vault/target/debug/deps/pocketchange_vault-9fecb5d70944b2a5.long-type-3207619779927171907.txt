@@ -1,0 +1,3 @@
+anchor_lang::system_program::AuthorizeNonceAccount<'info>
+anchor_lang::system_program::CreateAccountWithSeed<'info>
+anchor_spl::token_2022::InitializeMintCloseAuthority<'info>

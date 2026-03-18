@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: arbitrasaas-engine-worker
+  labels:
+    app: engine-worker
+spec:
+  replicas: 10 # Autoscaled based on queue depth / active users
+  selector:
+    matchLabels:
+      app: engine-worker
+  template:
+    metadata:
+      labels:
+        app: engine-worker
+    spec:
+      containers:
+      - name: engine
+        image: arbitrasaas/rust-engine:latest
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: url
+        - name: RPC_HTTPS_URL
+          valueFrom:
+            secretKeyRef:
+              name: rpc-credentials
+              key: https_url
+        - name: NATS_URL
+          value: "nats://nats-cluster:4222"
+        resources:
+          requests:
+            cpu: "1" # Core dedicated for extreme low latency
+            memory: "2Gi"
+          limits:
+            cpu: "2"
+            memory: "4Gi"

@@ -1,0 +1,98 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id             String    @id @default(uuid())
+  email          String    @unique
+  passwordHash   String?
+  walletAuth     String?   // For wallet-based auth (sign message)
+  isVerified     Boolean   @default(false)
+  tier           String    @default("FREE") // FREE, PRO, ENTERPRISE
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  twoFactorEnabled Boolean @default(false)
+
+  wallets        Wallet[]
+  trades         TradeLog[]
+}
+
+model Wallet {
+  id             String    @id @default(uuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  publicKey      String
+  encryptedKey   String    // AES-256 encrypted private key or mnemonic
+  salt           String    // Per-user or per-wallet salt
+  balanceSol     Float     @default(0.0)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  config         TradingConfig?
+  trades         TradeLog[]
+  positions      ActivePosition[]
+
+  @@unique([userId, publicKey])
+}
+
+model TradingConfig {
+  id                 String  @id @default(uuid())
+  walletId           String  @unique
+  wallet             Wallet  @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  
+  isTradingEnabled   Boolean @default(false)
+  minProfitThreshold Float   @default(0.01) // In SOL or percentage depending on engine
+  maxTradeSize       Float   @default(1.0)  // In SOL
+  slippageTolerance  Float   @default(1.0)  // Percentage
+  dexWhitelist       String  // JSON array or comma separated string of allowed DEXs
+  priorityFeeStrgy   String  @default("dynamic") // dynamic or fixed
+  jitoEnabled        Boolean @default(true)
+  
+  notificationsEmail Boolean @default(false)
+  
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model TradeLog {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  walletId    String
+  wallet      Wallet   @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  
+  status      String   // PENDING, SUCCESS, FAILED
+  profitAmt   Float?   // Profit realized in SOL
+  route       String?  // Description of the arb route (e.g., RAYDIUM -> JUPITER)
+  txHash      String?  
+  errorMsg    String?
+  
+  createdAt   DateTime @default(now())
+}
+
+model ActivePosition {
+  id              String   @id @default(uuid())
+  walletId        String
+  wallet          Wallet   @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  
+  strategy        String   // STATISTICAL or FUNDING_RATE
+  pair            String   // e.g., SOL/JitoSOL
+  status          String   // OPEN, CLOSING, CLOSED
+  
+  entryPrice      Float
+  entryRatio      Float?   // For Statistical Arb
+  fundingBasis    Float?   // For Funding Arb
+  
+  sizeSol         Float
+  
+  targetPrice     Float?
+  targetRatio     Float?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  closedAt        DateTime?
+}

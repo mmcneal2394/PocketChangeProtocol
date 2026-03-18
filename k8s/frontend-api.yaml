@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: arbitrasaas-frontend
+  labels:
+    app: arbitrasaas-frontend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: arbitrasaas-frontend
+  template:
+    metadata:
+      labels:
+        app: arbitrasaas-frontend
+    spec:
+      containers:
+      - name: frontend
+        image: arbitrasaas/frontend:latest
+        ports:
+        - containerPort: 3000
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: url
+        resources:
+          requests:
+            cpu: "250m"
+            memory: "512Mi"
+          limits:
+            cpu: "500m"
+            memory: "1Gi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: arbitrasaas-frontend-svc
+spec:
+  selector:
+    app: arbitrasaas-frontend
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 3000
+  type: LoadBalancer

@@ -1,0 +1,102 @@
+[
+  {
+    "txid": "4o7uTcfqiynJ1hiNXkE79GcCcw5z1iVJWKs2DdgAQn2uEvrcTi4VdoGC6Y92p2EoPSZecEZ73pRJcni5ioZXVDh3",
+    "fee": 5000,
+    "net": -637021
+  },
+  {
+    "txid": "527FwpxYkeGQJVxdV1J6xTgQK7CVrTt9m1FHz3jzPF2emxYov668wwppTciMsw8Xk8q2t34fnAsXULKivnWRpEGJ",
+    "fee": 5000,
+    "net": -15000
+  },
+  {
+    "txid": "2ayHWDSKmqYdQcnxHHn8asC8FFvesaLetEUWgGdNZzXid2hCdawdJmCCbZKRddrrTJpHWpg1Vzxv8E2VabnjqtjK",
+    "fee": 105000,
+    "net": -7395
+  },
+  {
+    "txid": "3vk87KXZhEn4DbZgAq9nZu6KvqrJXs47UNcsMhoHVJngyLsmB2mEA7yepWUy92vzmwgxnRzAKUTXE1gq1deyqkkP",
+    "fee": 105000,
+    "net": -104925
+  },
+  {
+    "txid": "2iZunFTgcw1Cd7uHe4qw69RPb4rbSfmi2YArA85KPWjBuxt6iWjjJF5BYfRwCeAW277cvC6dh3Zkjv6iJ33cWV9",
+    "fee": 105000,
+    "net": -102555
+  },
+  {
+    "txid": "2CRRJ8MsnVWrfWDAy1QB7mmoNas6jtz6j4YDgat6VHyw5tJD7frxfB29fkaFvAGaWjf3xV5nxDbkHkFAMsP1dV1r",
+    "fee": 105000,
+    "net": -83677
+  },
+  {
+    "txid": "5DeDq4i715yan7K8DMtX2BpdqkAkHDbbmHXNfwERPWNiyr5YDyGsLiNvsuZUisxxQUSeVpMg7w1RVihUo5LLHpDi",
+    "fee": 105000,
+    "net": -104998
+  },
+  {
+    "txid": "3F6QVZhQZabZqY8ERMXgXyGbbrwNeduSfiraPSCbk7zEcmfqGaq5jbgLYRBXosBJc2zfBAJwR5SQnFqGXdGbdqPh",
+    "fee": 105000,
+    "net": -104958
+  },
+  {
+    "txid": "gSXSofbUS18X6ipDvkUjKM84rpPfSH9G4tBWtm1cF1uZyyuUdHLT5rpPDd3jX9aa72fanMksvbse6TPyemcvYZm",
+    "fee": 105000,
+    "net": -104979
+  },
+  {
+    "txid": "JbjYvNyzJWaXxM9MapcHSMTBCgJbbw8rCdA5Vsewz4fKqCBzs9JkAeuYPTNyypJKBzpxMvnVqYZz6476tcqx9Yk",
+    "fee": 105000,
+    "net": -104979
+  },
+  {
+    "txid": "3NJUQwizckLteKyGJP8MsKDokQesDgcrj5H9evoT1FSQREjCHsWo8iabG2Cw3YvTFa9wU7z7jtp6uozbgzjTHaFJ",
+    "fee": 105000,
+    "net": -5386
+  },
+  {
+    "txid": "3pG9Fiv15rS7B1H21Gi73BzVRwZQLUFECrSsXwSshcEgxWL9PiWUqMsE6omeQaFzcVPSmEM13CsfJiYo7EvSkwfm",
+    "fee": 105000,
+    "net": -96632
+  },
+  {
+    "txid": "5oEakZpAinktdAZ11S6L5hfi8kiiHpzj8x4XpchxXpV2ogPHaKXE6ScKgm4KpUEiFhaPwipKZuLk8nfKKpD4Cnsr",
+    "fee": 105000,
+    "net": -104997
+  },
+  {
+    "txid": "3pUvM9jaCyj5uyVDgdgVVWB4vsyh5FDJb3DdGq1BjFjQGYyeXK5QyEJf4DgLij33w2nqMpuM1jG4DyYC3BWBCscR",
+    "fee": 105000,
+    "net": -104995
+  },
+  {
+    "txid": "2iJZ6z861GecQAPEhSSHvM761m1AY4yGT9auxm9r2Fn81UMULSXeXMRYqtvmCaJQT6Xpp7p9C8W5PZLj1SwXGsfq",
+    "fee": 105000,
+    "net": -104998
+  },
+  {
+    "txid": "VF6gJWa8X29tBvuMtshHdfUmGXSkVJW5pd7frpdhs1QXMDAZqSJAiNYQFegKauf8a2NsTM55aneXESpXme1EWNG",
+    "fee": 5000,
+    "net": -434133
+  },
+  {
+    "txid": "3c9zDAMhNGAqMpFh5TYcRJBFB8TiGACZd3Mz7QGYL7yEC6gJj51AaZagirX55ZKxCDgNcsdi8HZEmLbVdACbqAgk",
+    "fee": 5000,
+    "net": -5018
+  },
+  {
+    "txid": "2cB9N2BD6yBvYkeF8GgXBMTHQ5PSKtYNhEPqBGyJjWZSDTZmY63SVC2w3uQx1jHcepfZDyhVUYhZ5nkjzYZEp2eV",
+    "fee": 5000,
+    "net": -5018
+  },
+  {
+    "txid": "3gU97h7Seb9eqzEnQwSEF2VYBDrThmVLNQkAW6HcVcTVydQAEc7fxr5H6r2Y73TtAACohpaKFd4EHYt1fuPTiMVJ",
+    "fee": 5000,
+    "net": -2475472
+  },
+  {
+    "txid": "28959fqvW11VrTpE46uhEXHddUCzfUwZqAFF5Qzyf2hMTGpu26ReH1GvHM8NFzt59Te5uPLYQW5Rsm6T54N8w5Mv",
+    "fee": 5000,
+    "net": -436209
+  }
+]

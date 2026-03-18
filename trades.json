@@ -1,0 +1,1602 @@
+[
+  {
+    "id": "tx_1773643594646_341",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0.01,
+    "route": "SOL -> 📈_VOL_HD43",
+    "txHash": "4HvYwa6BrLd8xWgtXd5KpShMfoLJZgoXKs9rpRFynn3HGYoAZcZFEs52cmPKdqWW68wTo3TQqRc93c7zhbXxVjYD",
+    "createdAt": "2026-03-16T06:46:34.646Z"
+  },
+  {
+    "id": "tx_1773643599192_389",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0.014,
+    "route": "SOL -> 📈_VOL_SKRb",
+    "txHash": "3pzfYr385Wnq6viY1eLBF7oKKJiJDk9pdbTXK3ooVXqyVLBuHaYFHwR8cNvhpndWQ8HKhLg46dDkNLCteCxY1joW",
+    "createdAt": "2026-03-16T06:46:39.192Z"
+  },
+  {
+    "id": "tx_1773643603761_293",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> 📈_VOL_9BB6",
+    "txHash": "384846466_1773643603687",
+    "createdAt": "2026-03-16T06:46:43.761Z"
+  },
+  {
+    "id": "tx_1773643608356_711",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0.0055,
+    "route": "SOL -> 📈_VOL_9Kjd",
+    "txHash": "5Xoe2YLWdGwYNim3oTgBy4v7F9awT4eB7aUa2GPoyHqb3EyhkHQoggAE35oE7TeQaAGpQ8JwemH7cUVKX8u3JiFP",
+    "createdAt": "2026-03-16T06:46:48.356Z"
+  },
+  {
+    "id": "tx_1773643612850_133",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0.019,
+    "route": "SOL -> 📈_VOL_DEGh",
+    "txHash": "gbcFg14isX78t5ncwtfSQgBTvHpL6qZMfezSfEQd3867dzjpab3u3v1PRy9BX5CrfaibB98xakrE1s1dZP56ULm",
+    "createdAt": "2026-03-16T06:46:52.850Z"
+  },
+  {
+    "id": "tx_1773643617402_562",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0.0075,
+    "route": "SOL -> 📈_VOL_USD1",
+    "txHash": "1Rj6GPtbqMxeKqA4mZ8CDr2pk28TxJfzdWp33FPxa1x2CbDNQSqiAkQJzk1xA6jT7nthVVYJoC8cLqGjKUP8LoR",
+    "createdAt": "2026-03-16T06:46:57.402Z"
+  },
+  {
+    "id": "tx_1773643621957_734",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0.0177,
+    "route": "SOL -> 📈_VOL_Er54",
+    "txHash": "4tVp9nz67orCb5FXd8VKh5y7n6Hwt5HKMNnaHYSAaG1skf5rjqN1p2EaQkhFALJ2WffbtAbGzv8qRByfv7Sk6VJX",
+    "createdAt": "2026-03-16T06:47:01.957Z"
+  },
+  {
+    "id": "tx_1773643626403_836",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0.0071,
+    "route": "SOL -> 📈_VOL_79eX",
+    "txHash": "2ZuhqePmvHuRbQ5qyuWNtxjDF5qx9zUGv67295Nbib6ZXwRrKo3f48BfrEDNNjctXcxJrKzHxyxGfkNnZBDnpCLD",
+    "createdAt": "2026-03-16T06:47:06.403Z"
+  },
+  {
+    "id": "tx_1773643630770_951",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0.018,
+    "route": "SOL -> 📈_VOL_pump",
+    "txHash": "384846535_1773643630704",
+    "createdAt": "2026-03-16T06:47:10.770Z"
+  },
+  {
+    "id": "tx_1773643688121_678",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> BONK",
+    "txHash": "2rxxysAg8hsT1AR9fvgBtGu1AgXeE9Jf9j7C5mSQEWKvC89EtvpLUkviegtjTUmeNqK8Qz6sCifWAEeco8KCGZGQ",
+    "createdAt": "2026-03-16T06:48:08.121Z"
+  },
+  {
+    "id": "tx_1773643718961_454",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> USDC",
+    "txHash": "33VK5epHVznf5kDSQ5o67xE89fPEovAQjwoyBMQCr4pcwh5W4kJXN2keEthpmssvS3Z3LSUPMPFTMqPS4G9qVjsj",
+    "createdAt": "2026-03-16T06:48:38.961Z"
+  },
+  {
+    "id": "tx_1773643867827_638",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> USDC",
+    "txHash": "384847140_1773643867648",
+    "createdAt": "2026-03-16T06:51:07.827Z"
+  },
+  {
+    "id": "tx_1773643873126_337",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> BONK",
+    "txHash": "33Ye8TW9NU6ZHjPnnDfWCjvfMjcaq1aC1GZwKqdKUcjANdvFWj7nT9D7Ao3asEMjWpbhLox9NTcCKR9FWapxjejv",
+    "createdAt": "2026-03-16T06:51:13.126Z"
+  },
+  {
+    "id": "tx_1773643881154_50",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> USDC",
+    "txHash": "384847174_1773643881023",
+    "createdAt": "2026-03-16T06:51:21.154Z"
+  },
+  {
+    "id": "tx_1773644002268_203",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> RAY",
+    "txHash": "4S4irdQnWeaLjEqF3XwjJa9iCTgrVHtcfYnzX8z3MR4d6j8v5ep83psyUrwgewbmjXE9vrmXFdJCyx8A4vFT3iyi",
+    "createdAt": "2026-03-16T06:53:22.268Z"
+  },
+  {
+    "id": "tx_1773644005940_267",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> USDC",
+    "txHash": "czMGSx8929FFA21vjNDdFM4vhe9Uqk6zirYL2ZfHfy3kSbvXP3UMAJbXRdiW65oW6DcfpMx4xEZqm5nXTqsnvz9",
+    "createdAt": "2026-03-16T06:53:25.940Z"
+  },
+  {
+    "id": "tx_1773644011129_413",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> WIF",
+    "txHash": "5NTTPLp8pRviDPxrf9dsCoRkMkxy5pMz4zwjxrHU2EoY5WuEGn33F1NWNde29C1VanCabqwNnKQK7hi2cox8Hu78",
+    "createdAt": "2026-03-16T06:53:31.129Z"
+  },
+  {
+    "id": "tx_1773644015234_627",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> RAY",
+    "txHash": "4TWHKwYA2abtmf7Sx37fg81oeKUHRfUsqFXEMHQTUJ9HCh63gzhUmdFqggnS332SAgKqPTy3ycpeVH1HRnnwAR7i",
+    "createdAt": "2026-03-16T06:53:35.234Z"
+  },
+  {
+    "id": "tx_1773644019537_536",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> NEW_2qEH",
+    "txHash": "5woTfe6dyTkTbEa6Uqs3d4DEvMLdremTkHFbnUapyYVr9r4QcVb1s8hHQfofUdhgFzVeNrd4RYEc232fdpHr86wh",
+    "createdAt": "2026-03-16T06:53:39.537Z"
+  },
+  {
+    "id": "tx_1773644024053_730",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> NEW_2qEH",
+    "txHash": "8ddHCnukUPX2bnGQYi3PthDYEN3fxgSjSBwZNySQCZygatLtYn9xEDVAcqR1aB8NFS3MMkneBWSEJCzSzMUZ5aC",
+    "createdAt": "2026-03-16T06:53:44.053Z"
+  },
+  {
+    "id": "tx_1773644028443_505",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> NEW_2qEH",
+    "txHash": "384847549_1773644028394",
+    "createdAt": "2026-03-16T06:53:48.443Z"
+  },
+  {
+    "id": "tx_1773644033326_234",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> BONK",
+    "txHash": "384847561_1773644033258",
+    "createdAt": "2026-03-16T06:53:53.326Z"
+  },
+  {
+    "id": "tx_1773644037784_620",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> NEW_DezX",
+    "txHash": "3W4H8juc9DMg6gtf7ev18qEr6D9wAa1BFo9Ek4HyXA5RagzugnPHcpVxcWWF3UjLRUbMBr6Vdo1CCKoi7CQCkZEC",
+    "createdAt": "2026-03-16T06:53:57.784Z"
+  },
+  {
+    "id": "tx_1773644041959_40",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> 📈_VOL_GG1t",
+    "txHash": "384847583_1773644041906",
+    "createdAt": "2026-03-16T06:54:01.959Z"
+  },
+  {
+    "id": "tx_1773644046603_629",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> WIF",
+    "txHash": "384847592_1773644046557",
+    "createdAt": "2026-03-16T06:54:06.603Z"
+  },
+  {
+    "id": "tx_1773644051283_520",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> 📈_VOL_GG1t",
+    "txHash": "384847605_1773644051237",
+    "createdAt": "2026-03-16T06:54:11.283Z"
+  },
+  {
+    "id": "tx_1773644055792_392",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> NEW_DezX",
+    "txHash": "384847616_1773644055722",
+    "createdAt": "2026-03-16T06:54:15.792Z"
+  },
+  {
+    "id": "tx_1773644060149_995",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> NEW_2qEH",
+    "txHash": "4NMgvyeoy445GagSVyxvA5QucaA6ifFCv2LoqXcukRAPFpApAubAfbya2MtM96k8bbomNeUheui46LBGZm4zxzcC",
+    "createdAt": "2026-03-16T06:54:20.149Z"
+  },
+  {
+    "id": "tx_1773644064617_590",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> WIF",
+    "txHash": "384847639_1773644064579",
+    "createdAt": "2026-03-16T06:54:24.617Z"
+  },
+  {
+    "id": "tx_1773644069128_79",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> WIF",
+    "txHash": "384847651_1773644069077",
+    "createdAt": "2026-03-16T06:54:29.128Z"
+  },
+  {
+    "id": "tx_1773644073629_93",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> NEW_4k3D",
+    "txHash": "384847662_1773644073555",
+    "createdAt": "2026-03-16T06:54:33.629Z"
+  },
+  {
+    "id": "tx_1773644078377_644",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> BONK",
+    "txHash": "3zrRt8cU2RJVnpezxCtPK5tG4si3TMxdrSEswaidDNUhHRgvL3omnMRUijUyT6daAze62UFuUMiuuV9qWhs7DasP",
+    "createdAt": "2026-03-16T06:54:38.377Z"
+  },
+  {
+    "id": "tx_1773644082915_815",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> NEW_DezX",
+    "txHash": "4sGaVDbMi2dFD1E3e1SpjX1VJQFCyUxV3sHB2YSJQyXBCYjchNsx3R6hKbeJCmCjJi3vfnRCxsD7krEi3HorVxEm",
+    "createdAt": "2026-03-16T06:54:42.915Z"
+  },
+  {
+    "id": "tx_1773644087466_529",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> NEW_6p6x",
+    "txHash": "4KhqdiC9it4LKadeyhpUNZCKC7VsDvYHCCNQoeFg13MpDTq5dUXLRwXkmR9n4G28SH6U5zHSy262hMFRSDTLPwEd",
+    "createdAt": "2026-03-16T06:54:47.466Z"
+  },
+  {
+    "id": "tx_1773644091652_822",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> NEW_2qEH",
+    "txHash": "4c6G9ZcjQypYNCks4cCm54r7CuaeNGCBRBER1qNiiWfzRkK6L2FP4sHvPieAMcrvbhTPA2Lf1EBJnsMWyvTkBLRk",
+    "createdAt": "2026-03-16T06:54:51.652Z"
+  },
+  {
+    "id": "tx_1773644096225_995",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> NEW_DezX",
+    "txHash": "384847718_1773644096179",
+    "createdAt": "2026-03-16T06:54:56.225Z"
+  },
+  {
+    "id": "tx_1773644100953_535",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> NEW_6p6x",
+    "txHash": "2jVEjS4aYFm6a1Q8wrtVSF5kWRCsUMGi5L1S1pEGPXymhLa5hFXHZav2ZMVrw1UJ58ieoH1N7jayt8W1scvBo3YC",
+    "createdAt": "2026-03-16T06:55:00.953Z"
+  },
+  {
+    "id": "tx_1773644105394_769",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> NEW_6p6x",
+    "txHash": "34HsYxqKv8oiNwPsBUauC63kxhBqzB5jA81yEciMhVYqdpyPE4CRF5XojN1Gewi9f3khUHFs3ebBjFLwdKfHiMaJ",
+    "createdAt": "2026-03-16T06:55:05.394Z"
+  },
+  {
+    "id": "tx_1773644109927_384",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> NEW_EKpQ",
+    "txHash": "36nuLT9ot7cSLCzmRXyNYoX4TiCZgTRH8LrpRLYBEcn9gDhSzSjhPvhoeBczTMJBgkuhoDEy2MoXisAfHPHMa8d1",
+    "createdAt": "2026-03-16T06:55:09.927Z"
+  },
+  {
+    "id": "tx_1773644114020_11",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> NEW_2qEH",
+    "txHash": "384847763_1773644113977",
+    "createdAt": "2026-03-16T06:55:14.020Z"
+  },
+  {
+    "id": "tx_1773644118958_380",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> 📈_VOL_GG1t",
+    "txHash": "384847777_1773644118906",
+    "createdAt": "2026-03-16T06:55:18.958Z"
+  },
+  {
+    "id": "tx_1773644123382_466",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> NEW_4k3D",
+    "txHash": "ywkhunGnbLiBasq7aEjGjjPxG5K13ETfoZqz7WGgrixyFSDNUNrmqYMHAFK1iCzhkWRJhCHpgLpdefxkPUSZ8aT",
+    "createdAt": "2026-03-16T06:55:23.382Z"
+  },
+  {
+    "id": "tx_1773644127551_414",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> 📈_VOL_Es9v",
+    "txHash": "384847799_1773644127503",
+    "createdAt": "2026-03-16T06:55:27.551Z"
+  },
+  {
+    "id": "tx_1773644132167_800",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> NEW_2qEH",
+    "txHash": "45M8TLmFqP7aReYMjEWAJLgSAuUatjfrA4xLXDahctj17qCCN6VgvAcZyAe1dVvqbWMoyqKZijW8zQ4mZpWstaZo",
+    "createdAt": "2026-03-16T06:55:32.167Z"
+  },
+  {
+    "id": "tx_1773644136527_698",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> USDC",
+    "txHash": "mN58xk6uik7bHzwM9nvcnDMvFdNmbH6RNNbTfwP3diay9x6smyjhKCERJALxyytw7SHYGyBZYh7GW74AFFZq758",
+    "createdAt": "2026-03-16T06:55:36.527Z"
+  },
+  {
+    "id": "tx_1773644141780_163",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> 📈_VOL_7dM6",
+    "txHash": "384847833_1773644141593",
+    "createdAt": "2026-03-16T06:55:41.780Z"
+  },
+  {
+    "id": "tx_1773644145962_424",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> NEW_DezX",
+    "txHash": "4KApcrFzCVG2Fgyu8v5cEKi7QqMewuYamRJhwApP2LVZYtxgwnsJRKiMZFcGCkhLMdeLJ4YYiaZ1intxdfUiiF46",
+    "createdAt": "2026-03-16T06:55:45.962Z"
+  },
+  {
+    "id": "tx_1773644150338_26",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> NEW_6p6x",
+    "txHash": "5vs5YRWt8yn6Cp4tKfMuJtYvBNXijWMEvzqS3tQSGyFTRrhjkxyL9Hgd7oxo1PuKZ57YGXZPj5baTuaFty8rfQJL",
+    "createdAt": "2026-03-16T06:55:50.338Z"
+  },
+  {
+    "id": "tx_1773644155113_424",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> 📈_VOL_GG1t",
+    "txHash": "26j2jcCcEZYRoX7pgdKqcwsUsRQemzgBGHaD2NBfX8w7vAb4gepgW9DwCy3WEdkRwc2Eog9ySVR23uZ9Cgd2v3tN",
+    "createdAt": "2026-03-16T06:55:55.113Z"
+  },
+  {
+    "id": "tx_1773644159262_203",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> 📈_VOL_Es9v",
+    "txHash": "5riMoMBFvPJtxBny4SUgsEQTNQR75hGePWP2Wt2LXu8qKndGCVeKxeG1NJ5ZjEdosaPnKq4yhyq6ZJdF9Lk9WnvB",
+    "createdAt": "2026-03-16T06:55:59.262Z"
+  },
+  {
+    "id": "tx_1773644164161_305",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> NEW_B3Ve",
+    "txHash": "5Sr8abX13mVjPUrLodfGjg4bAqDsY1yLFR4QT7Z7tYf591QyqDdJJxBjgC1FKGkJfgbNeWdosLPLMbALSoWbiKkS",
+    "createdAt": "2026-03-16T06:56:04.161Z"
+  },
+  {
+    "id": "tx_1773644168224_711",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> 📈_VOL_7dM6",
+    "txHash": "2SCKxKUy6sMW9fJpuiMFzqDbf1nSu1qn3tvVQUWgtkBBcZM3mQ7RQDk37bUeVg2gejSmrjAY4NfTqYVHuSMDAVdE",
+    "createdAt": "2026-03-16T06:56:08.224Z"
+  },
+  {
+    "id": "tx_1773644172741_332",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> 📈_VOL_GnUL",
+    "txHash": "2USf9fsniRp7hBfUhNfPiEV3CyqoupuV7YWdniugFZd6eLrcFtsVMgSBff7YMGCgWyGePmwxykP57vqwX3CdpD73",
+    "createdAt": "2026-03-16T06:56:12.741Z"
+  },
+  {
+    "id": "tx_1773644177261_881",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> WIF",
+    "txHash": "384847925_1773644177210",
+    "createdAt": "2026-03-16T06:56:17.261Z"
+  },
+  {
+    "id": "tx_1773644181749_816",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> NEW_B3Ve",
+    "txHash": "uX1W1zEMoEo27TNPaZyPVA2QNSWFi4BgU4JUgfhDzA4rnyPLqekXdbkYsSZS1w8eKkvwP3hVfcRf9cbEtVZjD9y",
+    "createdAt": "2026-03-16T06:56:21.749Z"
+  },
+  {
+    "id": "tx_1773644186157_188",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> USDC",
+    "txHash": "5xUg12HXnUUJjJXfupJHX9awNhuUqKf6DiranLiYsaKgSpw2vvxtkAVfeXXZE58CJKb4vh8Lb6xtyp1LiX1NpN7K",
+    "createdAt": "2026-03-16T06:56:26.157Z"
+  },
+  {
+    "id": "tx_1773644191454_531",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> NEW_DezX",
+    "txHash": "63jZzuDnaon6HsLdCKrrQEyDZnHMigzDPi9A3Em6pWRdwoUANNvwSs7i84EcTh5g5gjZFSHiqfiRPwiMrxqjmppC",
+    "createdAt": "2026-03-16T06:56:31.454Z"
+  },
+  {
+    "id": "tx_1773644195560_951",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> 📈_VOL_7dM6",
+    "txHash": "384847969_1773644195481",
+    "createdAt": "2026-03-16T06:56:35.560Z"
+  },
+  {
+    "id": "tx_1773644200169_612",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> 📈_VOL_GG1t",
+    "txHash": "4NHo8JcUR331GGbWp3zAp8jaoYNRD18pXBiainm8dSQpmHVrY7YstGJXJqtzsVotjdaRM1iKrNauXyFpZMF9SLYg",
+    "createdAt": "2026-03-16T06:56:40.169Z"
+  },
+  {
+    "id": "tx_1773644204114_381",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> USDC",
+    "txHash": "5qeKk8gxZda5XwYw1whKYYgA9MVXBM8edPTP8981dzyMgUmQjqPVUVhfgvNMkdVHCJbHDkraGfnUqE2BSDySAvzq",
+    "createdAt": "2026-03-16T06:56:44.114Z"
+  },
+  {
+    "id": "tx_1773644208975_265",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> 📈_VOL_EPqk",
+    "txHash": "384847997_1773644208899",
+    "createdAt": "2026-03-16T06:56:48.975Z"
+  },
+  {
+    "id": "tx_1773644330453_324",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> BONK",
+    "txHash": "3DoSGAhHsxWhJ9tom5grtfLjLqM15y719CMTqZHnUpXTRx6qnSGtnTuTrgCPzbZeQuvbfCpSUcjEWetE2FKpDjPG",
+    "createdAt": "2026-03-16T06:58:50.453Z"
+  },
+  {
+    "id": "tx_1773644334598_266",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> USDC",
+    "txHash": "5dH6tCHgiVW1KdwtwqPdhjQmXJod8UN1jKNWA3CD4pxCwsVZFHSuAR3s69Jhon4N3TKqJTVHRRfPP3K5mrnQouCx",
+    "createdAt": "2026-03-16T06:58:54.598Z"
+  },
+  {
+    "id": "tx_1773644366598_488",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> BONK",
+    "txHash": "2EWGtp5vJpmDmhrT2TKa3zjVTJ3H1rEDGmtT3timKetLKSurKNYnUyFsndaNxDWgiJ9HaLCRLyfHVKaCnngZ7h6o",
+    "createdAt": "2026-03-16T06:59:26.598Z"
+  },
+  {
+    "id": "tx_1773644587131_516",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> 📈_VOL_33dh",
+    "txHash": "3iCEpdbwKzL1wb48xFgY9ZYu7dgK6UJd2rMDZg8g6z6REcXaPSourH9VyFX26AUaRbYBdb1ezBSDP7Knqf6FN1Kt",
+    "createdAt": "2026-03-16T07:03:07.131Z"
+  },
+  {
+    "id": "tx_1773644609843_600",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> NEW_DezX",
+    "txHash": "3FFgEYMhXgyEg7HSMQvAkT1J2bENsf6VvSgaVkFPJyevzJLaLnxbfcSRoe9pSWdhoPMjWcwe9MZqrnPkU3ZGPfiA",
+    "createdAt": "2026-03-16T07:03:29.843Z"
+  },
+  {
+    "id": "tx_1773644852784_488",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> USDC",
+    "txHash": "59dTRK3fKJRjpAgV9cREmq7iebkBKEJjuV6rzhusSTaV2vJ8Vkcx9vdfGq3ysAz9SSXCpSUhEHu5wvsGB1yHg6nB",
+    "createdAt": "2026-03-16T07:07:32.784Z"
+  },
+  {
+    "id": "tx_1773644952249_173",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> 📈_VOL_Es9v",
+    "txHash": "3tpBG71y3KvZH8RxFVJ3JUvMDif8ZQwUncSyYwPUMqP1EHmcwZgDfJodR6gaSGeWZ2WdzaFqWXYiKws8aQpAo9Vx",
+    "createdAt": "2026-03-16T07:09:12.249Z"
+  },
+  {
+    "id": "tx_1773645051655_579",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> NEW_DezX",
+    "txHash": "2NARX5q3zHvxcHCTRXfe1nCH5ZsYmmFoT7ec6c8naxPGK8RtdgtjU2BxRz84G8motyGUvy5k2B4L2sBmYCoHUeRg",
+    "createdAt": "2026-03-16T07:10:51.655Z"
+  },
+  {
+    "id": "tx_1773645197548_280",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> 📈_VOL_FKbt",
+    "txHash": "62GmreUjkd7F7DR77V6Qp7Fb4fCosMyzXHQvt588gAz3fkysq4FMhp4s2XkQw1QeafhmjTBXPBJwwF8CdCLaG85X",
+    "createdAt": "2026-03-16T07:13:17.548Z"
+  },
+  {
+    "id": "tx_1773645312684_285",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> NEW_98sM",
+    "txHash": "4pi3FREzEtPALCp7ExuTzYgnVWaD7KwAEoQ1GKCjXoD8QixvZYzwueQdpM5kwvFEuuPBnZoUp3uwr5T7EBKuT9nk",
+    "createdAt": "2026-03-16T07:15:12.684Z"
+  },
+  {
+    "id": "tx_1773645964117_864",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> NEW_EKpQ",
+    "txHash": "2w6ViCtjNzdVXKvaCRtENUUEFTmgLghNsg2mTWCm8JJHugTEcKwv4Sw4XPSK6miNrWncwbL5Cg2bC5jZnbeajE7K",
+    "createdAt": "2026-03-16T07:26:04.117Z"
+  },
+  {
+    "id": "tx_1773646096733_642",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> USDC",
+    "txHash": "384852792_1773646096572",
+    "createdAt": "2026-03-16T07:28:16.734Z"
+  },
+  {
+    "id": "tx_1773646116743_424",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> NEW_USD1",
+    "txHash": "384852837_1773646116613",
+    "createdAt": "2026-03-16T07:28:36.743Z"
+  },
+  {
+    "id": "tx_1773646237014_247",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> 📈_VOL_JUPy",
+    "txHash": "4gTrW7xFqJNWnzFdiHqk4KhpMd6SeLpHUynEqRSWnp8Aa9gxxUJcDXdADXEf5HdbA2nLDUFFy74QFWQGQMpLn24V",
+    "createdAt": "2026-03-16T07:30:37.014Z"
+  },
+  {
+    "id": "tx_1773646387193_603",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> USDC",
+    "txHash": "4P738C9iFB8LKS8a9dbbUJYypX7EvRnpDfGRH5Pn7MRmK3kHENkuh336iF4jgvjQonAQLH4pphBna8BTZ6WKGqLa",
+    "createdAt": "2026-03-16T07:33:07.193Z"
+  },
+  {
+    "id": "tx_1773646419019_646",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> NEW_2zMM",
+    "txHash": "43zQRRQ11yizQ5wNyfdVh9pRAKwnqtHRdmSqZt28HQ3gMEWpbVTixqAshSYswRXztnWQSBLvpqzrFVgbVoyfEAps",
+    "createdAt": "2026-03-16T07:33:39.019Z"
+  },
+  {
+    "id": "tx_1773646436876_257",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> 📈_VOL_pump",
+    "txHash": "4vr7DavSxWESpFDSwbL2HX7wYsn2VDpmJQLC4fn4xJiLXDvC9w99AW2fAPRmFYzg5S15LM1QQctJq7qtVshdVjm1",
+    "createdAt": "2026-03-16T07:33:56.876Z"
+  },
+  {
+    "id": "tx_1773646444206_495",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> 📈_VOL_pump",
+    "txHash": "5ZZ39uQzGA5Fkaid2sEQCCZE5HnhPYjGwuNaTXSjStGizMgDPrYoXmnz96tqXyNXDEaAsNyobKDxB7tFz4j2oznG",
+    "createdAt": "2026-03-16T07:34:04.206Z"
+  },
+  {
+    "id": "tx_1773646493808_475",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> NEW_AZsH",
+    "txHash": "5Nut2ei1vnXijuBhEj7MpfnQbchpBaMk6XUHvfMEpLZFJFjZrFdgrUFZtdUPNu3JjSL8yACx1WLB7u4bkbiVZYZL",
+    "createdAt": "2026-03-16T07:34:53.808Z"
+  },
+  {
+    "id": "tx_1773646497992_80",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> NEW_USD1",
+    "txHash": "384853794_1773646497940",
+    "createdAt": "2026-03-16T07:34:57.992Z"
+  },
+  {
+    "id": "tx_1773646522612_582",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> NEW_2zMM",
+    "txHash": "2LkypPueGfe4xBPUQwDpY1MtEcFCYc8F9PWQieCpKkaGBLW87yaftTz3BWP4LpM1c9DhEdXdx5eU3duTLMHzL3Wi",
+    "createdAt": "2026-03-16T07:35:22.612Z"
+  },
+  {
+    "id": "tx_1773646779217_654",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> 📈_VOL_Es9v",
+    "txHash": "384854514_1773646779019",
+    "createdAt": "2026-03-16T07:39:39.217Z"
+  },
+  {
+    "id": "tx_1773646855779_342",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> USDC",
+    "txHash": "rSBSbX3fcgK1xDvminG1BuTT3BXAdkNHodvDUto491o6nxVC8cdyKEe1KU57mmv8nTuRBvMdXx1nVawwGjjeazJ",
+    "createdAt": "2026-03-16T07:40:55.779Z"
+  },
+  {
+    "id": "tx_1773648601540_787",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0001,
+    "route": "SOL -> USDC",
+    "txHash": "384859133_1773648601310",
+    "createdAt": "2026-03-16T08:10:01.540Z"
+  },
+  {
+    "id": "tx_1773648606612_459",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0001,
+    "route": "SOL -> WIF",
+    "txHash": "4HqiJWvrpYCzpSh9Bhco8bKho6CzkuyrpAvjUbHxfeZpA7du4eMBQToay1ffugSYfau8zNF11ssPYccWSdPrzMcS",
+    "createdAt": "2026-03-16T08:10:06.612Z"
+  },
+  {
+    "id": "tx_1773648610795_300",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0001,
+    "route": "SOL -> RAY",
+    "txHash": "5BwZ7w9dGegxuLNENoX9RQKn1FErvE3x4hVca7PLhP3XJ4YSMe9EZtxT7fJdadJMGtbARPAm8YbyM6qUcBDirYuq",
+    "createdAt": "2026-03-16T08:10:10.795Z"
+  },
+  {
+    "id": "tx_1773648615072_677",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0001,
+    "route": "SOL -> RAY",
+    "txHash": "384859169_1773648614995",
+    "createdAt": "2026-03-16T08:10:15.072Z"
+  },
+  {
+    "id": "tx_1773648619560_773",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0001,
+    "route": "SOL -> RAY",
+    "txHash": "384859180_1773648619514",
+    "createdAt": "2026-03-16T08:10:19.560Z"
+  },
+  {
+    "id": "tx_1773648624185_747",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0001,
+    "route": "SOL -> BONK",
+    "txHash": "384859192_1773648624138",
+    "createdAt": "2026-03-16T08:10:24.185Z"
+  },
+  {
+    "id": "tx_1773648628560_734",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0001,
+    "route": "SOL -> RAY",
+    "txHash": "384859202_1773648628507",
+    "createdAt": "2026-03-16T08:10:28.560Z"
+  },
+  {
+    "id": "tx_1773648633055_651",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0001,
+    "route": "SOL -> RAY",
+    "txHash": "384859214_1773648633000",
+    "createdAt": "2026-03-16T08:10:33.055Z"
+  },
+  {
+    "id": "tx_1773648637550_868",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0001,
+    "route": "SOL -> USDC",
+    "txHash": "4eEkaMdNHU7u28YepZgxv1bXtAxJxihMRjpCsj2h5V6myJJTZfCcjiyPqbvAtDXFJKFU4jCeCQACtoHqQLcNMo13",
+    "createdAt": "2026-03-16T08:10:37.550Z"
+  },
+  {
+    "id": "tx_1773648641972_774",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0001,
+    "route": "SOL -> USDC",
+    "txHash": "9wHZ5Aqf9iS5RCTY4bEZFEJVqME3iYcd8bMUSQHc2EQaCc9ZTqVGzzqJoBoTFXCFvBBoBEkWetRqaxqbLUgdu5Y",
+    "createdAt": "2026-03-16T08:10:41.972Z"
+  },
+  {
+    "id": "tx_1773648646398_844",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0001,
+    "route": "SOL -> USDC",
+    "txHash": "384859247_1773648646343",
+    "createdAt": "2026-03-16T08:10:46.398Z"
+  },
+  {
+    "id": "tx_1773648651604_893",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0001,
+    "route": "SOL -> RAY",
+    "txHash": "384859258_1773648651485",
+    "createdAt": "2026-03-16T08:10:51.604Z"
+  },
+  {
+    "id": "tx_1773648655842_262",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0001,
+    "route": "SOL -> BONK",
+    "txHash": "384859268_1773648655784",
+    "createdAt": "2026-03-16T08:10:55.842Z"
+  },
+  {
+    "id": "tx_1773648660354_763",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0001,
+    "route": "SOL -> NEW_7GCi",
+    "txHash": "4aP3jbAX6fhcAWiHoPNn7pkLtJjSyu5DBRbJzvMFRebjEXmwEiGXYkogYk69vzVLGEWkWe9oKAxc1JD1ytXsXnZV",
+    "createdAt": "2026-03-16T08:11:00.354Z"
+  },
+  {
+    "id": "tx_1773648664865_399",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0001,
+    "route": "SOL -> WIF",
+    "txHash": "384859291_1773648664813",
+    "createdAt": "2026-03-16T08:11:04.865Z"
+  },
+  {
+    "id": "tx_1773648669299_299",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0001,
+    "route": "SOL -> NEW_7GCi",
+    "txHash": "41casSt7e2MZZRnjANbe4ytzojKcW5fDtp4bTbNMKQPbzCUeZ7jbenpvdned1ML27Xv58hCsFWH7Ye5B6NmwiscA",
+    "createdAt": "2026-03-16T08:11:09.299Z"
+  },
+  {
+    "id": "tx_1773648673793_983",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0001,
+    "route": "SOL -> NEW_7GCi",
+    "txHash": "uHxm1gqhxgnPRZMhhZjTREJPJgqauCVCvwEXjri68Vhv7dakJ3DBofa9XCz6JmnTbRBkLLBZGWhHKCojFVtUGLp",
+    "createdAt": "2026-03-16T08:11:13.793Z"
+  },
+  {
+    "id": "tx_1773648678253_87",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0001,
+    "route": "SOL -> NEW_7GCi",
+    "txHash": "27yemtSzay7TAdtXh8LGQF4Vqvmp7bwakpQ9grn6J1khQVQi9ft4hAeJPfN4vd2JKyqqDmjPQANDoeUrSKjriFs7",
+    "createdAt": "2026-03-16T08:11:18.253Z"
+  },
+  {
+    "id": "tx_1773648682734_358",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0001,
+    "route": "SOL -> NEW_7GCi",
+    "txHash": "384859336_1773648682688",
+    "createdAt": "2026-03-16T08:11:22.734Z"
+  },
+  {
+    "id": "tx_1773648687346_227",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0001,
+    "route": "SOL -> WIF",
+    "txHash": "384859348_1773648687287",
+    "createdAt": "2026-03-16T08:11:27.346Z"
+  },
+  {
+    "id": "tx_1773648692063_193",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0001,
+    "route": "SOL -> NEW_7GCi",
+    "txHash": "3Kio3vspPUwL5Uy9PmSnab4KjLYCkN4CnEofCGCjomF7LoxnHfSdhozdXqSKKUDfHycVc2bC63FQfHdHQGdkWDLJ",
+    "createdAt": "2026-03-16T08:11:32.063Z"
+  },
+  {
+    "id": "tx_1773648696022_955",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0001,
+    "route": "SOL -> USDC",
+    "txHash": "384859371_1773648695949",
+    "createdAt": "2026-03-16T08:11:36.022Z"
+  },
+  {
+    "id": "tx_1773648701270_951",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0001,
+    "route": "SOL -> NEW_7GCi",
+    "txHash": "384859385_1773648701126",
+    "createdAt": "2026-03-16T08:11:41.270Z"
+  },
+  {
+    "id": "tx_1773648705325_437",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0001,
+    "route": "SOL -> NEW_7GCi",
+    "txHash": "384859393_1773648705285",
+    "createdAt": "2026-03-16T08:11:45.325Z"
+  },
+  {
+    "id": "tx_1773648709672_415",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0001,
+    "route": "SOL -> USDC",
+    "txHash": "39uvJ6zkyvBYk88LJ9MY8Qd4SftAjnR8K8d4gkEvQGGVBTZA4sZfkSDnMSw8TNWaMqCdJg7jEzbtAnQxRheTpoVf",
+    "createdAt": "2026-03-16T08:11:49.672Z"
+  },
+  {
+    "id": "tx_1773648715004_802",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0007,
+    "route": "SOL -> 📈_VOL_8dan",
+    "txHash": "wLR6ZSk9Bid5TSqiUfdLRsfQBhPcBv4KX9zGJa5LYmmnn1H3zro5b5ER9LrB9QBZevEUsbPDEKD3wRPkBJiKeSh",
+    "createdAt": "2026-03-16T08:11:55.004Z"
+  },
+  {
+    "id": "tx_1773648718824_139",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0001,
+    "route": "SOL -> NEW_7GCi",
+    "txHash": "384859423_1773648718775",
+    "createdAt": "2026-03-16T08:11:58.824Z"
+  },
+  {
+    "id": "tx_1773648723680_287",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0006,
+    "route": "SOL -> 📈_VOL_ApW3",
+    "txHash": "5NBcyPPu9CsybFcdwdrpTQoMcBjqThyJHved7UZ6yEw29xfWBLN919zVWXYQxouas21DDWSA5Yo9wJQ8EQ9E6D7Y",
+    "createdAt": "2026-03-16T08:12:03.680Z"
+  },
+  {
+    "id": "tx_1773648727942_675",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0001,
+    "route": "SOL -> WIF",
+    "txHash": "38eNWbVe8ux4HANTgVNfFHsgzMc5KtYUaRRBiRA92jQzxtwjoU4ChZGjxDK6QLMxNhPvucv5SjWKm7tD6cZ4bQPM",
+    "createdAt": "2026-03-16T08:12:07.942Z"
+  },
+  {
+    "id": "tx_1773648732499_271",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0001,
+    "route": "SOL -> WIF",
+    "txHash": "N7FTuVtC3bUJekr5eRRt5wYHLNeLGqSaMjt8NLNapy7kdmUzdpWTuXYAa3mguYiEfQzfpQ97ai5QTm4m8jBBbcV",
+    "createdAt": "2026-03-16T08:12:12.499Z"
+  },
+  {
+    "id": "tx_1773648736867_94",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0001,
+    "route": "SOL -> NEW_HgBR",
+    "txHash": "8YFdaCeGuqaecUu6aYpmJBA5pk1Uj8LC3dF3g31gsmZxFiopQHqsjiFLFiGxb6dTcSQ6EjfaB3ez5KD2jDnfg2L",
+    "createdAt": "2026-03-16T08:12:16.867Z"
+  },
+  {
+    "id": "tx_1773648741500_206",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0001,
+    "route": "SOL -> NEW_7GCi",
+    "txHash": "2QYauQrmQuGTWpDoJvFLY2R4oKvd9dQJuvkXcvrvAujC1wJeuxoHU5kzN42hqtYsyc2kgnx1bzjEjZd6Ek8kZvFY",
+    "createdAt": "2026-03-16T08:12:21.500Z"
+  },
+  {
+    "id": "tx_1773648745831_502",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0005,
+    "route": "SOL -> 📈_VOL_6dKC",
+    "txHash": "64Ley7q5KfJiXLGsVpSGyFu8Pn72WwUzbBEv31hmK5yxXq9rMBm5KeBxTStb5xXQBXGyn8LjFKUn33N6NBg4fZPG",
+    "createdAt": "2026-03-16T08:12:25.831Z"
+  },
+  {
+    "id": "tx_1773648750457_631",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0001,
+    "route": "SOL -> NEW_7GCi",
+    "txHash": "384859501_1773648750407",
+    "createdAt": "2026-03-16T08:12:30.457Z"
+  },
+  {
+    "id": "tx_1773648754909_757",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0006,
+    "route": "SOL -> 📈_VOL_ApW3",
+    "txHash": "X7jHCM3j4NKiJf4AVKKKqE6NTakHgbU8dUxRcofgEsDb8hZ95hG9CWz7S5evm5YDbx1C8VR9hvpGXHZa96Kep9Q",
+    "createdAt": "2026-03-16T08:12:34.909Z"
+  },
+  {
+    "id": "tx_1773648759399_998",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0005,
+    "route": "SOL -> 📈_VOL_6dKC",
+    "txHash": "3DB8re1t9whRgK9BBpj4TFasuLWYft7zz4q8aFBQ6ETJpTkYwsH4wrz2rrTpr19kX2Yb1pKVUXzvfXNRpuC2c2qX",
+    "createdAt": "2026-03-16T08:12:39.399Z"
+  },
+  {
+    "id": "tx_1773648763987_10",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0001,
+    "route": "SOL -> NEW_7GCi",
+    "txHash": "384859534_1773648763922",
+    "createdAt": "2026-03-16T08:12:43.987Z"
+  },
+  {
+    "id": "tx_1773648768432_400",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0001,
+    "route": "SOL -> NEW_7GCi",
+    "txHash": "5Kn7fFEPdC5sCyER9HbyEfDMRHwksNVN8RhWzcidy935aLauTumZcdHqMrMiz23L8LaoFQsjZLCW1dTuyWPMmz9J",
+    "createdAt": "2026-03-16T08:12:48.432Z"
+  },
+  {
+    "id": "tx_1773648772736_639",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0001,
+    "route": "SOL -> NEW_HgBR",
+    "txHash": "384859557_1773648772689",
+    "createdAt": "2026-03-16T08:12:52.736Z"
+  },
+  {
+    "id": "tx_1773648777348_430",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0006,
+    "route": "SOL -> 📈_VOL_HfBX",
+    "txHash": "5tDJnKZANUL7VGDg4CoKCGud9aYeccR6uf5baJmFF3TEyw7ot7YbP6kFHLwhY9iwU74LtoHsXYPkXDmD7U3WhrEi",
+    "createdAt": "2026-03-16T08:12:57.348Z"
+  },
+  {
+    "id": "tx_1773648781727_776",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0006,
+    "route": "SOL -> 📈_VOL_HfBX",
+    "txHash": "384859580_1773648781681",
+    "createdAt": "2026-03-16T08:13:01.727Z"
+  },
+  {
+    "id": "tx_1773648786532_288",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0001,
+    "route": "SOL -> RAY",
+    "txHash": "5u5MqLGyFFUaPqLRwbFMEP6MFjbXShyoRyWK3N4sUfQ3Nb2HH9pPxw3fR5x6tK54VNPESXEU6BynxYwU3p7pn9nz",
+    "createdAt": "2026-03-16T08:13:06.532Z"
+  },
+  {
+    "id": "tx_1773648791215_791",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0006,
+    "route": "SOL -> 📈_VOL_8dan",
+    "txHash": "NghKxHa9wazQfRLMYU9gtREcioYc4R1U4Eo5ADvQdaz4FRKxs11xgyr4VhWobotsJkwmRV475jSP2RtrNi9FCLU",
+    "createdAt": "2026-03-16T08:13:11.215Z"
+  },
+  {
+    "id": "tx_1773648795374_342",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0006,
+    "route": "SOL -> 📈_VOL_HfBX",
+    "txHash": "2wieyYJQEBUohfWqSSZAen4ZzaABehCuN6dF7PSZ8jLyL4FqKTXuqerJefN9FXYwZ62CSM2GbfRG68BZBhAW3hRu",
+    "createdAt": "2026-03-16T08:13:15.374Z"
+  },
+  {
+    "id": "tx_1773648799918_729",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0001,
+    "route": "SOL -> NEW_7GCi",
+    "txHash": "384859628_1773648799854",
+    "createdAt": "2026-03-16T08:13:19.918Z"
+  },
+  {
+    "id": "tx_1773648804411_765",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0001,
+    "route": "SOL -> NEW_J1to",
+    "txHash": "384859640_1773648804359",
+    "createdAt": "2026-03-16T08:13:24.411Z"
+  },
+  {
+    "id": "tx_1773648809031_132",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0001,
+    "route": "SOL -> NEW_7GCi",
+    "txHash": "3Tu1etoW1vK9eY6mTvmQrSrwkucYnWSTWXeV3phk59QroTWuTTRtCBRgzuk1w7MFZWoHMJ2DFFEGvMHeo2G85tEx",
+    "createdAt": "2026-03-16T08:13:29.031Z"
+  },
+  {
+    "id": "tx_1773648813356_783",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0006,
+    "route": "SOL -> 📈_VOL_ApW3",
+    "txHash": "384859661_1773648813304",
+    "createdAt": "2026-03-16T08:13:33.356Z"
+  },
+  {
+    "id": "tx_1773648822386_881",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0006,
+    "route": "SOL -> 📈_VOL_4WJL",
+    "txHash": "384859683_1773648822201",
+    "createdAt": "2026-03-16T08:13:42.386Z"
+  },
+  {
+    "id": "tx_1773648827033_47",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0001,
+    "route": "SOL -> NEW_7dHb",
+    "txHash": "2yg4iqTNkmaBzSy6tPeaPX7AAAKWe1eT938DWEDbdQpvtDufVBBjnXxgAyyP2w5AanrXeNGEqzfHrSx3Bf4XirBw",
+    "createdAt": "2026-03-16T08:13:47.033Z"
+  },
+  {
+    "id": "tx_1773648831546_126",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0.0014,
+    "route": "SOL -> 📈_VOL_HfBX",
+    "txHash": "3LzpQjQbgzGiKuheaRQ9T4RkCrRepgDJMb8ozRk1QxJi18o679mCz95SBmnYUuVn1Ls97CTNV76mdoHLscoo5vW8",
+    "createdAt": "2026-03-16T08:13:51.546Z"
+  },
+  {
+    "id": "tx_1773648836000_629",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0001,
+    "route": "SOL -> NEW_J1to",
+    "txHash": "2zcHEBVJtao8JxFTqFgYdo5dRQyH21MonLCrkjQdMEzvu91nzHHu49YPJaZ7z486Uzid2gyrgJp4KpQBHbS7WmDP",
+    "createdAt": "2026-03-16T08:13:56.000Z"
+  },
+  {
+    "id": "tx_1773648840434_124",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0006,
+    "route": "SOL -> 📈_VOL_ApW3",
+    "txHash": "af99omMJqRD6yHS64oe2Hm1Y1SkSnG1qPJ4zjiX2UaeefwNHcTB1VgG1CZoBrGxd7nVjgQMDgDubTptAJVPxspZ",
+    "createdAt": "2026-03-16T08:14:00.434Z"
+  },
+  {
+    "id": "tx_1773648841716_661",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> WIF",
+    "txHash": "384859734_1773648841601",
+    "createdAt": "2026-03-16T08:14:01.716Z"
+  },
+  {
+    "id": "tx_1773648845272_264",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0006,
+    "route": "SOL -> 📈_VOL_HfBX",
+    "txHash": "384859742_1773648845212",
+    "createdAt": "2026-03-16T08:14:05.272Z"
+  },
+  {
+    "id": "tx_1773648849445_424",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0001,
+    "route": "SOL -> RAY",
+    "txHash": "384859754_1773648849377",
+    "createdAt": "2026-03-16T08:14:09.445Z"
+  },
+  {
+    "id": "tx_1773648853935_520",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0001,
+    "route": "SOL -> NEW_7GCi",
+    "txHash": "384859765_1773648853875",
+    "createdAt": "2026-03-16T08:14:13.935Z"
+  },
+  {
+    "id": "tx_1773648872557_602",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0001,
+    "route": "SOL -> NEW_HgBR",
+    "txHash": "5HsArahVCmcFFzsWgfCfC1YAof5FS5M3K2iHCHUhAopCqDn3jgRRG3fbsZRXvokfmmWajYWKfqrc7YYhxAHwECwH",
+    "createdAt": "2026-03-16T08:14:32.557Z"
+  },
+  {
+    "id": "tx_1773648873835_240",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0006,
+    "route": "SOL -> 📈_VOL_4WJL",
+    "txHash": "384859815_1773648873782",
+    "createdAt": "2026-03-16T08:14:33.835Z"
+  },
+  {
+    "id": "tx_1773648874072_427",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0006,
+    "route": "SOL -> 📈_VOL_4WJL",
+    "txHash": "384859816_1773648874019",
+    "createdAt": "2026-03-16T08:14:34.072Z"
+  },
+  {
+    "id": "tx_1773648876438_745",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0006,
+    "route": "SOL -> 📈_VOL_8dan",
+    "txHash": "384859822_1773648876386",
+    "createdAt": "2026-03-16T08:14:36.438Z"
+  },
+  {
+    "id": "tx_1773648881298_775",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": -0.0001,
+    "route": "SOL -> RAY",
+    "txHash": "44PXHpEhysVpE4kNYyJG1PLQaA7WaRKt4HWoEfJcF71EXkEHsc2MdR8dVDmqkfCSFAxCERcRd7SHaHsktJoT56op",
+    "createdAt": "2026-03-16T08:14:41.298Z"
+  },
+  {
+    "id": "tx_1773649017819_257",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> 📈_VOL_Dfh5",
+    "txHash": "4QPHHRXwjmVxsJbCkytwnseVDx5eYgB9cPHFNiSjqo6a7z6MzqcbaEJZpqZdcS9LGLQWZbBTs3oexhakoqL1huCU",
+    "createdAt": "2026-03-16T08:16:57.819Z"
+  },
+  {
+    "id": "tx_1773649707500_248",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> NEW_2zMM",
+    "txHash": "67QdU1mGhCLt45CVMpv96vkPVpeC2QUeegrUbRNk1HVCFi9nohPz1Y5sadLj79NjNKCoYY2vKrirByddFJ9DyNdp",
+    "createdAt": "2026-03-16T08:28:27.500Z"
+  },
+  {
+    "id": "tx_1773649883068_729",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> 📈_VOL_pump",
+    "txHash": "3g8gpzDmgeYHfWVbjNfutjeX9ta49XDxGRh2HgEeR59P2H3sdsRRH5bbUqThqdMkj5GWqtGXmZCf9TYJEUK6Rnmd",
+    "createdAt": "2026-03-16T08:31:23.068Z"
+  },
+  {
+    "id": "tx_1773650288723_513",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> 📈_VOL_DezX",
+    "txHash": "384863377_1773650288583",
+    "createdAt": "2026-03-16T08:38:08.723Z"
+  },
+  {
+    "id": "tx_1773650834047_517",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> 📈_VOL_HhJp",
+    "txHash": "384864744_1773650833891",
+    "createdAt": "2026-03-16T08:47:14.047Z"
+  },
+  {
+    "id": "tx_1773651127122_114",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> 📈_VOL_9BB6",
+    "txHash": "2cEGMdR6Wxgg5skihuiewGYFe5bfRtaEbCjkZAhUWhHwTA1rSHSBi8wwDwc6QMJVUBYcuaSRpEBkPwq61zQbsxjs",
+    "createdAt": "2026-03-16T08:52:07.122Z"
+  },
+  {
+    "id": "tx_1773651172496_281",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> 📈_VOL_9BB6",
+    "txHash": "28959fqvW11VrTpE46uhEXHddUCzfUwZqAFF5Qzyf2hMTGpu26ReH1GvHM8NFzt59Te5uPLYQW5Rsm6T54N8w5Mv",
+    "createdAt": "2026-03-16T08:52:52.496Z"
+  },
+  {
+    "id": "tx_1773651870498_891",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> 📈_VOL_Es9v",
+    "txHash": "384867357_1773651870321",
+    "createdAt": "2026-03-16T09:04:30.498Z"
+  },
+  {
+    "id": "tx_1773651974181_837",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> NEW_2b1k",
+    "txHash": "31DDhnRsyM3sA1MdiVAKR9AAzLv6bAZqWX9F8E3cCXebZGK9wrCnQCqasLYrehYkvwLJowNbuA4bLajcJtPiJ42g",
+    "createdAt": "2026-03-16T09:06:14.181Z"
+  },
+  {
+    "id": "tx_1773652334849_30",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> 📈_VOL_SKRb",
+    "txHash": "3gU97h7Seb9eqzEnQwSEF2VYBDrThmVLNQkAW6HcVcTVydQAEc7fxr5H6r2Y73TtAACohpaKFd4EHYt1fuPTiMVJ",
+    "createdAt": "2026-03-16T09:12:14.849Z"
+  },
+  {
+    "id": "tx_1773652415887_705",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> 📈_VOL_Es9v",
+    "txHash": "4Dy6RXzQQkaqfQfTtYAmkbmxJZePiYSGamg8RrDACEv8aXjDCwV3ZDG6aRij4ccrb8HvGfo24QFC42zL9fD4MbE3",
+    "createdAt": "2026-03-16T09:13:35.887Z"
+  },
+  {
+    "id": "tx_1773652903069_783",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> 📈_VOL_DezX",
+    "txHash": "VF6gJWa8X29tBvuMtshHdfUmGXSkVJW5pd7frpdhs1QXMDAZqSJAiNYQFegKauf8a2NsTM55aneXESpXme1EWNG",
+    "createdAt": "2026-03-16T09:21:43.069Z"
+  },
+  {
+    "id": "tx_1773653484083_222",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "SUCCESS",
+    "profitAmt": 0,
+    "route": "SOL -> 📈_VOL_Dfh5",
+    "txHash": "4o7uTcfqiynJ1hiNXkE79GcCcw5z1iVJWKs2DdgAQn2uEvrcTi4VdoGC6Y92p2EoPSZecEZ73pRJcni5ioZXVDh3",
+    "createdAt": "2026-03-16T09:31:24.083Z"
+  },
+  {
+    "id": "tx_1773708800799_790",
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "walletId": "ABPRFJuheqRPUDrrxfAvDSWQ5y9WiVL6QhoXRvhyKQSc",
+    "status": "RATE LIMITED",
+    "profitAmt": 0,
+    "route": "SOL -> NEW_HZ1J",
+    "txHash": "atomic_1773708800672",
+    "createdAt": "2026-03-17T00:53:20.799Z"
+  }
+]

@@ -1,0 +1,65 @@
+﻿Run a command with secrets injected into the environment.
+Secrets can also be mounted to an ephemeral file using the --mount flag.
+
+To view the CLI's active configuration, run `doppler configure debug`
+
+Usage:
+  doppler run [command] [flags]
+  doppler run [command]
+
+Examples:
+doppler run -- YOUR_COMMAND --YOUR-FLAG
+doppler run --command "YOUR_COMMAND && YOUR_OTHER_COMMAND"
+doppler run --mount secrets.json -- cat secrets.json
+
+Available Commands:
+  clean       Delete old fallback files
+
+Flags:
+      --command string                    command to execute (e.g. "echo hi")
+  -c, --config string                     config (e.g. dev)
+      --dynamic-ttl duration              (BETA) dynamic secrets will expire after specified duration, (e.g. '3h', '15m')
+      --fallback string                   path to the fallback file. encrypted secrets are written to this file after each successful fetch. secrets will be read from this file if subsequent connections are unsuccessful.
+      --fallback-only                     read all secrets directly from the fallback file, without contacting Doppler. secrets will not be updated. (implies --fallback-readonly and --no-liveness-ping)
+      --fallback-readonly                 disable modifying the fallback file. secrets can still be read from the file.
+      --forward-signals                   forward signals to the child process (defaults to false when STDOUT is a TTY) (default true)
+  -h, --help                              help for run
+      --mount string                      write secrets to an ephemeral file, accessible at DOPPLER_CLI_SECRETS_PATH. when enabled, secrets are NOT injected into the environment
+      --mount-format string               file format to use. if not specified, will be auto-detected from mount name. one of [env json dotnet-json template env-no-quotes docker] (default "json")
+      --mount-max-reads int               maximum number of times the mounted secrets file can be read (0 for unlimited)
+      --mount-template string             template file to use. secrets will be rendered into this template before mount. see 'doppler secrets substitute' for more info.
+      --name-transformer string           output name transformer. one of upper-camel, camel, lower-kebab, lower-snake, tf-var, dotnet-env
+      --no-cache                          disable using the fallback file to speed up fetches. the fallback file is only used when the API indicates that it's still current.
+      --no-exit-on-missing-only-secrets   do not exit on missing secrets via --only-secrets
+      --no-exit-on-write-failure          do not exit if unable to write the fallback file
+      --no-fallback                       disable reading and writing the fallback file (implies --no-cache)
+      --no-liveness-ping                  disable the periodic liveness ping
+      --offline                           alias for --fallback-only
+      --only-secrets strings              only include the specified secrets
+      --passphrase string                 passphrase to use for encrypting the fallback file. the default passphrase is computed using your current configuration.
+      --preserve-env string[="true"]      a comma separated list of secrets for which the existing value from the environment, if any, should take precedence over the Doppler secret value. value must be specified with an equals sign (e.g. --preserve-env="FOO,BAR"). specify "true" to give precedence to all existing environment values, however this has potential security implications and should be used at your own risk. (default "false")
+  -p, --project string                    project (e.g. backend)
+      --watch                             (BETA) automatically restart the process when secrets change
+
+Global Flags:
+      --api-host string                 The host address for the Doppler API (default "https://api.doppler.com")
+      --attempts int                    number of http request attempts made before failing (default 5)
+      --config-dir string               config directory (default "C:\\Users\\admin\\.doppler")
+      --dashboard-host string           The host address for the Doppler Dashboard (default "https://dashboard.doppler.com")
+      --debug                           output additional information
+      --dns-resolver-address string     address to use for DNS resolution (default "1.1.1.1:53")
+      --dns-resolver-proto string       protocol to use for DNS resolution (default "udp")
+      --dns-resolver-timeout duration   max dns lookup duration (default 5s)
+      --enable-dns-resolver             bypass the OS's default DNS resolver
+      --json                            output json
+      --no-check-version                disable checking for Doppler CLI updates
+      --no-read-env                     do not read config from the environment
+      --no-timeout                      disable http timeout
+      --no-verify-tls                   do not verify the validity of TLS certificates on HTTP requests (not recommended)
+      --print-config                    output active configuration
+      --scope string                    the directory to scope your config to (default ".")
+      --silent                          disable output of info messages
+      --timeout duration                max http request duration (default 10s)
+  -t, --token string                    doppler token
+
+Use "doppler run [command] --help" for more information about a command.
