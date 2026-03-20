@@ -5,10 +5,10 @@
 set -e
 
 echo "🚀 Initiating Sub-5ms Trading Engine Sync..."
-cd /home/pcprotocol/optimized-jupiter-bot || exit
+cd /opt/pcprotocol/optimized-jupiter-bot || exit
 
 echo "📦 Pulling latest refinement matrices from upstream..."
-git pull origin main
+git pull origin master
 
 echo "⚙️ Installing physical dependencies silently..."
 npm install --silent
