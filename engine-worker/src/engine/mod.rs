@@ -76,8 +76,9 @@ impl VaultExecutor {
         let jitter = rng.random_range(1..=50_000);
         let randomized_jito_tip = jito_tip_lamports + jitter;
 
-        let jito_tip_account = Pubkey::from_str("96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5").unwrap();
-        ixs.push(system_instruction::transfer(&self.admin.pubkey(), &jito_tip_account, randomized_jito_tip));
+        // Helius SWQOS Tip Account required for direct injection validation
+        let helius_tip_account = Pubkey::from_str("3KCKozbAaF75qEU33jtzozcJ29yJuaLJTy2jFdzUY8b").unwrap();
+        ixs.push(system_instruction::transfer(&self.admin.pubkey(), &helius_tip_account, randomized_jito_tip));
 
         // 1. Borrow Instruction
         let mut borrow_data = get_discriminator("borrow_for_arbitrage").to_vec();
