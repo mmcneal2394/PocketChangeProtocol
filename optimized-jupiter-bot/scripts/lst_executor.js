@@ -23,9 +23,9 @@ const { Connection, Keypair, VersionedTransaction, Transaction } = require('@sol
 const fs         = require('fs');
 
 // ── Config ────────────────────────────────────────────────────────────────────
-const HELIUS_RPC = process.env.RPC_ENDPOINT || 'https://mainnet.helius-rpc.com/?api-key=df082a16-aebf-4ec4-8ad6-86abfa06c8fc';
-const CHAIN_RPC  = 'https://solana-mainnet.core.chainstack.com/95d603f3d634acfbf2ac5a57a32baf97';
-const JUP_KEY    = process.env.JUPITER_API_KEY || '05aa94b2-05d5-4993-acfe-30e18dc35ff1';
+const HELIUS_RPC = process.env.RPC_ENDPOINT || 'https://rpc.helius.xyz/?api-key=YOUR_HELIUS_API_KEY';
+const CHAIN_RPC  = 'https://rpc.YOUR_CHAINSTACK_ENDPOINT';
+const JUP_KEY    = process.env.JUPITER_API_KEY || 'YOUR_JUPITER_API_KEY';
 const JUP_BASE   = 'https://api.jup.ag/swap/v1';
 const JUP_H_GET  = { 'x-api-key': JUP_KEY };
 const JUP_H      = { 'Content-Type': 'application/json', 'x-api-key': JUP_KEY };

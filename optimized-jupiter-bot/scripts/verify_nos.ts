@@ -29,22 +29,22 @@ async function verify() {
         throw new Error("Rate limit strictly blocked over 75s.");
     }
 
-    const q1Url = `https://lite-api.jup.ag/swap/v1/quote?inputMint=So11111111111111111111111111111111111111112&outputMint=nosXBqwB22HkM3pJo9YqQhG1hHh2gQ5pXhS7vXkXVmQ&amount=10000000&slippageBps=50`;
+    const q1Url = `https://quote-api.jup.ag/v6/quote?inputMint=So11111111111111111111111111111111111111112&outputMint=nosXBqwB22HkM3pJo9YqQhG1hHh2gQ5pXhS7vXkXVmQ&amount=10000000&slippageBps=50`;
     const quote1 = await safeFetchJSON(q1Url, { headers: { 'x-api-key': API_KEY } });
     console.log(`📊 Quote 1 [SOL -> NOS]: ${Number(quote1.outAmount) / 1e6} NOS`);
     
-    const q2Url = `https://lite-api.jup.ag/swap/v1/quote?inputMint=nosXBqwB22HkM3pJo9YqQhG1hHh2gQ5pXhS7vXkXVmQ&outputMint=So11111111111111111111111111111111111111112&amount=${quote1.outAmount}&slippageBps=50`;
+    const q2Url = `https://quote-api.jup.ag/v6/quote?inputMint=nosXBqwB22HkM3pJo9YqQhG1hHh2gQ5pXhS7vXkXVmQ&outputMint=So11111111111111111111111111111111111111112&amount=${quote1.outAmount}&slippageBps=50`;
     const quote2 = await safeFetchJSON(q2Url, { headers: { 'x-api-key': API_KEY } });
     console.log(`📊 Quote 2 [NOS -> SOL]: ${Number(quote2.outAmount) / 1e9} SOL`);
     
     console.log("📦 Requesting distinct Raw Execution Instructions...");
     
-    const ix1Res = await safeFetchJSON('https://lite-api.jup.ag/swap/v1/swap-instructions', {
+    const ix1Res = await safeFetchJSON('https://quote-api.jup.ag/v6/swap-instructions', {
         method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
         body: JSON.stringify({ quoteResponse: quote1, userPublicKey: config.WALLET_PUBLIC_KEY, wrapAndUnwrapSol: true })
     });
 
-    const ix2Res = await safeFetchJSON('https://lite-api.jup.ag/swap/v1/swap-instructions', {
+    const ix2Res = await safeFetchJSON('https://quote-api.jup.ag/v6/swap-instructions', {
         method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
         body: JSON.stringify({ quoteResponse: quote2, userPublicKey: config.WALLET_PUBLIC_KEY, wrapAndUnwrapSol: true })
     });

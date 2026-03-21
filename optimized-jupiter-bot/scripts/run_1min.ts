@@ -45,7 +45,7 @@ async function getWalletBalance() {
 }
 
 async function findAtomicOpportunity(targetMint: string, targetSymbol: string, amountInLamports: number) {
-    const API_KEY = config.JUPITER_API_KEY || '05aa94b2-05d5-4993-acfe-30e18dc35ff1';
+    const API_KEY = config.JUPITER_API_KEY || 'YOUR_JUPITER_API_KEY';
     const fetch = require('node-fetch');
 
     async function safeFetch(url: string, options: any) {

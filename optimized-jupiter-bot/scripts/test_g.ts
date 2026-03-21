@@ -2,7 +2,7 @@ import Client from '@triton-one/yellowstone-grpc';
 
 async function run() {
     console.log("Starting Geyser Test...");
-    const client = new Client("https://yellowstone-solana-mainnet.core.chainstack.com:443", "95d603f3d634acfbf2ac5a57a32baf97", undefined);
+    const client = new Client("https://yellowstone-solana-mainnet.core.chainstack.com:443", "YOUR_CHAINSTACK_KEY", undefined);
     
     try {
         const stream = await client.subscribe();
