@@ -1,5 +1,5 @@
 import ccxt from 'ccxt';
-import fetch from 'cross-fetch';
+import fetch from 'node-fetch';
 
 const TARGETS = [
     { mint: "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm", sym: "WIF", cexSymbol: "WIF/USDT", decimals: 6 },

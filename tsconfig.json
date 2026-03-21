@@ -1,11 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2017",
-    "lib": [
-      "dom",
-      "dom.iterable",
-      "esnext"
-    ],
+    "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
@@ -23,9 +19,7 @@
       }
     ],
     "paths": {
-      "@/*": [
-        "./src/*"
-      ]
+      "@/*": ["./src/*"]
     }
   },
   "include": [
@@ -34,17 +28,7 @@
     "**/*.tsx",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
-    "**/*.mts",
-    ".next_build/types/**/*.ts",
-    ".next_build/dev/types/**/*.ts",
-    ".next_build2/types/**/*.ts",
-    ".next_build2/dev/types/**/*.ts"
+    "**/*.mts"
   ],
-  "exclude": [
-    "node_modules",
-    "gsd-2",
-    "engine-worker",
-    "scripts",
-    "optimized-jupiter-bot"
-  ]
+  "exclude": ["node_modules", "anchor", "scripts"]
 }

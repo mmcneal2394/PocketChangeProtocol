@@ -1,11 +1,33 @@
 import type { Metadata } from 'next';
 import './globals.css';
-import Sidebar from '@/components/Sidebar';
-import AppWalletProvider from '@/components/AppWalletProvider';
+import AppWrapper from '@/components/AppWrapper';
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://pcprotocol.dev'),
   title: 'PocketChange | DeFi Arbitrage Vault',
   description: 'Turn your pocket change into institutional-grade arbitrage returns on Solana.',
+  openGraph: {
+    title: 'PocketChange | DeFi Arbitrage Vault',
+    description: 'Turn your pocket change into institutional-grade arbitrage returns on Solana.',
+    url: 'https://pcprotocol.dev',
+    siteName: 'PocketChange Protocol',
+    images: [
+      {
+        url: 'https://cdn.helius-rpc.com/cdn-cgi/image//https://ipfs.io/ipfs/QmQwvUsgwBUa8PmKhTUgG6o1LL8PvUuo7XtkcVBNtQqry4',
+        width: 800,
+        height: 600,
+        alt: 'PocketChange Protocol Banner',
+      },
+    ],
+    locale: 'en_US',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'PocketChange | DeFi Arbitrage Vault',
+    description: 'Turn your pocket change into institutional-grade arbitrage returns on Solana.',
+    images: ['https://cdn.helius-rpc.com/cdn-cgi/image//https://ipfs.io/ipfs/QmQwvUsgwBUa8PmKhTUgG6o1LL8PvUuo7XtkcVBNtQqry4'],
+  },
 };
 
 export default function RootLayout({
@@ -20,12 +42,9 @@ export default function RootLayout({
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </head>
       <body suppressHydrationWarning>
-        <AppWalletProvider>
-          <Sidebar />
-          <main style={{ marginLeft: "280px", padding: "32px", width: "calc(100% - 280px)", minHeight: "100vh" }}>
+        <AppWrapper>
             {children}
-          </main>
-        </AppWalletProvider>
+        </AppWrapper>
       </body>
     </html>
   );

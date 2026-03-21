@@ -16,10 +16,8 @@ pub struct TradeLogEvent {
     pub tx_signature: String,
     pub profit_sol: f64,
     pub status: String,
-    pub error_msg: Option<String>,
-    pub latency_ms: Option<u64>,
-    pub slippage_bps: Option<f64>,
-    pub mev_tip_paid: Option<u64>
+    pub success: bool,
+    pub error_msg: Option<String>
 }
 
 impl DbClient {
@@ -51,31 +49,6 @@ impl DbClient {
         }
 
         println!("[Audit Pipeline] Submitted execution state -> telemetry.jsonl");
-
-        // Reflect to pcprotocol.dev dashboard!
-        let internal_api_key = std::env::var("INTERNAL_API_KEY").unwrap_or_else(|_| "demo_auth_123".to_string());
-        let payload = serde_json::json!({
-            "walletPubkey": event.tenant_id.clone(),
-            "status": event.status.clone(),
-            "profitAmt": event.profit_sol,
-            "route": event.route.clone(),
-            "txHash": event.tx_signature.clone()
-        });
-        let payload_str = payload.to_string();
-        tokio::task::spawn_blocking(move || {
-            let _ = std::process::Command::new("curl")
-                .arg("-s")
-                .arg("-X")
-                .arg("POST")
-                .arg("-H")
-                .arg("Content-Type: application/json")
-                .arg("-H")
-                .arg(format!("Authorization: Bearer {}", internal_api_key))
-                .arg("-d")
-                .arg(&payload_str)
-                .arg("https://pcprotocol.dev/api/log_trade")
-                .output();
-        });
 
         Ok(())
     }

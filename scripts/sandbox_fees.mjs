@@ -1,6 +1,6 @@
 import { Connection, PublicKey } from "@solana/web3.js";
 
-const RPC_ENDPOINT = "https://solana-mainnet.core.chainstack.com/95d603f3d634acfbf2ac5a57a32baf97";
+const RPC_ENDPOINT = "https://mainnet.helius-rpc.com/?api-key=df082a16-aebf-4ec4-8ad6-86abfa06c8fc";
 const connection = new Connection(RPC_ENDPOINT, "confirmed");
 
 const TARGETS = [

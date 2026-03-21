@@ -36,15 +36,15 @@ PocketChange is the first **community‑owned arbitrage protocol** on Solana. By
 
 ### How It Works
 
-1. **Users deposit** USDC, SOL, or $PCP into the PocketChange Vault.
+1. **Users deposit** USDC or SOL into the PocketChange Vault and receive **$PCP tokens** proportional to their stake.
 2. **The vault executes** automated arbitrage strategies across:
    - Solana DEXs (Raydium, Orca, Meteora)
    - Centralized exchanges (Bitget, Kraken)
    - Flash loan opportunities
    - Prediction markets (Polymarket)
    - Negative lending rate plays
-3. **Profits are distributed** – 50% goes to contributors, 30% to the treasury for development and buybacks, and 20% to the founder.
-4. **$PCP holders** govern the protocol, vote on strategies, and earn boosted rewards.
+3. **Profits are compounded** – 80% dynamically inflates the underlying value of all circulating $PCP tokens, and 20% is routed to the protocol treasury.
+4. **Withdrawal** – Users burn their $PCP at any time to reclaim base assets, subject to a **0.5% unstaking fee** that protects liquidity and rewards long-term holders.
 
 ### Why Solana?
 - **Sub‑second finality** – Enables latency‑sensitive arbitrage.
@@ -71,10 +71,10 @@ PocketChange is the first **community‑owned arbitrage protocol** on Solana. By
 
 $PCP is the **economic backbone** of the protocol:
 
-- **Staking** – Stake $PCP to earn 50% of all arbitrage profits (paid in USDC or $PCP).
-- **Governance** – Propose and vote on new strategies, risk parameters, and treasury allocations.
-- **Fee Discounts** – Pay lower vault fees when holding $PCP.
-- **Liquidity Mining** – Provide LP pairs (e.g., $PCP‑USDC) to earn additional rewards.
+- **Auto-Compounding Pool Share** – $PCP serves as the native liquid staking token. Its value automatically inflates against the underlying deposit assets as arbitrage profits are secured by the vault.
+- **Deflationary Mechanics** – A smart-contract enforced **0.5% unstaking fee** is levied on withdrawals, protecting the pool and directly benefiting long-term holders.
+- **Governance** – Holders propose and vote on new strategies, risk parameters, and treasury allocations.
+- **Atomic Operations** – The vault is non-custodial and operates via atomic Programmable Transaction Blocks (PTB).
 
 ### Allocation
 
@@ -98,11 +98,11 @@ $PCP is the **economic backbone** of the protocol:
 
 ```text
 ┌─────────────────┐
-│   User Deposits │ (USDC, SOL, $PCP)
+│   User Deposits │ (USDC, SOL)
 └────────┬────────┘
          ▼
 ┌─────────────────┐
-│ PocketChange    │ → Issues vault shares (receipt tokens)
+│ PocketChange    │ → Mints $PCP (Pool Share Token)
 │ Vault Contract  │
 └────────┬────────┘
          │
@@ -114,8 +114,8 @@ $PCP is the **economic backbone** of the protocol:
          │
          ▼
 ┌─────────────────┐
-│ Profit          │ → 50% to contributors, 30% to treasury, 20% to founder
-│ Distribution    │
+│ Profit          │ → 80% Stays in Vault (Boosts $PCP value)
+│ Distribution    │ → 20% to Protocol Treasury
 └─────────────────┘
 ```
 
@@ -186,6 +186,34 @@ We’re building the **people’s arbitrage protocol**. Whether you’re a crypt
 - **For Partners:** Integrate PocketChange into your dApp or exchange for shared liquidity.
 
 **Together, we turn pocket change into life‑changing wealth.**
+
+---
+
+## 🚀 Local Deployment (ArbitraSaaS Stack)
+
+Want to run the complete execution environment locally or on a VPS? We've bundled the Next.js Frontend, Rust Execution Engine, and Postgres Telemetry Database into a unified Docker Compose architecture.
+
+### Prerequisites
+- Docker & Docker Compose
+- Node.js (v18+) & Rust (cargo)
+
+### Quick Start
+1. Clone the repository and configure your keys:
+```bash
+cp .env.example .env
+nano .env # Insert your KMS_MASTER_KEY and SOLANA_RPC_URL
+```
+
+2. Run the deployment script:
+```bash
+chmod +x deploy.sh
+./deploy.sh
+```
+
+3. **Verify Deployment:**
+- **Dashboard UI**: `http://localhost:3000`
+- **Engine Logs**: `docker-compose logs -f engine-worker`
+- **Postgres DB**: `localhost:5432`
 
 ---
 

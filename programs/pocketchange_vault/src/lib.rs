@@ -1,25 +1,27 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer, MintTo, Burn};
 
-declare_id!("PKcVault11111111111111111111111111111111111");
+declare_id!("FSRUKKMxfWNDiVKKVyxiaaweZR8HZEMnsyHmb8caPjAy");
 
 #[program]
 pub mod pocketchange_vault {
     use super::*;
 
-    /// Initializes the Vault parameters, sets the admin, and prepares the xPKC Mint.
-    pub fn initialize(ctx: Context<Initialize>, fee_basis_points: u16) -> Result<()> {
+    /// Initializes the Vault parameters, sets the admin, and prepares the PCP Mint.
+    pub fn initialize(ctx: Context<Initialize>, unstaking_fee_basis_points: u16, profit_share_treasury_bp: u16) -> Result<()> {
         let vault_state = &mut ctx.accounts.vault_state;
         vault_state.admin = ctx.accounts.admin.key();
-        vault_state.xpkc_mint = ctx.accounts.xpkc_mint.key();
+        vault_state.pcp_mint = ctx.accounts.pcp_mint.key();
         vault_state.vault_usdc_account = ctx.accounts.vault_usdc_account.key();
-        vault_state.fee_basis_points = fee_basis_points; // e.g. 1500 = 15%
+        vault_state.treasury_usdc_account = ctx.accounts.treasury_usdc_account.key();
+        vault_state.unstaking_fee_basis_points = unstaking_fee_basis_points; // e.g., 50 = 0.5%
+        vault_state.profit_share_treasury_bp = profit_share_treasury_bp; // e.g., 2000 = 20%
         vault_state.total_shares = 0;
         vault_state.total_deposits = 0;
         Ok(())
     }
 
-    /// User deposits USDC into the Vault, and receives xPKC shares representing their pool percentage.
+    /// User deposits USDC into the Vault, and receives PCP shares representing their pool percentage.
     pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
         require!(amount > 0, VaultError::ZeroDeposit);
 
@@ -44,14 +46,14 @@ pub mod pocketchange_vault {
                 .unwrap() as u64
         };
 
-        // Mint xPKC Shares to the User
+        // Mint PCP Shares to the User
         let vault_bump = ctx.bumps.vault_state;
         let seeds = &["vault".as_bytes(), &[vault_bump]];
         let signer = &[&seeds[..]];
 
         let mint_to_accounts = MintTo {
-            mint: ctx.accounts.xpkc_mint.to_account_info(),
-            to: ctx.accounts.user_xpkc_account.to_account_info(),
+            mint: ctx.accounts.pcp_mint.to_account_info(),
+            to: ctx.accounts.user_pcp_account.to_account_info(),
             authority: ctx.accounts.vault_state.to_account_info(),
         };
         let mint_to_ctx = CpiContext::new_with_signer(
@@ -66,55 +68,107 @@ pub mod pocketchange_vault {
         vault_state.total_deposits = vault_state.total_deposits.checked_add(amount).unwrap();
         vault_state.total_shares = vault_state.total_shares.checked_add(shares_to_mint).unwrap();
 
-        msg!("Deposited {} USDC, Minted {} xPKC", amount, shares_to_mint);
+        msg!("Deposited {} USDC, Minted {} PCP", amount, shares_to_mint);
         Ok(())
     }
 
-    /// Allows the Admin (Live Arbitrage Engine) to execute flash loans out of the pool.
-    /// The admin MUST repay the loan + profit within the SAME transaction via CPI, or it reverts.
-    pub fn process_arbitrage(ctx: Context<ProcessArbitrage>, flash_loan_amount: u64, min_profit: u64) -> Result<()> {
+    /// Allows the Admin to withdraw USDC from the vault to perform arbitrage.
+    /// This requires atomic transaction composability where the Admin MUST repay
+    /// the principal + profit before the end of the transaction.
+    pub fn borrow_for_arbitrage(ctx: Context<BorrowForArbitrage>, amount: u64) -> Result<()> {
         let vault_state = &ctx.accounts.vault_state;
         require!(ctx.accounts.admin.key() == vault_state.admin, VaultError::Unauthorized);
-        
-        // 1. Send USDC to Engine/Executor (Instruction 1)
-        // 2. Engine does Raydium -> Orca swaps externally (Instruction 2)
-        // 3. Engine Repays USDC + Profit back to Vault (Instruction 3)
-        // Note: For atomic composition, this requires CPI or a Flash Loan Callback pattern (e.g. `invoke`).
-        
-        // Simplified Demo representation:
-        // Instead of CPI, we can verify that before instruction ends, vault balance > previous balance + min_profit
-        
-        // In a true implementation, we would transfer out to admin, then expect admin to transfer back.
-        // It relies on transaction-wide composability verifying balance state at the end of the PTB.
-        
-        msg!("Arbitrage Authorized for {} USDC. Engine must return {} + {}", flash_loan_amount, flash_loan_amount, min_profit);
+
+        let vault_bump = ctx.bumps.vault_state;
+        let seeds = &["vault".as_bytes(), &[vault_bump]];
+        let signer = &[&seeds[..]];
+
+        let transfer_accounts = Transfer {
+            from: ctx.accounts.vault_usdc_account.to_account_info(),
+            to: ctx.accounts.admin_usdc_account.to_account_info(),
+            authority: ctx.accounts.vault_state.to_account_info(),
+        };
+        let cpi_program = ctx.accounts.token_program.to_account_info();
+        let cpi_ctx = CpiContext::new_with_signer(cpi_program, transfer_accounts, signer);
+        token::transfer(cpi_ctx, amount)?;
+
+        msg!("Arbitrage Borrow: {} USDC. Must be repaid in same PTB.", amount);
+        Ok(())
+    }
+
+    /// Process Arbitrage Profit. The admin (Engine) reports the flash loan repayment and profit.
+    /// The Engine must have already transferred the principal + total_profit back to the vault prior to calling this.
+    /// It calculates the treasury cut, sends it to the treasury, and the remaining profit inflates the pool.
+    pub fn process_arbitrage(ctx: Context<ProcessArbitrage>, total_profit: u64) -> Result<()> {
+        let vault_state = &mut ctx.accounts.vault_state;
+        require!(ctx.accounts.admin.key() == vault_state.admin, VaultError::Unauthorized);
+        require!(total_profit > 0, VaultError::ZeroProfit);
+
+        // Calculate treasury share based on profit_share_treasury_bp (e.g., 20% = 2000 bp)
+        let treasury_share = (total_profit as u128)
+            .checked_mul(vault_state.profit_share_treasury_bp as u128)
+            .unwrap()
+            .checked_div(10000)
+            .unwrap() as u64;
+
+        let pool_share = total_profit.checked_sub(treasury_share).unwrap();
+
+        // Transfer treasury share from vault to treasury
+        if treasury_share > 0 {
+            let vault_bump = ctx.bumps.vault_state;
+            let seeds = &["vault".as_bytes(), &[vault_bump]];
+            let signer = &[&seeds[..]];
+
+            let cpi_accounts = Transfer {
+                from: ctx.accounts.vault_usdc_account.to_account_info(),
+                to: ctx.accounts.treasury_usdc_account.to_account_info(),
+                authority: vault_state.to_account_info(),
+            };
+            let cpi_program = ctx.accounts.token_program.to_account_info();
+            let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer);
+            token::transfer(cpi_ctx, treasury_share)?;
+        }
+
+        // The pool_share remains in the vault. We update total_deposits so the exchange rate of PCP increases.
+        vault_state.total_deposits = vault_state.total_deposits.checked_add(pool_share).unwrap();
+
+        msg!("Arbitrage Processed. Profit: {} USDC (Treasury: {}, Pool: {})", total_profit, treasury_share, pool_share);
         
         Ok(())
     }
 
-    /// User Burns their xPKC to withdraw their share of the USDC Pool
+    /// User Burns their PCP to withdraw their share of the USDC Pool
     pub fn withdraw(ctx: Context<Withdraw>, shares: u64) -> Result<()> {
         require!(shares > 0, VaultError::ZeroWithdraw);
         let vault_state = &mut ctx.accounts.vault_state;
 
-        // Calculate User's Underlying USDC balance
-        let usdc_to_return = (shares as u128)
+        // Calculate User's Underlying USDC balance based on their shares
+        let usdc_value = (shares as u128)
             .checked_mul(vault_state.total_deposits as u128)
             .unwrap()
             .checked_div(vault_state.total_shares as u128)
             .unwrap() as u64;
 
-        // Burn User's xPKC
+        // Calculate unstaking fee (e.g., 50 bp = 0.5%)
+        let fee = (usdc_value as u128)
+            .checked_mul(vault_state.unstaking_fee_basis_points as u128)
+            .unwrap()
+            .checked_div(10000)
+            .unwrap() as u64;
+
+        let usdc_to_return = usdc_value.checked_sub(fee).unwrap();
+
+        // Burn User's PCP
         let burn_accounts = Burn {
-            mint: ctx.accounts.xpkc_mint.to_account_info(),
-            from: ctx.accounts.user_xpkc_account.to_account_info(),
+            mint: ctx.accounts.pcp_mint.to_account_info(),
+            from: ctx.accounts.user_pcp_account.to_account_info(),
             authority: ctx.accounts.user.to_account_info(),
         };
         let cpi_program = ctx.accounts.token_program.to_account_info();
         let burn_ctx = CpiContext::new(cpi_program, burn_accounts);
         token::burn(burn_ctx, shares)?;
 
-        // Transfer USDC to User
+        // Transfer USDC to User (net of fee)
         let vault_bump = ctx.bumps.vault_state;
         let seeds = &["vault".as_bytes(), &[vault_bump]];
         let signer = &[&seeds[..]];
@@ -122,7 +176,7 @@ pub mod pocketchange_vault {
         let transfer_accounts = Transfer {
             from: ctx.accounts.vault_usdc_account.to_account_info(),
             to: ctx.accounts.user_usdc_account.to_account_info(),
-            authority: ctx.accounts.vault_state.to_account_info(),
+            authority: vault_state.to_account_info(),
         };
         let transfer_ctx = CpiContext::new_with_signer(
             ctx.accounts.token_program.to_account_info(),
@@ -132,8 +186,14 @@ pub mod pocketchange_vault {
         token::transfer(transfer_ctx, usdc_to_return)?;
 
         // Update state
+        // The burned shares are removed from total_shares
         vault_state.total_shares = vault_state.total_shares.checked_sub(shares).unwrap();
+        
+        // total_deposits decreases by `usdc_to_return`. The `fee` stays in the vault, 
+        // effectively distributed to the remaining pool participants!
         vault_state.total_deposits = vault_state.total_deposits.checked_sub(usdc_to_return).unwrap();
+
+        msg!("Withdrew {} USDC (Fee: {} USDC) for {} PCP burned", usdc_to_return, fee, shares);
 
         Ok(())
     }
@@ -151,14 +211,15 @@ pub struct Initialize<'info> {
     #[account(
         init,
         payer = admin,
-        space = 8 + 32 + 32 + 32 + 2 + 8 + 8,
+        space = 8 + 32 + 32 + 32 + 32 + 2 + 2 + 8 + 8,
         seeds = [b"vault"],
         bump
     )]
     pub vault_state: Account<'info, VaultState>,
 
-    pub xpkc_mint: Account<'info, Mint>,
+    pub pcp_mint: Account<'info, Mint>,
     pub vault_usdc_account: Account<'info, TokenAccount>,
+    pub treasury_usdc_account: Account<'info, TokenAccount>,
     pub system_program: Program<'info, System>,
 }
 
@@ -180,9 +241,25 @@ pub struct Deposit<'info> {
     pub vault_usdc_account: Account<'info, TokenAccount>,
 
     #[account(mut)]
-    pub xpkc_mint: Account<'info, Mint>,
+    pub pcp_mint: Account<'info, Mint>,
     #[account(mut)]
-    pub user_xpkc_account: Account<'info, TokenAccount>,
+    pub user_pcp_account: Account<'info, TokenAccount>,
+
+    pub token_program: Program<'info, Token>,
+}
+
+#[derive(Accounts)]
+pub struct BorrowForArbitrage<'info> {
+    #[account(mut)]
+    pub admin: Signer<'info>,
+
+    #[account(mut, seeds = [b"vault"], bump)]
+    pub vault_state: Account<'info, VaultState>,
+
+    #[account(mut)]
+    pub vault_usdc_account: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub admin_usdc_account: Account<'info, TokenAccount>,
 
     pub token_program: Program<'info, Token>,
 }
@@ -198,7 +275,7 @@ pub struct ProcessArbitrage<'info> {
     #[account(mut)]
     pub vault_usdc_account: Account<'info, TokenAccount>,
     #[account(mut)]
-    pub admin_usdc_account: Account<'info, TokenAccount>,
+    pub treasury_usdc_account: Account<'info, TokenAccount>,
 
     pub token_program: Program<'info, Token>,
 }
@@ -217,9 +294,9 @@ pub struct Withdraw<'info> {
     pub user_usdc_account: Account<'info, TokenAccount>,
 
     #[account(mut)]
-    pub xpkc_mint: Account<'info, Mint>,
+    pub pcp_mint: Account<'info, Mint>,
     #[account(mut)]
-    pub user_xpkc_account: Account<'info, TokenAccount>,
+    pub user_pcp_account: Account<'info, TokenAccount>,
 
     pub token_program: Program<'info, Token>,
 }
@@ -231,9 +308,11 @@ pub struct Withdraw<'info> {
 #[account]
 pub struct VaultState {
     pub admin: Pubkey,
-    pub xpkc_mint: Pubkey,
+    pub pcp_mint: Pubkey,
     pub vault_usdc_account: Pubkey,
-    pub fee_basis_points: u16,
+    pub treasury_usdc_account: Pubkey,
+    pub unstaking_fee_basis_points: u16,
+    pub profit_share_treasury_bp: u16,
     pub total_shares: u64,
     pub total_deposits: u64,
 }
@@ -244,6 +323,8 @@ pub enum VaultError {
     ZeroDeposit,
     #[msg("Withdraw amount must be greater than zero.")]
     ZeroWithdraw,
-    #[msg("Unauthorized execution. Only the primary engine node can flash-loan.")]
+    #[msg("Reported profit must be greater than zero.")]
+    ZeroProfit,
+    #[msg("Unauthorized execution. Only the primary engine node can process arbitrage.")]
     Unauthorized,
 }

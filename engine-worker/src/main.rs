@@ -12,7 +12,6 @@ mod engine;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
-    dotenv::dotenv().ok();
     println!("🚀 Starting ArbitraSaaS Multi-Tenant Worker...");
 
     // 1. Initialize Log Telemetry
@@ -20,17 +19,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     // Test Injecting an audit log manually before booting
     db_client.inject_audit_log(db::TradeLogEvent {
-        execution_time_ms: 45,
+        execution_time_ms: 120,
         timestamp_sec: 0,
         route: "USDC -> WIF -> USDC".to_string(),
         tenant_id: "system-1".to_string(),
         tx_signature: "5xyz...mock".to_string(),
         profit_sol: 0.150,
         status: "EXEC_SUCCESS".to_string(),
-        error_msg: None,
-        latency_ms: None,
-        slippage_bps: None,
-        mev_tip_paid: None
+        success: true,
+        error_msg: None
     }).await.unwrap();
 
     // 2. Connect to Central Message Bus
@@ -39,21 +36,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     // 3. Load Assigned Tenants configuration
     println!("🔐 Authenticating with KMS. Requesting Assigned Wallets...");
-    let priv_key_str = env::var("PCP_DEPLOYER_PRIVATE_KEY").unwrap_or_else(|_| "".to_string());
-    
-    let wallet = if !priv_key_str.is_empty() {
-        Keypair::from_base58_string(&priv_key_str)
-    } else {
-        println!("⚠️ No PCP_DEPLOYER_PRIVATE_KEY found! Generating Ephemeral Sandbox Wallet...");
-        Keypair::new()
-    };
-    println!("🔑 Successfully generated / loaded Wallet: {}", wallet.pubkey());
+    let kms_client = kms::KMSClient::new();
+    let secret = kms_client.decrypt_tenant_key("tenant_1_e883_enc", "nonce").unwrap();
+    let wallet = Keypair::from_base58_string(&secret);
+    println!("🔑 Successfully loaded E883 Wallet: {}", wallet.pubkey());
 
     // 4. Test Engine Network Connection
-    println!("⚡ Initializing Solana RPC Connection (Mainnet)...");
-    let rpc_client = solana_client::rpc_client::RpcClient::new("https://api.mainnet-beta.solana.com");
+    println!("⚡ Initializing Solana RPC Connection (Devnet)...");
+    let rpc_client = solana_client::rpc_client::RpcClient::new("https://api.devnet.solana.com");
     let balance = rpc_client.get_balance(&wallet.pubkey()).unwrap_or(0);
-    println!("💰 Mainnet Balance for {}: {} SOL", wallet.pubkey(), balance as f64 / 1e9);
+    println!("💰 Devnet Balance for {}: {} SOL", wallet.pubkey(), balance as f64 / 1e9);
 
     println!("⚡ Initializing Jito Bundler API clients...");
 
