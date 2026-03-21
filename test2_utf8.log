@@ -1,0 +1,114 @@
+﻿≡ƒÅü Initiating 60-Second Micro-Amount Arbitrage Refinement Test...
+node : C:\pcprotocol\optimized-ju
+piter-bot\src\utils\config.js:6
+At line:1 char:1
++ node scripts\run_1min.js > 
+c:\pcprotocol\test2.log 2>&1
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : No 
+   tSpecified: (C:\pcprotocol\o  
+  ...ils\config.js:6:String) [   
+ ], RemoteException
+    + FullyQualifiedErrorId : Na 
+   tiveCommandError
+ 
+dotenv_1.default.config();
+                 ^
+TypeError: Cannot read 
+properties of undefined (reading 
+'config')
+    at Object.<anonymous> (C:\pcp
+rotocol\optimized-jupiter-bot\src
+\utils\config.js:6:18)
+    at Module._compile (node:inte
+rnal/modules/cjs/loader:1812:14)
+    at node:internal/modules/cjs/
+loader:1943:10
+    at Object.require.extensions.
+<computed> [as .js] (C:\pcprotoco
+l\optimized-jupiter-bot\node_modu
+les\ts-node\src\index.ts:1608:43)
+    at Module.load (node:internal
+/modules/cjs/loader:1533:32)
+    at Module._load (node:interna
+l/modules/cjs/loader:1335:12)
+    at wrapModuleLoad (node:inter
+nal/modules/cjs/loader:255:19)
+    at Module.require (node:inter
+nal/modules/cjs/loader:1556:12)
+    at require (node:internal/mod
+ules/helpers:152:16)
+    at Object.<anonymous> (C:\pcp
+rotocol\optimized-jupiter-bot\src
+\geyser\client.ts:1:1)
+
+ΓÅ▒∩╕Å 60 seconds elapsed. Terminating Sandbox Engine...
+≡ƒôè Tracking 'SQLite trades.db' & Running Native Refinement Analytics...
+C:\pcprotocol\optimized-jupiter-b
+ot\src\utils\config.js:6
+dotenv_1.default.config();
+                 ^
+TypeError: Cannot read 
+properties of undefined (reading 
+'config')
+    at Object.<anonymous> (C:\pcp
+rotocol\optimized-jupiter-bot\src
+\utils\config.js:6:18)
+    at Module._compile (node:inte
+rnal/modules/cjs/loader:1812:14)
+    at node:internal/modules/cjs/
+loader:1943:10
+    at Object.require.extensions.
+<computed> [as .js] (C:\pcprotoco
+l\optimized-jupiter-bot\node_modu
+les\ts-node\src\index.ts:1608:43)
+    at Module.load (node:internal
+/modules/cjs/loader:1533:32)
+    at Module._load (node:interna
+l/modules/cjs/loader:1335:12)
+    at wrapModuleLoad (node:inter
+nal/modules/cjs/loader:255:19)
+    at Module.require (node:inter
+nal/modules/cjs/loader:1556:12)
+    at require (node:internal/mod
+ules/helpers:152:16)
+    at Object.<anonymous> (C:\pcp
+rotocol\optimized-jupiter-bot\scr
+ipts\refinement_tool.ts:2:1)
+Refinement analytics failed 
+natively: Command failed: npx 
+ts-node 
+scripts/refinement_tool.ts
+C:\pcprotocol\optimized-jupiter-b
+ot\src\utils\config.js:6
+dotenv_1.default.config();
+                 ^
+TypeError: Cannot read 
+properties of undefined (reading 
+'config')
+    at Object.<anonymous> (C:\pcp
+rotocol\optimized-jupiter-bot\src
+\utils\config.js:6:18)
+    at Module._compile (node:inte
+rnal/modules/cjs/loader:1812:14)
+    at node:internal/modules/cjs/
+loader:1943:10
+    at Object.require.extensions.
+<computed> [as .js] (C:\pcprotoco
+l\optimized-jupiter-bot\node_modu
+les\ts-node\src\index.ts:1608:43)
+    at Module.load (node:internal
+/modules/cjs/loader:1533:32)
+    at Module._load (node:interna
+l/modules/cjs/loader:1335:12)
+    at wrapModuleLoad (node:inter
+nal/modules/cjs/loader:255:19)
+    at Module.require (node:inter
+nal/modules/cjs/loader:1556:12)
+    at require (node:internal/mod
+ules/helpers:152:16)
+    at Object.<anonymous> (C:\pcp
+rotocol\optimized-jupiter-bot\scr
+ipts\refinement_tool.ts:2:1)
+

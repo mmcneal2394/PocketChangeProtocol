@@ -40,7 +40,7 @@ const cache_1 = require("../jupiter/cache");
 const config_1 = require("../utils/config");
 const logger_1 = require("../utils/logger");
 const connection = new web3_js_1.Connection(config_1.config.RPC_ENDPOINT, { commitment: 'processed' });
-async function buildVersionedTransaction(ix1Response, ix2Response) {
+async function buildVersionedTransaction(ix1Response, ix2Response, jitoTipLamports = 0) {
     try {
         const rawKeypair = JSON.parse(fs.readFileSync(config_1.config.WALLET_KEYPAIR_PATH, 'utf-8'));
         const wallet = web3_js_1.Keypair.fromSecretKey(new Uint8Array(rawKeypair));
@@ -49,19 +49,24 @@ async function buildVersionedTransaction(ix1Response, ix2Response) {
             throw new Error('No cached blockhash available');
         }
         const instructions = [];
-        // Helper to deserialize Jupiter's returned instruction
         const deserializeInstruction = (ix) => {
             if (!ix)
                 return null;
-            return new web3_js_1.TransactionInstruction({
-                programId: new web3_js_1.PublicKey(ix.programId),
-                keys: ix.accounts.map((key) => ({
-                    pubkey: new web3_js_1.PublicKey(key.pubkey),
-                    isSigner: key.isSigner,
-                    isWritable: key.isWritable,
-                })),
-                data: Buffer.from(ix.data, "base64"),
-            });
+            try {
+                return new web3_js_1.TransactionInstruction({
+                    programId: new web3_js_1.PublicKey(ix.programId),
+                    keys: ix.accounts.map((key) => ({
+                        pubkey: new web3_js_1.PublicKey(key.pubkey),
+                        isSigner: key.isSigner,
+                        isWritable: key.isWritable,
+                    })),
+                    data: Buffer.from(ix.data, "base64"),
+                });
+            }
+            catch (err) {
+                console.error("DEBUG PUBKEY ERROR on IX:", ix);
+                throw err;
+            }
         };
         // Load necessary address lookup tables
         const altsToFetch = [
@@ -93,12 +98,46 @@ async function buildVersionedTransaction(ix1Response, ix2Response) {
         logger_1.logger.info(`-----------------------------------------------------`);
         // Calculate baseline priority gas securely instead of relying on MEV auction padding
         // We are operating sub-10ms via Geyser, removing the need to fight block wars heavily.
-        const dynamicMicroLamports = 1000;
+        const dynamicMicroLamports = 250000; // Extremely high strictly prioritized fee!
         const { ComputeBudgetProgram } = require("@solana/web3.js");
         instructions.unshift(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: dynamicMicroLamports }));
         instructions.unshift(ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }));
         logger_1.logger.info(`🔥 Attached Strict Baseline Gas Priority: ${dynamicMicroLamports} microLamports (Bypassing Priority Auctions!)`);
-        // (Jito Tip instruction entirely removed: we rely on raw physical latency to the Chainstack node now)
+        if (jitoTipLamports > 0) {
+            let jitoTipAccounts = [
+                "96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5",
+                "HFqU5x63VTqvQss8hp11i4wVV8bD44PvwucfZ2bU7gRe",
+                "Cw8CFyM9FkoMi7K7Crf6HNQqf4uEMzpKw6QNghXLvLkY",
+                "ADaUMid9yfUytqMBgopwjb2DTLSokTSzL1zt6iGPaS49",
+                "DfXygSm4jCyNCybVYYK6DwvWqjKee8pbDmJGcLWNDXjh",
+                "ADuUkR4vqLUMWXxW9gh6D6L8pMSawimctcNZ5pGwDcEt",
+                "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT",
+                "DttWaMuVvTiduZRnguLF7jNxTgiMBZ1hyAumKUiL2KRL"
+            ];
+            try {
+                const fetch = require('node-fetch');
+                const res = await fetch("https://amsterdam.mainnet.block-engine.jito.wtf/api/v1/bundles", {
+                    method: "POST", headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "getTipAccounts", params: [] })
+                });
+                const data = await res.json();
+                if (data && data.result && data.result.length > 0) {
+                    jitoTipAccounts = data.result;
+                }
+            }
+            catch (err) {
+                logger_1.logger.error(`Failed to fetch dynamic Tip Accounts natively: ${err.message}`);
+            }
+            const randomTipAccount = jitoTipAccounts[Math.floor(Math.random() * jitoTipAccounts.length)];
+            const tipIx = web3_js_1.SystemProgram.transfer({
+                fromPubkey: wallet.publicKey,
+                toPubkey: new web3_js_1.PublicKey(randomTipAccount),
+                lamports: Math.floor(jitoTipLamports),
+            });
+            // Add the Jito Tip correctly as the LAST execution step
+            instructions.push(tipIx);
+            logger_1.logger.info(`💰 Appended DYNAMIC Jito Tip Execution successfully: ${jitoTipLamports / 1e9} SOL to ${randomTipAccount.substring(0, 6)}...`);
+        }
         const messageV0 = new web3_js_1.TransactionMessage({
             payerKey: wallet.publicKey,
             recentBlockhash: blockhash,

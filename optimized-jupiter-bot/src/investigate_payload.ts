@@ -1,10 +1,10 @@
 import { fetchJupiterQuote, getParallelSwapInstructions } from './jupiter/quotes';
 import { buildVersionedTransaction } from './execution/transaction';
-import { startBlockhashCache } from './jupiter/cache';
+import { getCachedBlockhash } from './jupiter/cache';
 import { logger } from './utils/logger';
 
 async function investigate() {
-  await startBlockhashCache();
+  console.log("Starting payload derivation testing sequence...");
   await new Promise(r => setTimeout(r, 1000)); // wait for blockhash to cache
   
   logger.info("Fetching strict quote for simulation...");
@@ -29,7 +29,10 @@ async function investigate() {
   const transaction = await buildVersionedTransaction(instructions.ix1, instructions.ix2);
 
   if (transaction) {
-      logger.info(`✅ Successfully built Payload. Exiting without broadcasting.`);
+      logger.info(`✅ Successfully built Payload. BROADCASTING FORCED LIVE TEST...`);
+      const { submitTransactionWithRacing } = require('./execution/racing');
+      const result = await submitTransactionWithRacing(transaction);
+      logger.info(`Transaction result: ${JSON.stringify(result)}`);
   } else {
       logger.error(`❌ Failed to build Payload!`);
   }

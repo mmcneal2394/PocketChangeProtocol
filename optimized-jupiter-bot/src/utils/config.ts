@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const envSchema = z.object({
-  GEYSER_ENDPOINT: z.string().url().or(z.string()),
+  GEYSER_RPC: z.string().url().or(z.string()),
   GEYSER_API_TOKEN: z.string(),
   RPC_ENDPOINT: z.string().url(),
   RPC_WEBSOCKET: z.string().url(),

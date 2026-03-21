@@ -2,10 +2,9 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const quotes_1 = require("./jupiter/quotes");
 const transaction_1 = require("./execution/transaction");
-const cache_1 = require("./jupiter/cache");
 const logger_1 = require("./utils/logger");
 async function investigate() {
-    await (0, cache_1.startBlockhashCache)();
+    console.log("Starting payload derivation testing sequence...");
     await new Promise(r => setTimeout(r, 1000)); // wait for blockhash to cache
     logger_1.logger.info("Fetching strict quote for simulation...");
     const TOKENS = {
@@ -26,7 +25,10 @@ async function investigate() {
     logger_1.logger.info("Building versioned transaction...");
     const transaction = await (0, transaction_1.buildVersionedTransaction)(instructions.ix1, instructions.ix2);
     if (transaction) {
-        logger_1.logger.info(`✅ Successfully built Payload. Exiting without broadcasting.`);
+        logger_1.logger.info(`✅ Successfully built Payload. BROADCASTING FORCED LIVE TEST...`);
+        const { submitTransactionWithRacing } = require('./execution/racing');
+        const result = await submitTransactionWithRacing(transaction);
+        logger_1.logger.info(`Transaction result: ${JSON.stringify(result)}`);
     }
     else {
         logger_1.logger.error(`❌ Failed to build Payload!`);

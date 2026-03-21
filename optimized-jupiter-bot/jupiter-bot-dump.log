@@ -1,0 +1,105 @@
+[TAILING] Tailing last 50 lines for [jupiter-bot] process (change the value with --lines option)
+/root/.pm2/logs/jupiter-bot-error.log last 50 lines:
+0|jupiter- |   }
+0|jupiter- | }
+0|jupiter- | [WARN] 2026-03-20T10:15:51.062Z - Failed to fetch dynamic tokens: TypeError: fetch failed
+0|jupiter- |     at node:internal/deps/undici/undici:14902:13
+0|jupiter- |     at processTicksAndRejections (node:internal/process/task_queues:95:5)
+0|jupiter- |     at Timeout.refreshDynamicTokens [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/dist/geyser/handlers.js:39:24) {
+0|jupiter- |   [cause]: Error: getaddrinfo ENOTFOUND tokens.jup.ag
+0|jupiter- |       at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26) {
+0|jupiter- |     errno: -3007,
+0|jupiter- |     code: 'ENOTFOUND',
+0|jupiter- |     syscall: 'getaddrinfo',
+0|jupiter- |     hostname: 'tokens.jup.ag'
+0|jupiter- |   }
+0|jupiter- | }
+0|jupiter- | [WARN] 2026-03-20T10:16:51.062Z - Failed to fetch dynamic tokens: TypeError: fetch failed
+0|jupiter- |     at node:internal/deps/undici/undici:14902:13
+0|jupiter- |     at processTicksAndRejections (node:internal/process/task_queues:95:5)
+0|jupiter- |     at Timeout.refreshDynamicTokens [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/dist/geyser/handlers.js:39:24) {
+0|jupiter- |   [cause]: Error: getaddrinfo ENOTFOUND tokens.jup.ag
+0|jupiter- |       at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26) {
+0|jupiter- |     errno: -3007,
+0|jupiter- |     code: 'ENOTFOUND',
+0|jupiter- |     syscall: 'getaddrinfo',
+0|jupiter- |     hostname: 'tokens.jup.ag'
+0|jupiter- |   }
+0|jupiter- | }
+0|jupiter- | [WARN] 2026-03-20T10:17:51.062Z - Failed to fetch dynamic tokens: TypeError: fetch failed
+0|jupiter- |     at node:internal/deps/undici/undici:14902:13
+0|jupiter- |     at processTicksAndRejections (node:internal/process/task_queues:95:5)
+0|jupiter- |     at Timeout.refreshDynamicTokens [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/dist/geyser/handlers.js:39:24) {
+0|jupiter- |   [cause]: Error: getaddrinfo ENOTFOUND tokens.jup.ag
+0|jupiter- |       at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26) {
+0|jupiter- |     errno: -3007,
+0|jupiter- |     code: 'ENOTFOUND',
+0|jupiter- |     syscall: 'getaddrinfo',
+0|jupiter- |     hostname: 'tokens.jup.ag'
+0|jupiter- |   }
+0|jupiter- | }
+0|jupiter- | [WARN] 2026-03-20T10:18:51.063Z - Failed to fetch dynamic tokens: TypeError: fetch failed
+0|jupiter- |     at node:internal/deps/undici/undici:14902:13
+0|jupiter- |     at processTicksAndRejections (node:internal/process/task_queues:95:5)
+0|jupiter- |     at Timeout.refreshDynamicTokens [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/dist/geyser/handlers.js:39:24) {
+0|jupiter- |   [cause]: Error: getaddrinfo ENOTFOUND tokens.jup.ag
+0|jupiter- |       at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26) {
+0|jupiter- |     errno: -3007,
+0|jupiter- |     code: 'ENOTFOUND',
+0|jupiter- |     syscall: 'getaddrinfo',
+0|jupiter- |     hostname: 'tokens.jup.ag'
+0|jupiter- |   }
+0|jupiter- | }
+
+/root/.pm2/logs/jupiter-bot-out.log last 50 lines:
+0|jupiter- | [INFO] 2026-03-20T10:19:07.382Z - Transmitting to Jito AMSTERDAM synchronously bypassing abstractions...
+0|jupiter- | [INFO] 2026-03-20T10:19:07.818Z - JITO BUNDLE RESPONSE: {"jsonrpc":"2.0","error":{"code":-32097,"message":"Network congested. Endpoint is globally rate limited.","data":null},"id":null}
+0|jupiter- | [INFO] 2026-03-20T10:19:10.922Z - [SCAN] Checking 2 pools internally mapped...
+0|jupiter- | [INFO] 2026-03-20T10:19:18.446Z - [SCAN] Checking 2 pools internally mapped...
+0|jupiter- | [INFO] 2026-03-20T10:19:18.748Z - [SCAN] Checking 2 pools internally mapped...
+0|jupiter- | [INFO] 2026-03-20T10:19:20.053Z - [SCAN] Checking 2 pools internally mapped...
+0|jupiter- | [INFO] 2026-03-20T10:19:21.308Z - 🔥 Triggering synthetic 'Force-Hop' to validate JITO tipping/compilation mechanics dynamically...
+0|jupiter- | [INFO] 2026-03-20T10:19:21.309Z - [COMPILATION] Constructing payload for Force-Test-Hop with tip: 0.001 SOL
+0|jupiter- | [INFO] 2026-03-20T10:19:22.045Z - --- TRANSACTION PAYLOAD STRUCTURE (9 Instructions) ---
+0|jupiter- | [INFO] 2026-03-20T10:19:22.045Z - [IX 0] Program: ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL
+0|jupiter- | [INFO] 2026-03-20T10:19:22.045Z - [IX 1] Program: 11111111111111111111111111111111
+0|jupiter- | [INFO] 2026-03-20T10:19:22.045Z - [IX 2] Program: TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA
+0|jupiter- | [INFO] 2026-03-20T10:19:22.045Z - [IX 3] Program: ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL
+0|jupiter- | [INFO] 2026-03-20T10:19:22.045Z - [IX 4] Program: JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4
+0|jupiter- | [INFO] 2026-03-20T10:19:22.045Z - [IX 5] Program: TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA
+0|jupiter- | [INFO] 2026-03-20T10:19:22.045Z - [IX 6] Program: ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL
+0|jupiter- | [INFO] 2026-03-20T10:19:22.045Z - [IX 7] Program: JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4
+0|jupiter- | [INFO] 2026-03-20T10:19:22.045Z - [IX 8] Program: TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA
+0|jupiter- | [INFO] 2026-03-20T10:19:22.045Z - -----------------------------------------------------
+0|jupiter- | [INFO] 2026-03-20T10:19:22.046Z - 🔥 Attached Strict Baseline Gas Priority: 250000 microLamports (Bypassing Priority Auctions!)
+0|jupiter- | [INFO] 2026-03-20T10:19:22.521Z - 💰 Appended DYNAMIC Jito Tip Execution successfully: 0.001 SOL to 96gYZG...
+0|jupiter- | [INFO] 2026-03-20T10:19:22.532Z - Executing MEV Bundle securely via High-Speed Chainstack Node + BloXroute + Jito for ultimate throughput...
+0|jupiter- | [INFO] 2026-03-20T10:19:22.550Z - [COMPILATION] Synced local Blockhash/ALT states sequentially mapping atomic instructions in 1.4ms!
+0|jupiter- | [INFO] 2026-03-20T10:19:22.553Z - Transmitting to Jito AMSTERDAM synchronously bypassing abstractions...
+0|jupiter- | [INFO] 2026-03-20T10:19:23.001Z - JITO BUNDLE RESPONSE: {"jsonrpc":"2.0","error":{"code":-32097,"message":"Network congested. Endpoint is globally rate limited.","data":null},"id":null}
+0|jupiter- | [INFO] 2026-03-20T10:19:28.988Z - [SCAN] Checking 2 pools internally mapped...
+0|jupiter- | [INFO] 2026-03-20T10:19:32.102Z - [SCAN] Checking 2 pools internally mapped...
+0|jupiter- | [INFO] 2026-03-20T10:19:32.603Z - [SCAN] Checking 2 pools internally mapped...
+0|jupiter- | [INFO] 2026-03-20T10:19:35.609Z - [SCAN] Checking 2 pools internally mapped...
+0|jupiter- | [INFO] 2026-03-20T10:19:36.308Z - 🔥 Triggering synthetic 'Force-Hop' to validate JITO tipping/compilation mechanics dynamically...
+0|jupiter- | [INFO] 2026-03-20T10:19:36.308Z - [COMPILATION] Constructing payload for Force-Test-Hop with tip: 0.001 SOL
+0|jupiter- | [INFO] 2026-03-20T10:19:36.615Z - [SCAN] Checking 2 pools internally mapped...
+0|jupiter- | [INFO] 2026-03-20T10:19:36.922Z - --- TRANSACTION PAYLOAD STRUCTURE (9 Instructions) ---
+0|jupiter- | [INFO] 2026-03-20T10:19:36.923Z - [IX 0] Program: ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL
+0|jupiter- | [INFO] 2026-03-20T10:19:36.923Z - [IX 1] Program: 11111111111111111111111111111111
+0|jupiter- | [INFO] 2026-03-20T10:19:36.923Z - [IX 2] Program: TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA
+0|jupiter- | [INFO] 2026-03-20T10:19:36.923Z - [IX 3] Program: ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL
+0|jupiter- | [INFO] 2026-03-20T10:19:36.923Z - [IX 4] Program: JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4
+0|jupiter- | [INFO] 2026-03-20T10:19:36.923Z - [IX 5] Program: TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA
+0|jupiter- | [INFO] 2026-03-20T10:19:36.923Z - [IX 6] Program: ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL
+0|jupiter- | [INFO] 2026-03-20T10:19:36.923Z - [IX 7] Program: JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4
+0|jupiter- | [INFO] 2026-03-20T10:19:36.923Z - [IX 8] Program: TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA
+0|jupiter- | [INFO] 2026-03-20T10:19:36.923Z - -----------------------------------------------------
+0|jupiter- | [INFO] 2026-03-20T10:19:36.923Z - 🔥 Attached Strict Baseline Gas Priority: 250000 microLamports (Bypassing Priority Auctions!)
+0|jupiter- | [INFO] 2026-03-20T10:19:37.358Z - 💰 Appended DYNAMIC Jito Tip Execution successfully: 0.001 SOL to ADaUMi...
+0|jupiter- | [INFO] 2026-03-20T10:19:37.370Z - Executing MEV Bundle securely via High-Speed Chainstack Node + BloXroute + Jito for ultimate throughput...
+0|jupiter- | [INFO] 2026-03-20T10:19:37.384Z - [COMPILATION] Synced local Blockhash/ALT states sequentially mapping atomic instructions in 1.4ms!
+0|jupiter- | [INFO] 2026-03-20T10:19:37.385Z - Transmitting to Jito AMSTERDAM synchronously bypassing abstractions...
+0|jupiter- | [INFO] 2026-03-20T10:19:37.717Z - [SCAN] Checking 2 pools internally mapped...
+0|jupiter- | [INFO] 2026-03-20T10:19:37.813Z - JITO BUNDLE RESPONSE: {"jsonrpc":"2.0","error":{"code":-32097,"message":"Network congested. Endpoint is globally rate limited.","data":null},"id":null}
+

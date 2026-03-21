@@ -1,0 +1,42 @@
+﻿Total executions: 79030
+Wins: 73628
+Recent 2: [
+  {
+    id: 79031,
+    timestamp: 1773986836810000,
+    slot: 0,
+    type: 'Simple-2-Hop',
+    route: '["USDC","USDC"]',
+    expected_in: 50000000,
+    expected_out: 215005079.6591795,
+    expected_profit: 165005079.65917948,
+    expected_profit_bps: 33001.01593183589,
+    decision: 'executed',
+    actual_out: null,
+    actual_profit: null,
+    jito_tip: 10000000,
+    priority_fee: 100000,
+    latency_ms: 0.018799999728798866,
+    error: null,
+    price_snapshot: null
+  },
+  {
+    id: 79030,
+    timestamp: 1773986836782000,
+    slot: 0,
+    type: 'Simple-2-Hop',
+    route: '["USDC","USDC"]',
+    expected_in: 1000000,
+    expected_out: 4312255.909828545,
+    expected_profit: 3312255.909828544,
+    expected_profit_bps: 33122.55909828544,
+    decision: 'executed',
+    actual_out: null,
+    actual_profit: null,
+    jito_tip: 1656127.954914272,
+    priority_fee: 100000,
+    latency_ms: 5.603999999992084,
+    error: null,
+    price_snapshot: null
+  }
+]

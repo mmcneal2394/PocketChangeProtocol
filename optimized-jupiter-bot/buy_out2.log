@@ -1,0 +1,20 @@
+[dotenv@17.3.1] injecting env (16) from .env -- tip: ⚙️  suppress all logs with { quiet: true }
+[INFO] 2026-03-20T12:01:03.201Z - 🔥 [FORCE LIVE BUY] Generating true on-chain swap via Jito boundaries...
+C:\pcprotocol\optimized-jupiter-bot\node_modules\node-fetch\lib\index.js:1501
+			reject(new FetchError(`request to ${request.url} failed, reason: ${err.message}`, 'system', err));
+          ^
+FetchError: request to https://quote-api.jup.ag/v6/quote?inputMint=So11111111111111111111111111111111111111112&outputMint=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&amount=1000000&slippageBps=50 failed, reason: getaddrinfo ENOTFOUND quote-api.jup.ag
+    at ClientRequest.<anonymous> (C:\pcprotocol\optimized-jupiter-bot\node_modules\node-fetch\lib\index.js:1501:11)
+    at ClientRequest.emit (node:events:508:28)
+    at ClientRequest.emit (node:domain:489:12)
+    at emitErrorEvent (node:_http_client:108:11)
+    at TLSSocket.socketErrorListener (node:_http_client:575:5)
+    at TLSSocket.emit (node:events:508:28)
+    at TLSSocket.emit (node:domain:489:12)
+    at emitErrorNT (node:internal/streams/destroy:170:8)
+    at emitErrorCloseNT (node:internal/streams/destroy:129:3)
+    at processTicksAndRejections (node:internal/process/task_queues:90:21) {
+  type: 'system',
+  errno: 'ENOTFOUND',
+  code: 'ENOTFOUND'
+}

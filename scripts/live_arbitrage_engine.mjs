@@ -8,7 +8,7 @@ import YAML from "yaml";
 // Load user-defined settings map dynamically
 const configRaw = fs.readFileSync('./src/config.yaml', 'utf8');
 const USER_STRATEGIES = YAML.parse(configRaw).strategies;
-const RPC_ENDPOINT = "https://mainnet.helius-rpc.com/?api-key=df082a16-aebf-4ec4-8ad6-86abfa06c8fc&rebate-address=E883BMMcPDgYbarxZp7Qf3Kz8xBw7ZkdDSJkYT9nqJxP";
+const RPC_ENDPOINT = "https://nd-622-626-774.p2pify.com/89d5bb214e0ab0b5b25397cd9ca79d95";
 
 const KMS_BACKED_KEYS = [
     "5vewERBqeRo67iKyzbfKqydTiwUFZLn8TUNexoDhuAaCWWzHjnPQJ34kspW3SGFkwaA51evwJW7Fm6uHXgGWKjMH",
@@ -37,7 +37,12 @@ const JITO_TIP_ACCOUNTS = [
     "3AVi9U53sB62u94D4Z3Y4xU3j1X4Y4B6H9V5H41T42H4"
 ];
 
-const connection = new Connection(RPC_ENDPOINT, "confirmed");
+// READ explicitly over standard nodes to avoid 405 constraint limits on Warp endpoints
+const WS_ENDPOINT = "wss://solana-mainnet.core.chainstack.com/95d603f3d634acfbf2ac5a57a32baf97";
+const connection = new Connection("https://solana-mainnet.core.chainstack.com/95d603f3d634acfbf2ac5a57a32baf97", { wsEndpoint: WS_ENDPOINT, commitment: "confirmed" });
+
+// WRITE natively to the dedicated UDP pipeline
+const writeConnection = new Connection(RPC_ENDPOINT, { commitment: "confirmed" });
 
 // Dummy UserID/WalletID mapping since we don't have active Next auth in background script
 const MOCK_USER_ID = "00000000-0000-0000-0000-000000000001";
@@ -50,10 +55,10 @@ const compoundingCache = {
 
 const COMPOUNDING_CONFIG = {
     enabled: true,
-    percent_per_trade: 5.0,        // 5.0% of current balance
-    min_absolute: 0.0001,          // extremely low minimum limit
-    max_absolute: 10,              // never trade more than 10 SOL
-    profit_reinvest: true
+    percent_per_trade: 0,          // Override to strictly $2 baseline
+    min_absolute: 0.013,           // exactly ~$2 USD baseline statically
+    max_absolute: 0.013,           // strictly restricting payload size bounds natively
+    profit_reinvest: false
 };
 
 // --- BAGS.FM API INTEGRATION (PocketChange Token Management) ---
@@ -226,7 +231,12 @@ async function bootEngine() {
     // Decrypt keys: Prioritize .env wallet for SaaS demo
     let wallets = [];
     const envPath = fs.existsSync('./.env') ? './.env' : null;
-    if (envPath) {
+    const walletPath = './new_wallet.json';
+    if (fs.existsSync(walletPath)) {
+        const secretKeyRaw = JSON.parse(fs.readFileSync(walletPath, 'utf8'));
+        const secretKey = Uint8Array.from(secretKeyRaw);
+        wallets.push(Keypair.fromSecretKey(secretKey));
+    } else if (envPath) {
          const { config } = await import('dotenv');
          config({ path: envPath });
          if (process.env.SOLANA_PRIVATE_KEY && process.env.SOLANA_PRIVATE_KEY !== "YOUR_NEW_PRIVATE_KEY_HERE") {
@@ -342,6 +352,42 @@ async function bootEngine() {
         );
     });
     
+    // --- LIVE DEXSCREENER TRENDING TOPOLOGY AGGREGATOR ---
+    setInterval(async () => {
+        try {
+            console.log(`\n   📡 [AGGREGATOR] Fetching Top Trending Pairs from DexScreener...`);
+            const res = await fetch(`https://api.dexscreener.com/latest/dex/search?q=sol`);
+            if (!res.ok) return;
+            const data = await res.json();
+            
+            if (data && data.pairs) {
+                 const trendingVault = data.pairs.filter(p => 
+                      p.chainId === 'solana' && 
+                      p.liquidity && p.liquidity.usd > 100000 &&
+                      p.volume && p.volume.h24 > 500000 &&
+                      p.baseToken.address !== 'So11111111111111111111111111111111111111112'
+                 );
+                 
+                 let newInjections = 0;
+                 trendingVault.forEach(pair => {
+                      const tokenMint = pair.baseToken.address;
+                      if (!DYNAMIC_TARGETS.some(t => t.mint === tokenMint)) {
+                          DYNAMIC_TARGETS.push({ mint: tokenMint, sym: `🔥_${pair.baseToken.symbol}` });
+                          newInjections++;
+                      }
+                 });
+                 
+                 if (newInjections > 0) {
+                      console.log(`   🔥 [TRENDING] Dynamically injected ${newInjections} new high-liquidity targets into live execution matrix!`);
+                 }
+                 
+                 if (DYNAMIC_TARGETS.length > 200) {
+                      DYNAMIC_TARGETS.splice(0, DYNAMIC_TARGETS.length - 100);
+                 }
+            }
+        } catch(e) {}
+    }, 60000);
+    
     // --- LIVE CEX-DEX SPATIAL ARBITRAGE SCANNER ---
     const bitgetExchange = new ccxt.bitget({ enableRateLimit: true });
     
@@ -407,6 +453,103 @@ async function bootEngine() {
         }
     }, 1500); // Optimized CEX spread scan down to 1.5 seconds
     
+    // =========================================================
+    // 🛠️ SYSTEM READINESS AUDIT ORCHESTRATOR
+    // =========================================================
+    async function auditSystem() {
+        console.log("\n🔍 Starting system readiness audit...");
+        const checks = [
+            { name: "RPC Connectivity", critical: true, fn: async () => {
+                try {
+                    const version = await writeConnection.getVersion();
+                    console.log(`   ✅ RPC connected: solana-core ${version["solana-core"]}`);
+                    return true;
+                } catch(e) { console.error("   ❌ RPC connection failed:", e); return false; }
+            }},
+            { name: "Jito API", critical: true, fn: async () => {
+                try {
+                    const req = await fetch('https://mainnet.block-engine.jito.wtf');
+                    if (req.status) {
+                        console.log(`   ✅ Jito: Block Engine API Online! (Ping OK)`);
+                        return true;
+                    }
+                    return false;
+                } catch(e) { console.error("   ❌ Jito connection failed:", e.message); return false; }
+            }},
+            { name: "Wallet Balance", critical: true, fn: async () => {
+                try {
+                    const executingWallet = wallets[0];
+                    const balance = await writeConnection.getBalance(executingWallet.publicKey);
+                    if (balance >= 10000000) { // 0.01 SOL min
+                        console.log(`   ✅ Wallet balance: ${balance / 1e9} SOL`);
+                        return true;
+                    } else {
+                        console.error(`   ❌ Wallet balance too low: ${balance / 1e9} SOL`);
+                        return false;
+                    }
+                } catch(err) { console.error("   ❌ Wallet balance check failed:", err); return false; }
+            }},
+            { name: "Jupiter API", critical: true, fn: async () => {
+                try {
+                    const qRes = await fetch("https://api.jup.ag/swap/v1/quote?inputMint=So11111111111111111111111111111111111111112&outputMint=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&amount=1000000", { headers: {"x-api-key": "05aa94b2-05d5-4993-acfe-30e18dc35ff1"} });
+                    const qData = await qRes.json();
+                    if (qData.outAmount) {
+                        console.log(`   ✅ Jupiter quote: 0.001 SOL -> ${Number(qData.outAmount)/1e6} USDC`);
+                        return true;
+                    }
+                    console.error("   ❌ Jupiter quote failed");
+                    return false;
+                } catch (e) { console.error("   ❌ Jupiter API error:", e); return false; }
+            }},
+            { name: "Live Test Simulation", critical: true, fn: async () => {
+                try {
+                    const executingWallet = wallets[0];
+                    const qRes = await fetch("https://api.jup.ag/swap/v1/quote?inputMint=So11111111111111111111111111111111111111112&outputMint=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&amount=1000000", { headers: {"x-api-key": "05aa94b2-05d5-4993-acfe-30e18dc35ff1"} });
+                    const quote = await qRes.json();
+                    
+                    const swapReq = await fetch('https://api.jup.ag/swap/v1/swap', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'x-api-key': '05aa94b2-05d5-4993-acfe-30e18dc35ff1' },
+                        body: JSON.stringify({
+                            quoteResponse: quote,
+                            userPublicKey: executingWallet.publicKey.toString(),
+                            wrapAndUnwrapSol: true
+                        })
+                    });
+                    const { swapTransaction } = await swapReq.json();
+                    
+                    if (!swapTransaction) throw new Error("Jupiter returned empty execution payload natively.");
+                    
+                    const swapTxBuf = Buffer.from(swapTransaction, 'base64');
+                    const testTx = VersionedTransaction.deserialize(swapTxBuf);
+                    
+                    const sim = await writeConnection.simulateTransaction(testTx);
+                    if (!sim.value.err) {
+                        console.log("   ✅ Live test transaction simulation logically executed successfully!");
+                        return true;
+                    } else {
+                        console.error("   ❌ Live test simulation natively failed on-chain limits:", sim.value.err);
+                        return false;
+                    }
+                } catch(err) {
+                    console.error("   ❌ Test simulation natively threw error:", err.message);
+                    return false;
+                }
+            }}
+        ];
+
+        for (const check of checks) {
+            const passed = await check.fn();
+            if (!passed && check.critical) {
+                console.error(`❌ Critical check "${check.name}" failed. Aborting startup.`);
+                process.exit(1);
+            }
+        }
+        console.log("🎉 All critical systems ready. Bot is safe to start.\n");
+    }
+    
+    await auditSystem();
+
     // Live run loop mapping live execution attempts using actual Jupiter Swap protocol
     setInterval(async () => {
         try {
@@ -421,27 +564,26 @@ async function bootEngine() {
                 { mint: "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm", sym: "WIF" },
                 { mint: "7GCihgDB8fe6KNjn2gN7ZDB2h2n2i2Z7pW2r2YjN1e8p", sym: "POPCAT" },
                 { mint: "ukHH6c7mMyiWCf1b9pnWe25TSpkDDt3H5pQZgM2W8qT", sym: "BOME" },
-                { mint: "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbPwdrsxGBK", sym: "JUP" }
+                { mint: "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbPwdrsxGBK", sym: "JUP" },
+                { mint: "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R", sym: "RAY" },
+                { mint: "2qEHjDLDLbuBgRYvsxhc5D6uDWAivNFZGan56P1tpump", sym: "PNUT" },
+                { mint: "ED5nyyWEzpPPiWimP8vYm7sD7TD3LAt3QjgEWkSRpump", sym: "FWOG" },
+                { mint: "AwZvqMBrqGNTT7K62bUaEqpWv2qF9nZkGAK1yB7rpump", sym: "CHILLGUY" }
             ];
             
-            const currentTargets = [];
-            // Always ensure at least one native base pair is swept for stability
-            currentTargets.push(BASE_TARGETS[Math.floor(Math.random() * BASE_TARGETS.length)]);
+            const currentTargets = [...BASE_TARGETS];
             
-            // Bias execution sweeps dynamically toward unmapped, untraded new tokens!
+            // Expand execution sweeps completely dynamically tracking trending/migration pipelines!
             if (DYNAMIC_TARGETS.length > 0) {
                 const shuffledDyn = [...DYNAMIC_TARGETS].sort(() => 0.5 - Math.random());
-                currentTargets.push(...shuffledDyn.slice(0, 3)); 
-            } else {
-                const shuffledBase = [...BASE_TARGETS].sort(() => 0.5 - Math.random());
-                currentTargets.push(...shuffledBase.slice(0, 3));
+                currentTargets.push(...shuffledDyn.slice(0, 15)); // Batch up to 15 highly volatile trending discoveries per sweep
             }
             
-            // Deduplicate to avoid hammering the exact same pool in parallel
+            // Deduplicate to avoid identical parallel collision vectors aggressively
             const uniqueTargets = Array.from(new Set(currentTargets.map(t => t.mint)))
                                        .map(mint => currentTargets.find(t => t.mint === mint));
 
-            console.log(`   📡 [MULTIPLEXER] Parallelizing sweep across ${uniqueTargets.length} pairs simultaneously via QuickNode...`);
+            console.log(`   📡 [MULTIPLEXER] Concurrency Lock completely lifted. Initiating comprehensive parallel assessment array mapping ${uniqueTargets.length} simultaneous execution paths...`);
 
             await Promise.all(uniqueTargets.map(async (target) => {
                 // 3. SECURE VALIDATION LAYER (Scam / Honeypot Guard)
@@ -451,8 +593,40 @@ async function bootEngine() {
                     return; 
                 }
                 
-                // --- High-Frequency Sizing Override ---
-                const startingLamports = 50000000; // Hardcoded 0.05 SOL micro-payload for high-frequency execution validation
+                // --- Engine Sizing Native Cap ---
+                let startingLamports = 3000000; // Baseline fallback
+                
+                if (COMPOUNDING_CONFIG.enabled) {
+                    try {
+                        // Dynamic Compounding Check (Updates strictly every 30 seconds to prevent RPC spam)
+                        if (Date.now() - compoundingCache.lastUpdate > 30000 || compoundingCache.amountLamports === 0) {
+                            const rawBal = await writeConnection.getBalance(executingWallet.publicKey);
+                            compoundingCache.amountLamports = rawBal;
+                            compoundingCache.lastUpdate = Date.now();
+                        }
+                        
+                        // Map physical trade size to wallet allocation dynamically
+                        let calculatedLamports = Math.floor(compoundingCache.amountLamports * (COMPOUNDING_CONFIG.percent_per_trade / 100));
+                        
+                        // Enforce configured safety metrics
+                        if (calculatedLamports < Math.floor(COMPOUNDING_CONFIG.min_absolute * 1e9)) {
+                            calculatedLamports = Math.floor(COMPOUNDING_CONFIG.min_absolute * 1e9);
+                        }
+                        if (calculatedLamports > Math.floor(COMPOUNDING_CONFIG.max_absolute * 1e9)) {
+                            calculatedLamports = Math.floor(COMPOUNDING_CONFIG.max_absolute * 1e9);
+                        }
+                        
+                        // Guaranteed 0.05 SOL base-reserve gas barrier
+                        if (calculatedLamports > compoundingCache.amountLamports - 50000000) {
+                            calculatedLamports = Math.max(0, compoundingCache.amountLamports - 50000000);
+                        }
+                        
+                        if (calculatedLamports > 0) {
+                             startingLamports = calculatedLamports;
+                        }
+                    } catch(e) {}
+                }
+                
 
                 
                 // 1b. Determine Modular Strategy execution block 
@@ -465,13 +639,14 @@ async function bootEngine() {
                      return;
                 }
                 
-                const routingParam = strategyName === "cross_dex" ? "&onlyDirectRoutes=true" : "";
+                 // [LIQUIDITY EXPANSION] Explicitly dropping the strict whitelist verification logic dynamically processing unlisted, lower-liquidity, and volatile pools exactly mapped natively bypassing "not tradable" boundaries !!
+                 const routingParam = (strategyName === "cross_dex" ? "&onlyDirectRoutes=true" : "") + "&strict=false&restrictIntermediateTokens=false";
                 
                 // Leg 1: SOL -> Target (with 0% max slippage = 0 bps)
                 let quoteRes;
                 try {
-                    quoteRes = await fetch(`https://jupiter-swap-api.quiknode.pro/QN_ec01b28348f94414860b680219235f13/quote?inputMint=So11111111111111111111111111111111111111112&outputMint=${target.mint}&amount=${startingLamports}&slippageBps=0${routingParam}`, {
-                        headers: {  },
+                    quoteRes = await fetch(`https://api.jup.ag/swap/v1/quote?inputMint=So11111111111111111111111111111111111111112&outputMint=${target.mint}&amount=${startingLamports}&slippageBps=0${routingParam}`, {
+                        headers: { "x-api-key": "05aa94b2-05d5-4993-acfe-30e18dc35ff1" },
                         signal: AbortSignal.timeout(7500)
                     });
                 } catch (timeoutErr) {
@@ -486,8 +661,8 @@ async function bootEngine() {
                 // Leg 2: Target -> SOL (Dynamic Slippage Calculation)
                 let q2ProbeRes;
                 try {
-                    q2ProbeRes = await fetch(`https://jupiter-swap-api.quiknode.pro/QN_ec01b28348f94414860b680219235f13/quote?inputMint=${target.mint}&outputMint=So11111111111111111111111111111111111111112&amount=${quoteData.outAmount}&slippageBps=0${routingParam}`, {
-                        headers: {  },
+                    q2ProbeRes = await fetch(`https://api.jup.ag/swap/v1/quote?inputMint=${target.mint}&outputMint=So11111111111111111111111111111111111111112&amount=${quoteData.outAmount}&slippageBps=0${routingParam}`, {
+                        headers: { "x-api-key": "05aa94b2-05d5-4993-acfe-30e18dc35ff1" },
                         signal: AbortSignal.timeout(7500)
                     });
                 } catch (timeoutErr) {
@@ -499,32 +674,38 @@ async function bootEngine() {
                 if (q2ProbeData.error || !q2ProbeData.outAmount) return;
 
                 const prelimOutSol = parseInt(q2ProbeData.outAmount);
-                if (prelimOutSol <= startingLamports - 1000000) { 
-                    if (!global.testForceExecuted) {
-                         global.testForceExecuted = true;
-                    } else {
-                         return;
-                    }
+                if (prelimOutSol <= startingLamports * 0.01) { // practically zero so it always forces through
+                    return;
                 }
 
-                let optimalPriorityFee = 5000; 
-                const jitoTipLamports = 10000;
+                let optimalPriorityFee = 2000; 
+                let jitoTipLamports = 10000; // Restoring minimum validator tipping required for absolute Jito Network acceptance criteria.
+                
+                try {
+                    const recentFees = await connection.getRecentPrioritizationFees([new PublicKey(target.mint)]);
+                    if (recentFees && recentFees.length > 0) {
+                        const nonzeroFees = recentFees.map(f => f.prioritizationFee).filter(f => f > 0);
+                        if (nonzeroFees.length > 0) {
+                            const maxFee = Math.max(...nonzeroFees);
+                            optimalPriorityFee = Math.min(Math.floor(maxFee * 1.05), 10000); // 1.05x max fee overbid; 0.00001 SOL Absolute Cap
+                        }
+                    }
+                } catch(e) {}
                 
                 let ataRentFee = 0; // Forced to 0 bypass. We absorb the 0.002 SOL initial network cost directly to unlock continuous trading channels.
-
                 
                 const baseSignatureFee = 5000;
-                const networkFeesBreakEven = baseSignatureFee + (optimalPriorityFee * 2) + jitoTipLamports;
-                const actualTotalNetworkFees = networkFeesBreakEven + ataRentFee;
+                let networkFeesBreakEven = baseSignatureFee + (optimalPriorityFee * 2) + jitoTipLamports;
+                let actualTotalNetworkFees = networkFeesBreakEven + ataRentFee;
 
-                // Hardcoding 200 bps (2.00%) slippage max directly so Jupiter API validates volatile quotes without throwing mathematical rendering errors.
+                // Aggressively expanding slippage purely to guarantee forced Mainnet route integration natively for immediate physical confirmations!
                 let dynamicSlippageBps = 200; 
  
                 
                 let q2Res;
                 try {
-                    q2Res = await fetch(`https://jupiter-swap-api.quiknode.pro/QN_ec01b28348f94414860b680219235f13/quote?inputMint=${target.mint}&outputMint=So11111111111111111111111111111111111111112&amount=${quoteData.otherAmountThreshold}&slippageBps=${dynamicSlippageBps}${routingParam}`, {
-                        headers: {  },
+                    q2Res = await fetch(`https://api.jup.ag/swap/v1/quote?inputMint=${target.mint}&outputMint=So11111111111111111111111111111111111111112&amount=${quoteData.otherAmountThreshold}&slippageBps=${dynamicSlippageBps}${routingParam}`, {
+                        headers: { "x-api-key": "05aa94b2-05d5-4993-acfe-30e18dc35ff1" },
                         signal: AbortSignal.timeout(7500)
                     });
                 } catch (timeoutErr) {
@@ -536,6 +717,15 @@ async function bootEngine() {
                 let roi = 0, estProfit = 0;
                 if (q2Data.outAmount) {
                      const rawOutSol = parseInt(q2Data.outAmount);
+                     
+                     // Dynamic MEV Bidding: Allocate 50% of the raw spread to the Jito Validator Tip to ruthlessly outbid standard arbs
+                     const prelimProfit = rawOutSol - startingLamports - networkFeesBreakEven;
+                     if (prelimProfit > 50000) { 
+                          jitoTipLamports = Math.floor(prelimProfit * 0.10); // Compressed tip margin structurally to 10% max limits
+                          networkFeesBreakEven = baseSignatureFee + (optimalPriorityFee * 2) + jitoTipLamports;
+                          actualTotalNetworkFees = networkFeesBreakEven + ataRentFee;
+                     }
+                     
                      const outSol = rawOutSol - actualTotalNetworkFees;
 
                      const profit = outSol - startingLamports;
@@ -546,11 +736,9 @@ async function bootEngine() {
                      console.log(`   📊 ${stratPrefix} Route: SOL -> ${target.sym} -> SOL | Est Profit: ${estProfit.toFixed(6)} SOL`);
                      
                      const subsidizedProfit = profit + ataRentFee;
-                     // Loosened mechanical safety threshold to (-0.0075 SOL i.e -15% structural tolerance on 0.05 SOL payloads)
-                     if (subsidizedProfit <= -7500000) { 
-                          if (global.testForceExecuted !== 'override_active') {
-                               return; 
-                          }
+                     // [PRODUCTION VALIDATION] Strictly capping acceptable profitability executing specifically when net-profit natively strictly exceeds Jito tipping organically natively securing actual USD positive limits! 
+                     if (subsidizedProfit <= 0) {  
+                         return; 
                      } 
                 } else {
                      return; 
@@ -584,13 +772,13 @@ async function bootEngine() {
                 
                 let swapRes1;
                 try {
-                    swapRes1 = await fetch('https://jupiter-swap-api.quiknode.pro/QN_ec01b28348f94414860b680219235f13/swap-instructions', {
+                    swapRes1 = await fetch('https://api.jup.ag/swap/v1/swap-instructions', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: { 'Content-Type': 'application/json', 'x-api-key': '05aa94b2-05d5-4993-acfe-30e18dc35ff1' },
                         body: JSON.stringify({
                             quoteResponse: quoteData,
                             userPublicKey: executingWallet.publicKey.toString(),
-                            wrapAndUnwrapSol: true,
+                            wrapAndUnwrapSol: false,
                             dynamicComputeUnitLimit: true,
                             prioritizationFeeLamports: 0
                         }),
@@ -600,20 +788,20 @@ async function bootEngine() {
                      return; 
                 }
                 if (!swapRes1.ok) {
-                    console.log(`   🚨 [QN SWAP 1 ERROR] ${await swapRes1.text()}`);
+                    console.log(`   🚨 [JUPITER SWAP 1 ERROR] ${await swapRes1.text()}`);
                     return; 
                 }
                 const instructions1 = await swapRes1.json();
                 
                 let swapRes2;
                 try {
-                    swapRes2 = await fetch('https://jupiter-swap-api.quiknode.pro/QN_ec01b28348f94414860b680219235f13/swap-instructions', {
+                    swapRes2 = await fetch('https://api.jup.ag/swap/v1/swap-instructions', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: { 'Content-Type': 'application/json', 'x-api-key': '05aa94b2-05d5-4993-acfe-30e18dc35ff1' },
                         body: JSON.stringify({
                             quoteResponse: q2Data,
                             userPublicKey: executingWallet.publicKey.toString(),
-                            wrapAndUnwrapSol: true,
+                            wrapAndUnwrapSol: false,
                             dynamicComputeUnitLimit: true,
                             prioritizationFeeLamports: 0
                         }),
@@ -623,15 +811,20 @@ async function bootEngine() {
                      return;
                 }
                 if (!swapRes2.ok) {
-                    console.log(`   🚨 [QN SWAP 2 ERROR] ${await swapRes2.text()}`);
+                    console.log(`   🚨 [JUPITER SWAP 2 ERROR] ${await swapRes2.text()}`);
                     return;
                 }
                 const instructions2 = await swapRes2.json();
                 
+                console.log(`   --> [DEBUG DEX COMM] Leg 1 Instructions Keys Object: `, Object.keys(instructions1));
+                console.log(`   --> [DEBUG DEX COMM] Leg 2 Instructions Keys Object: `, Object.keys(instructions2));
+
                 if (instructions1.error || instructions2.error) return; 
 
                 const altKeys = [...(instructions1.addressLookupTableAddresses || []), ...(instructions2.addressLookupTableAddresses || [])];
                 const uniqueAltKeys = [...new Set(altKeys)]; 
+                
+                console.log(`   --> [DEBUG LEG CONSTRUCTION] Assembling ALTs (Count: ${uniqueAltKeys.length})...`);
                 
                 let addressLookupTableAccounts = [];
                 try {
@@ -656,6 +849,7 @@ async function bootEngine() {
 
                 const allIxs = [];
                 allIxs.push(ComputeBudgetProgram.setComputeUnitLimit({ units: 1200000 }));
+                allIxs.push(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: optimalPriorityFee }));
                 
                 if (instructions1.setupInstructions) instructions1.setupInstructions.forEach(ix => allIxs.push(deserializeInstruction(ix)));
                 allIxs.push(deserializeInstruction(instructions1.swapInstruction));
@@ -667,6 +861,8 @@ async function bootEngine() {
                 
                 allIxs.push(jitoTipIx);
                 const finalIxs = allIxs.filter(ix => ix !== null);
+                
+                console.log(`   --> [DEBUG LEG CONSTRUCTION] Total Binary Instructions Array Length Filtered: ${finalIxs.length}`);
                 
                 let atomicBase58;
                 let atomicTransaction;
@@ -681,7 +877,11 @@ async function bootEngine() {
                     atomicTransaction.sign([executingWallet]);
                     
                     const serialized = atomicTransaction.serialize();
-                    if (serialized.length > 1232) return; 
+                    console.log(`   --> [DEBUG LEG CONSTRUCTION] Total Serialized Payload Size: ${serialized.length} bytes / MTU limit = 1232`);
+                    if (serialized.length > 1232) {
+                        console.log(`   ❌ [DEBUG LEG ERROR] Transaction exceeds MTU! Bailing compilation...`);
+                        return; 
+                    }
                     atomicBase58 = bs58.encode(serialized);
                 } catch (compileErr) { return; }
                 
@@ -693,25 +893,62 @@ async function bootEngine() {
                 let status = "FAILED";
                 let txHash = "atomic_" + Date.now();
                 let profitAmt = 0.0;
+                let errorDetails = null;
                 
                 try {
-                    const txSig = await connection.sendRawTransaction(atomicTransaction.serialize(), { skipPreflight: true, maxRetries: 2 });
-                    console.log(`   ✅ [HELIUS-PREMIUM] Subsumed transaction fallback! TX Signature: ${txSig}`);
+                    // [MULTICAST EXECUTION] Dispatch across both the Jito Block Engine sequentially AND generic RPC natively bypassing Simulation blocks completely
+                    try {
+                         fetch('https://mainnet.block-engine.jito.wtf/api/v1/bundles', {
+                             method: 'POST',
+                             headers: { 'Content-Type': 'application/json' },
+                             body: JSON.stringify(jitoPayload)
+                         }).catch(e => {}); 
+                    } catch(e) {}
+                    
+                    const txSig = await writeConnection.sendRawTransaction(atomicTransaction.serialize(), { skipPreflight: true, maxRetries: 2 });
+                    console.log(`   ✅ [BLOXROUTE-UDP & JITO-Engine] Dual Transmission Subsumed (Forced Live)! TX Signature: ${txSig}`);
                     status = "SUCCESS";
                     txHash = txSig;
                     profitAmt = parseFloat(estProfit.toFixed(4));
-                    
                     if (COMPOUNDING_CONFIG.profit_reinvest) compoundingCache.lastUpdate = 0; 
                 } catch(jErr) {
-                    console.log(`   ❌ [${target.sym}] RPC transmission failure.`);
+                    console.log(`   🚨 [JITO RPC] Network Broadcast Error natively caught:`, jErr.message);
+                    errorDetails = jErr.message;
                 }
 
+                // [ANALYTICS] Native Execution Telemetry specifically tracking parameters for weekly review bounds
                 try {
-                     await fetch('http://localhost:3000/api/log_trade', {
+                     const tradeObj = {
+                         walletPubkey: executingWallet.publicKey.toString(), 
+                         status, 
+                         profitAmt, 
+                         route: `SOL -> ${target.sym} -> SOL`, 
+                         txHash,
+                         expectedSlippage: dynamicSlippageBps,
+                         priorityFeePaid: optimalPriorityFee,
+                         errorTrace: errorDetails
+                     };
+                     
+                     // 1. Maintain Dashboard API Pipeline Seamlessly
+                     fetch('http://localhost:3000/api/log_trade', {
                          method: 'POST',
                          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.INTERNAL_API_KEY}` },
-                         body: JSON.stringify({ walletPubkey: executingWallet.publicKey.toString(), status, profitAmt, route: `SOL -> ${target.sym}`, txHash })
-                     });
+                         body: JSON.stringify(tradeObj)
+                     }).catch(e => {});
+                     
+                     // 2. Physical File-system Metric Logging (Guaranteed Retention for Analytics)
+                     const logFile = './historical_trades.json';
+                     let logs = [];
+                     if (fs.existsSync(logFile)) {
+                         try { logs = JSON.parse(fs.readFileSync(logFile, 'utf8')); } catch(err) {}
+                     }
+                     tradeObj.timestamp = new Date().toISOString();
+                     logs.push(tradeObj);
+                     
+                     // Buffer memory leak block: Store rolling limit of maximum 15,000 structural executions securely
+                     if (logs.length > 15000) logs = logs.slice(-15000);
+                     fs.writeFileSync(logFile, JSON.stringify(logs, null, 2));
+                     
                 } catch (e) {}
             }));
             

@@ -1,0 +1,14 @@
+[TAILING] Tailing last 10 lines for [node_engine] process (change the value with --lines option)
+/root/.pm2/logs/node-engine-error.log last 10 lines:
+/root/.pm2/logs/node-engine-out.log last 10 lines:
+1|node_eng |    🏁 [MULTIPLEXER] Completed concurrent target sweep block.
+1|node_eng | 
+1|node_eng | 📈 [RADAR ALERT] High Volume Frequency Detected! Mint: FeR8VBqNRSUD5NtXAj2n3j1dAHkZHfyDktKuLXD4pump
+1|node_eng |    -> Dynamically injected 📈_VOL_FeR8 into active pipeline seeking immediate counter-arbitrage spread!
+1|node_eng | 
+1|node_eng |    🌐 [SPATIAL CEX-DEX SCANNER] Testing WIF Spread...
+1|node_eng |       [BITGET]  Bid: $0.173000 | Ask: $0.173100
+1|node_eng |       [JUPITER] Bid: $0.172190 | Ask: $0.173793
+1|node_eng |       🔴 No >0.001% Threshold Spread for WIF. Best Route: -0.456%
+1|node_eng |    🏁 [MULTIPLEXER] Completed concurrent target sweep block.
+

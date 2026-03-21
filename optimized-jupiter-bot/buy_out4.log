@@ -1,0 +1,9 @@
+[dotenv@17.3.1] injecting env (16) from .env -- tip: ⚙️  override existing env vars with { override: true }
+[INFO] 2026-03-20T12:02:31.319Z - 🔥 [FORCE LIVE BUY] Generating true on-chain swap via Jito boundaries...
+[INFO] 2026-03-20T12:02:31.506Z - ⚡ Funneling Swap Instructions into Native Compiler...
+[ERROR] 2026-03-20T12:02:31.511Z - Failed to build versioned transaction: Error: No cached blockhash available
+    at getCachedBlockhash (C:\pcprotocol\optimized-jupiter-bot\src\jupiter\cache.ts:37:15)
+    at buildVersionedTransaction (C:\pcprotocol\optimized-jupiter-bot\src\execution\transaction.ts:14:41)
+    at forceLiveBuy (C:\pcprotocol\optimized-jupiter-bot\scripts\force_live_buy.ts:53:56)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+[ERROR] 2026-03-20T12:02:31.525Z - Native Compiler failed to build versioned structures.

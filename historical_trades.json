@@ -1,0 +1,42 @@
+[
+  {
+    "walletPubkey": "DnQhJawMXW7ZWA19XbzrV1q3KWZvMnpfyrxe4f74FHVj",
+    "status": "SUCCESS",
+    "profitAmt": -0.0001,
+    "route": "SOL -> RAY -> SOL",
+    "txHash": "a387qqZsqy4qbPgrpEZhcJaBsYdzEmi4cJnx2fbfexp9sd3j4aEC9JinEx1fUFvxGiTaP1ZRPNbNCJ7RYQurmSa",
+    "expectedSlippage": 15,
+    "priorityFeePaid": 2000,
+    "timestamp": "2026-03-19T17:10:05.131Z"
+  },
+  {
+    "walletPubkey": "DnQhJawMXW7ZWA19XbzrV1q3KWZvMnpfyrxe4f74FHVj",
+    "status": "SUCCESS",
+    "profitAmt": -0.0002,
+    "route": "SOL -> PNUT -> SOL",
+    "txHash": "2qvUa6MxQNjKH83Fnb5sY368zhX2AuFwSuX4teDjFfq8XJyjXfqmJizWJbL7xuptZkZQ3jLnBPNKPpLucmsVQ6w3",
+    "expectedSlippage": 15,
+    "priorityFeePaid": 2000,
+    "timestamp": "2026-03-19T17:10:08.175Z"
+  },
+  {
+    "walletPubkey": "DnQhJawMXW7ZWA19XbzrV1q3KWZvMnpfyrxe4f74FHVj",
+    "status": "SUCCESS",
+    "profitAmt": -0.0002,
+    "route": "SOL -> NEW_AFbX -> SOL",
+    "txHash": "9hoEBAB7wYFJbsFL4TZQdtqKkBMbF6nMub7imwY1WzLoBgaUXeYQBD74DBGGSWqoprksPe9qi4XKAjZmRYiofaQ",
+    "expectedSlippage": 15,
+    "priorityFeePaid": 2000,
+    "timestamp": "2026-03-19T17:10:11.311Z"
+  },
+  {
+    "walletPubkey": "DnQhJawMXW7ZWA19XbzrV1q3KWZvMnpfyrxe4f74FHVj",
+    "status": "SUCCESS",
+    "profitAmt": -0.0001,
+    "route": "SOL -> BONK -> SOL",
+    "txHash": "2iWfNm8tSXxoYTmL6SA6rkHtE9QnziRdFpjyF7SWG4ysmy3vq15nbq6ca9xMhJnE24dUqsFWEcJqsuwWAqgWHcNq",
+    "expectedSlippage": 15,
+    "priorityFeePaid": 2000,
+    "timestamp": "2026-03-19T17:10:14.326Z"
+  }
+]

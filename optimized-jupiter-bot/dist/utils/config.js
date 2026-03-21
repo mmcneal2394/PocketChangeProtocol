@@ -8,7 +8,7 @@ const zod_1 = require("zod");
 const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
 const envSchema = zod_1.z.object({
-    GEYSER_ENDPOINT: zod_1.z.string().url().or(zod_1.z.string()),
+    GEYSER_RPC: zod_1.z.string().url().or(zod_1.z.string()),
     GEYSER_API_TOKEN: zod_1.z.string(),
     RPC_ENDPOINT: zod_1.z.string().url(),
     RPC_WEBSOCKET: zod_1.z.string().url(),
@@ -24,6 +24,14 @@ const envSchema = zod_1.z.object({
     MAX_TRADE_SIZE_SOL: zod_1.z.string().transform(Number),
     RESTRICT_INTERMEDIATE_TOKENS: zod_1.z.union([zod_1.z.boolean(), zod_1.z.string().transform((s) => s === 'true')]).default(true),
     BAGS_API_KEY: zod_1.z.string().optional(),
+    // Local Engine Constants
+    MIN_PROFIT_SOL: zod_1.z.string().default("0.05").transform(Number),
+    TIP_PERCENTAGE: zod_1.z.string().default("0.5").transform(Number),
+    MAX_SLIPPAGE_BPS: zod_1.z.string().default("50").transform(Number),
+    SCAN_INTERVAL_MS: zod_1.z.string().default("100").transform(Number),
+    TOKENS_TO_SCAN: zod_1.z.string().default("So11111111111111111111111111111111111111112"),
+    // Storage System Mappings
+    LOG_DB_PATH: zod_1.z.string().default("./trades.db")
 });
 const parsed = envSchema.safeParse(process.env);
 if (!parsed.success) {

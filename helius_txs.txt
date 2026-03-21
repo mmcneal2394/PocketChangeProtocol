@@ -1,0 +1,50 @@
+Failed to update recent blockhash 
+Failed to update recent blockhash 
+Failed to update recent blockhash 
+Failed to update recent blockhash 
+Failed to update recent blockhash 
+Failed to update recent blockhash 
+[Chainstack-RPC] Failed: 429 Too Many 
+[Jito-BlockEngine] Failed: Network 
+[BloXroute-OFR] Failed: Unexpected 
+Failed to update recent blockhash 
+Failed to update recent blockhash 
+Failed to update recent blockhash 
+Failed to update recent blockhash 
+Failed to update recent blockhash 
+Failed to update recent blockhash 
+Failed to update recent blockhash 
+Failed to update recent blockhash 
+Failed to update recent blockhash 
+Failed to update recent blockhash 
+Failed to update recent blockhash 
+Failed to fetch ALT G6EBADumaU4MaifUPMYY
+Failed to fetch ALT 9N9Chw3edzTnY2bDMpzM
+[INFO] 2026-03-20T08:37:09.933Z - [COMPILATION] Synced local Blockhash/ALT states sequentially mapping atomic instructions in 1.4ms!
+Failed to update recent blockhash 
+Failed to update recent blockhash 
+Failed to update recent blockhash 
+Failed to update recent blockhash 
+Failed to update recent blockhash 
+Failed to update recent blockhash 
+[INFO] 2026-03-20T08:37:11.183Z - [COMPILATION] Constructing payload for Simple-2-Hop with tip: 0.002 SOL
+Failed to update recent blockhash 
+Failed to update recent blockhash 
+Failed to update recent blockhash 
+Failed to update recent blockhash 
+Failed to update recent blockhash 
+Failed to update recent blockhash 
+Failed to update recent blockhash 
+Failed to update recent blockhash 
+[Chainstack-RPC] Failed: 429 Too Many 
+[Jito-BlockEngine] Failed: Network 
+[BloXroute-OFR] Failed: Unexpected 
+Failed to update recent blockhash 
+Failed to update recent blockhash 
+Failed to update recent blockhash 
+Failed to update recent blockhash 
+Failed to update recent blockhash 
+Failed to update recent blockhash 
+Failed to update recent blockhash 
+Failed to update recent blockhash 
+Failed to update recent blockhash 

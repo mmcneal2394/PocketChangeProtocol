@@ -65,17 +65,25 @@ async function refreshDynamicTokens() {
 refreshDynamicTokens();
 // Refresh every 60 seconds (1 minute) for absolute maximum trending pool tracking
 setInterval(refreshDynamicTokens, 60 * 1000);
+const spl_token_1 = require("@solana/spl-token");
 // Connection for wallet balance checking
 const connection = new web3_js_1.Connection(config_1.config.RPC_ENDPOINT, { commitment: 'processed' });
 const walletPubkey = new web3_js_1.PublicKey(config_1.config.WALLET_PUBLIC_KEY);
 let cachedLamportsBalance = 0.5 * 10 ** 9; // Fallback
-// Update balance every 30 seconds
+let existingAtas = new Set();
+// Update balance and known ATAs every 30 seconds
 setInterval(async () => {
     try {
         cachedLamportsBalance = await connection.getBalance(walletPubkey);
+        // Fetch all token accounts to cache existing ATAs
+        const accounts = await connection.getParsedTokenAccountsByOwner(walletPubkey, {
+            programId: spl_token_1.TOKEN_PROGRAM_ID
+        });
+        const tokenMints = accounts.value.map(acc => acc.account.data.parsed.info.mint);
+        existingAtas = new Set(tokenMints);
     }
     catch (err) {
-        logger_1.logger.warn("Failed to fetch wallet balance:", err);
+        logger_1.logger.warn("Failed to fetch wallet balance and ATAs:", err);
     }
 }, 30000);
 let hasForcedInitialTrade = false;
@@ -122,7 +130,10 @@ async function handleAccountUpdate(data) {
         // Subtract standard physical network fees natively (Bypassing MEV Tips constraints)
         // Freed up ~200,000 lamports of margin previously wasted on Artificial buffers!
         const ESTIMATED_GAS_AND_TIP_LAMPORTS = 15000;
-        const netProfitLamports = grossProfitLamports - ESTIMATED_GAS_AND_TIP_LAMPORTS;
+        // CRITICAL FIX: Account for ~0.002 SOL Rent Exemption if this is a new dynamically routed token!
+        // Without this, the bot bleeds 2,000,000 lamports per new token, far exceeding typical 5bps arbitrage profit!
+        const ATA_RENT_LAMPORTS = existingAtas.has(intermediateMint) ? 0 : 2039280;
+        const netProfitLamports = grossProfitLamports - ESTIMATED_GAS_AND_TIP_LAMPORTS - ATA_RENT_LAMPORTS;
         const netProfitBps = (netProfitLamports / tradeSizeLamports) * 10000;
         return { size, quote1, quote2, netProfitLamports, netProfitBps };
     }));
@@ -149,11 +160,9 @@ async function handleAccountUpdate(data) {
         if (instructions) {
             const transaction = await (0, transaction_1.buildVersionedTransaction)(instructions.ix1, instructions.ix2);
             if (transaction) {
-                const results = await (0, racing_1.submitTransactionWithRacing)(transaction);
-                const rpcResult = results[0];
-                if (rpcResult.status === 'fulfilled' && rpcResult.value.success) {
-                    signatureStr = rpcResult.value.signature;
-                    success = true;
+                const rpcResult = await (0, racing_1.submitTransactionWithRacing)(transaction);
+                if (rpcResult && rpcResult.success) {
+                    signatureStr = rpcResult.signature;
                 }
             }
             else {

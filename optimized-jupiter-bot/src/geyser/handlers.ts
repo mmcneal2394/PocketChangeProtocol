@@ -186,11 +186,9 @@ export async function handleAccountUpdate(data: any) {
     if (instructions) {
       const transaction = await buildVersionedTransaction(instructions.ix1, instructions.ix2);
       if (transaction) {
-        const results = await submitTransactionWithRacing(transaction);
-        const rpcResult = results[0];
-        if (rpcResult.status === 'fulfilled' && rpcResult.value.success) {
-            signatureStr = rpcResult.value.signature as string;
-            success = true;
+        const rpcResult = await submitTransactionWithRacing(transaction);
+        if (rpcResult && rpcResult.success) {
+            signatureStr = (rpcResult as any).signature as string;
         }
       } else {
         logger.error('Failed to build versioned transaction.');

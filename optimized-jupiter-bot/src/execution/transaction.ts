@@ -11,25 +11,29 @@ export async function buildVersionedTransaction(ix1Response: any, ix2Response: a
     const rawKeypair = JSON.parse(fs.readFileSync(config.WALLET_KEYPAIR_PATH, 'utf-8'));
     const wallet = Keypair.fromSecretKey(new Uint8Array(rawKeypair));
 
-    const blockhash = getCachedBlockhash();
+    let blockhash = getCachedBlockhash();
     if (!blockhash) {
-      throw new Error('No cached blockhash available');
+      blockhash = (await connection.getLatestBlockhash('processed')).blockhash;
     }
 
     const instructions: TransactionInstruction[] = [];
 
-    // Helper to deserialize Jupiter's returned instruction
     const deserializeInstruction = (ix: any) => {
       if (!ix) return null;
-      return new TransactionInstruction({
-        programId: new PublicKey(ix.programId),
-        keys: ix.accounts.map((key: any) => ({
-          pubkey: new PublicKey(key.pubkey),
-          isSigner: key.isSigner,
-          isWritable: key.isWritable,
-        })),
-        data: Buffer.from(ix.data, "base64"),
-      });
+      try {
+          return new TransactionInstruction({
+            programId: new PublicKey(ix.programId),
+            keys: ix.accounts.map((key: any) => ({
+              pubkey: new PublicKey(key.pubkey),
+              isSigner: key.isSigner,
+              isWritable: key.isWritable,
+            })),
+            data: Buffer.from(ix.data, "base64"),
+          });
+      } catch (err) {
+          console.error("DEBUG PUBKEY ERROR on IX:", ix);
+          throw err;
+      }
     };
 
     // Load necessary address lookup tables
@@ -61,33 +65,50 @@ export async function buildVersionedTransaction(ix1Response: any, ix2Response: a
       instructions.push(deserializeInstruction(ix2Response.cleanupInstruction)!);
     }
 
-    logger.info(`--- TRANSACTION PAYLOAD STRUCTURE (${instructions.length} Instructions) ---`);
-    instructions.forEach((ix, i) => {
+    const validInstructions = instructions.filter(ix => ix !== null);
+
+    logger.info(`--- TRANSACTION PAYLOAD STRUCTURE (${validInstructions.length} Instructions) ---`);
+    validInstructions.forEach((ix, i) => {
        logger.info(`[IX ${i}] Program: ${ix.programId.toBase58()}`);
     });
     logger.info(`-----------------------------------------------------`);
 
     // Calculate baseline priority gas securely instead of relying on MEV auction padding
     // We are operating sub-10ms via Geyser, removing the need to fight block wars heavily.
-    const dynamicMicroLamports = 1000; 
+    const dynamicMicroLamports = 250000; // Extremely high strictly prioritized fee!
     
     const { ComputeBudgetProgram } = require("@solana/web3.js");
-    instructions.unshift(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: dynamicMicroLamports }));
-    instructions.unshift(ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }));
+    validInstructions.unshift(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: dynamicMicroLamports }));
+    validInstructions.unshift(ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }));
     
     logger.info(`🔥 Attached Strict Baseline Gas Priority: ${dynamicMicroLamports} microLamports (Bypassing Priority Auctions!)`);
 
     if (jitoTipLamports > 0) {
-        const jitoTipAccounts = [
-            "96gYZGLnJYVFmbjzopPSU6QiCRKbkciwEMKqQk9w3VjD",
-            "HFqU5x63VTQVPe97uX1K49VDsJkS7mD1N52aWbS5r7D7",
-            "Cw8C9e89d1qQ2H1A5kS6rA4kZ9kE5gM1B7S1X8G4C9E7",
-            "ADaUMid9yfUytqMBgopwjb2DTLSk1nB3p1Z5z6K7gW2D",
-            "DfXygSm46qf6vjVz7k6k1o5Y7b9pS1X8G4C9E7H2K5L3",
-            "AD1Q8e89d1qQ2H1A5kS6rA4kZ9kE5gM1B7S1X8G4C9E7",
-            "3AVi2R1qQ2H1A5kS6rA4kZ9kE5gM1B7S1X8G4C9E7H2K",
-            "DttWaMcVpdYxM78L4z3Pq9kM7V9X8G4C9E7H2K5L3P7D"
+        let jitoTipAccounts = [
+            "96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5",
+            "HFqU5x63VTqvQss8hp11i4wVV8bD44PvwucfZ2bU7gRe",
+            "Cw8CFyM9FkoMi7K7Crf6HNQqf4uEMzpKw6QNghXLvLkY",
+            "ADaUMid9yfUytqMBgopwjb2DTLSokTSzL1zt6iGPaS49",
+            "DfXygSm4jCyNCybVYYK6DwvWqjKee8pbDmJGcLWNDXjh",
+            "ADuUkR4vqLUMWXxW9gh6D6L8pMSawimctcNZ5pGwDcEt",
+            "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT",
+            "DttWaMuVvTiduZRnguLF7jNxTgiMBZ1hyAumKUiL2KRL"
         ];
+        
+        try {
+           const fetch = require('node-fetch');
+           const res = await fetch("https://amsterdam.mainnet.block-engine.jito.wtf/api/v1/bundles", {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "getTipAccounts", params: [] })
+           });
+           const data = await res.json();
+           if (data && data.result && data.result.length > 0) {
+               jitoTipAccounts = data.result;
+           }
+        } catch (err: any) {
+           logger.error(`Failed to fetch dynamic Tip Accounts natively: ${err.message}`);
+        }
+        
         const randomTipAccount = jitoTipAccounts[Math.floor(Math.random() * jitoTipAccounts.length)];
         
         const tipIx = SystemProgram.transfer({
@@ -96,22 +117,22 @@ export async function buildVersionedTransaction(ix1Response: any, ix2Response: a
             lamports: Math.floor(jitoTipLamports),
         });
         
-        // Add the Jito Tip correctly as the LAST execution step dynamically flawlessly predictably cleanly safely stably naturally seamlessly realistically appropriately properly nicely successfully safely expertly flawlessly smartly organically suitably cleanly cleanly physically strictly
-        instructions.push(tipIx);
-        logger.info(`💰 Appended Jito Tip Execution successfully: ${jitoTipLamports / 1e9} SOL to ${randomTipAccount.substring(0, 6)}...`);
+        // Add the Jito Tip correctly as the LAST execution step
+        validInstructions.push(tipIx);
+        logger.info(`💰 Appended DYNAMIC Jito Tip Execution successfully: ${jitoTipLamports / 1e9} SOL to ${randomTipAccount.substring(0, 6)}...`);
     }
 
     const messageV0 = new TransactionMessage({
       payerKey: wallet.publicKey,
       recentBlockhash: blockhash,
-      instructions,
+      instructions: validInstructions as TransactionInstruction[],
     }).compileToV0Message(alts);
 
     const transaction = new VersionedTransaction(messageV0);
     transaction.sign([wallet]);
 
     return transaction;
-  } catch (error) {
+    } catch (error) {
     logger.error('Failed to build versioned transaction:', error);
     return null;
   }

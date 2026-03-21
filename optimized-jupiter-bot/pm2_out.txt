@@ -1,0 +1,54 @@
+[1m[90m[TAILING] Tailing last 50 lines for [jupiter-ultra-bot] process (change the value with --lines option)[39m[22m
+[90mC:\Users\admin\.pm2\logs\jupiter-ultra-bot-error.log last 50 lines:[39m
+[90mC:\Users\admin\.pm2\logs\jupiter-ultra-bot-out.log last 50 lines:[39m
+[32m0|jupiter- | [39m2026-03-20T07:20:25: 📊 Scanning: 0.0302 SOL → USDT...
+[32m0|jupiter- | [39m2026-03-20T07:20:25:    No profit: 0.0302 SOL → 0.0027 USDT (gross: -0.027469 SOL)
+[32m0|jupiter- | [39m2026-03-20T07:20:25: .
+[32m0|jupiter- | [39m2026-03-20T07:20:25: 
+[32m0|jupiter- | [39m2026-03-20T07:20:25: 📊 Scanning: 0.0302 SOL → mSOL...
+[32m0|jupiter- | [39m2026-03-20T07:20:25:    No profit: 0.0302 SOL → 0.0221 mSOL (gross: -0.008070 SOL)
+[32m0|jupiter- | [39m2026-03-20T07:20:25: .
+[32m0|jupiter- | [39m2026-03-20T07:20:25: 💼 Sell Check: Holding BONK (Spent 0.033517 SOL)
+[32m0|jupiter- | [39m2026-03-20T07:20:25:    Holding BONK... Exit yields 0.033514 SOL (Net: -0.000003 SOL)
+[32m0|jupiter- | [39m2026-03-20T07:20:25: .
+[32m0|jupiter- | [39m2026-03-20T07:20:30: 
+[32m0|jupiter- | [39m2026-03-20T07:20:30: 📊 Scanning: 0.0302 SOL → USDC...
+[32m0|jupiter- | [39m2026-03-20T07:20:30:    No profit: 0.0302 SOL → 0.0027 USDC (gross: -0.027469 SOL)
+[32m0|jupiter- | [39m2026-03-20T07:20:30: .
+[32m0|jupiter- | [39m2026-03-20T07:20:30: 
+[32m0|jupiter- | [39m2026-03-20T07:20:30: 📊 Scanning: 0.0302 SOL → USDT...
+[32m0|jupiter- | [39m2026-03-20T07:20:30:    No profit: 0.0302 SOL → 0.0027 USDT (gross: -0.027469 SOL)
+[32m0|jupiter- | [39m2026-03-20T07:20:30: .
+[32m0|jupiter- | [39m2026-03-20T07:20:30: 
+[32m0|jupiter- | [39m2026-03-20T07:20:30: 📊 Scanning: 0.0302 SOL → mSOL...
+[32m0|jupiter- | [39m2026-03-20T07:20:30:    No profit: 0.0302 SOL → 0.0221 mSOL (gross: -0.008070 SOL)
+[32m0|jupiter- | [39m2026-03-20T07:20:30: 
+[32m0|jupiter- | [39m2026-03-20T07:20:30: 💼 Sell Check: Holding BONK (Spent 0.033517 SOL)
+[32m0|jupiter- | [39m2026-03-20T07:20:31:    Holding BONK... Exit yields 0.033514 SOL (Net: -0.000003 SOL)
+[32m0|jupiter- | [39m2026-03-20T07:20:31: .
+[32m0|jupiter- | [39m2026-03-20T07:20:36: 
+[32m0|jupiter- | [39m2026-03-20T07:20:36: 📊 Scanning: 0.0302 SOL → USDC...
+[32m0|jupiter- | [39m2026-03-20T07:20:36:    No profit: 0.0302 SOL → 0.0027 USDC (gross: -0.027469 SOL)
+[32m0|jupiter- | [39m2026-03-20T07:20:36: .
+[32m0|jupiter- | [39m2026-03-20T07:20:36: 
+[32m0|jupiter- | [39m2026-03-20T07:20:36: 📊 Scanning: 0.0302 SOL → USDT...
+[32m0|jupiter- | [39m2026-03-20T07:20:36:    No profit: 0.0302 SOL → 0.0027 USDT (gross: -0.027469 SOL)
+[32m0|jupiter- | [39m2026-03-20T07:20:36: 
+[32m0|jupiter- | [39m2026-03-20T07:20:36: 📊 Scanning: 0.0302 SOL → mSOL...
+[32m0|jupiter- | [39m2026-03-20T07:20:36:    No profit: 0.0302 SOL → 0.0221 mSOL (gross: -0.008070 SOL)
+[32m0|jupiter- | [39m2026-03-20T07:20:36: 
+[32m0|jupiter- | [39m2026-03-20T07:20:36: 💼 Sell Check: Holding BONK (Spent 0.033517 SOL)
+[32m0|jupiter- | [39m2026-03-20T07:20:36:    Holding BONK... Exit yields 0.033514 SOL (Net: -0.000003 SOL)
+[32m0|jupiter- | [39m2026-03-20T07:20:41: 
+[32m0|jupiter- | [39m2026-03-20T07:20:41: 📊 Scanning: 0.0302 SOL → USDC...
+[32m0|jupiter- | [39m2026-03-20T07:20:42:    No profit: 0.0302 SOL → 0.0027 USDC (gross: -0.027469 SOL)
+[32m0|jupiter- | [39m2026-03-20T07:20:42: 
+[32m0|jupiter- | [39m2026-03-20T07:20:42: 📊 Scanning: 0.0302 SOL → USDT...
+[32m0|jupiter- | [39m2026-03-20T07:20:42:    No profit: 0.0302 SOL → 0.0027 USDT (gross: -0.027469 SOL)
+[32m0|jupiter- | [39m2026-03-20T07:20:42: 
+[32m0|jupiter- | [39m2026-03-20T07:20:42: 📊 Scanning: 0.0302 SOL → mSOL...
+[32m0|jupiter- | [39m2026-03-20T07:20:42:    No profit: 0.0302 SOL → 0.0221 mSOL (gross: -0.008070 SOL)
+[32m0|jupiter- | [39m2026-03-20T07:20:42: 
+[32m0|jupiter- | [39m2026-03-20T07:20:42: 💼 Sell Check: Holding BONK (Spent 0.033517 SOL)
+[32m0|jupiter- | [39m2026-03-20T07:20:42:    Holding BONK... Exit yields 0.033533 SOL (Net: 0.000016 SOL)
+

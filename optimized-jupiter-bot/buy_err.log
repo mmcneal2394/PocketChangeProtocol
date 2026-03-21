@@ -1,0 +1,21 @@
+C:\pcprotocol\optimized-jupiter-bot\node_modules\ts-node\src\index.ts:859
+    return new TSError(diagnosticText, diagnosticCodes, diagnostics);
+           ^
+TSError: ⨯ Unable to compile TypeScript:
+scripts/force_live_buy.ts(39,9): error TS18046: 'ixData' is of type 'unknown'.
+scripts/force_live_buy.ts(40,50): error TS18046: 'ixData' is of type 'unknown'.
+scripts/force_live_buy.ts(60,74): error TS2339: Property 'signature' does not exist on type '{ success: boolean; provider: string; signature: string; latency: number; } | { success: boolean; provider: string; error: string; }'.
+  Property 'signature' does not exist on type '{ success: boolean; provider: string; error: string; }'.
+
+    at createTSError (C:\pcprotocol\optimized-jupiter-bot\node_modules\ts-node\src\index.ts:859:12)
+    at reportTSError (C:\pcprotocol\optimized-jupiter-bot\node_modules\ts-node\src\index.ts:863:19)
+    at getOutput (C:\pcprotocol\optimized-jupiter-bot\node_modules\ts-node\src\index.ts:1077:36)
+    at Object.compile (C:\pcprotocol\optimized-jupiter-bot\node_modules\ts-node\src\index.ts:1433:41)
+    at Module.m._compile (C:\pcprotocol\optimized-jupiter-bot\node_modules\ts-node\src\index.ts:1617:30)
+    at node:internal/modules/cjs/loader:1943:10
+    at Object.require.extensions.<computed> [as .ts] (C:\pcprotocol\optimized-jupiter-bot\node_modules\ts-node\src\index.ts:1621:12)
+    at Module.load (node:internal/modules/cjs/loader:1533:32)
+    at Module._load (node:internal/modules/cjs/loader:1335:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19) {
+  diagnosticCodes: [ 18046, 18046, 2339 ]
+}

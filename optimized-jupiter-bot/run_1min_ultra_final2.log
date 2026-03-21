@@ -1,0 +1,397 @@
+[dotenv@17.3.1] injecting env (19) from .env -- tip: ⚙️  write to custom object with { processEnv: myObject }
+🚀 Starting Jupiter Ultra Arbitrage Bot...
+✅ Wallet loaded: DnQhJawMXW7ZWA19XbzrV1q3KWZvMnpfyrxe4f74FHVj
+
+🔄 Bot running. Scanning every 5 seconds...
+💰 Min profit threshold: 0.001 SOL
+📊 Trade size: 10% of balance (max 1.0 SOL)
+🛡️ MEV Protection: ShadowLane (34x stronger) 
+⚡ Latency: 50-400ms target 
+
+
+📊 Scanning: 0.0577 SOL → USDC...
+   No profit: 0.0577 SOL → 0.0052 USDC (gross: -0.052523 SOL)
+.
+📊 Scanning: 0.0577 SOL → USDT...
+   No profit: 0.0577 SOL → 0.0052 USDT (gross: -0.052523 SOL)
+.
+📊 Scanning: 0.0577 SOL → mSOL...
+   No profit: 0.0577 SOL → 0.0422 mSOL (gross: -0.015431 SOL)
+.
+📊 Scanning: 0.0577 SOL → BONK...
+
+🎯 PROFITABLE OPPORTUNITY FOUND!
+   Input:  0.057678 SOL
+   Output: 85.938368 BONK
+   Gross:  85.880690 SOL
+   Net:    85.880690 SOL
+   Route:  1 hop(s)
+
+🚀 EXECUTING TRADE #1...
+📦 Building Ultra swap transaction...
+📡 Sending via Ultra (ShadowLane protected)...
+✅ Transaction sent!
+🔗 Explorer: https://solscan.io/tx/48AW4MPdofX6k2BpP6zLU93w39ySoJERitxvM81bu36zgMxTT6hR1Q1c4gW4EMumw4UTeaJK9NcFNd24vUYYpmDz
+💸 Input: 0.057677988 SOL
+💰 Output: 85.938367583 DezXAZ8z...
+💰 New balance: 0.5191 SOL
+📈 P&L since last: -0.057683 SOL
+
+⏳ Waiting 5s before next scan...
+
+📊 Scanning: 0.0519 SOL → USDC...
+   No profit: 0.0519 SOL → 0.0046 USDC (gross: -0.047270 SOL)
+.
+📊 Scanning: 0.0519 SOL → USDT...
+   No profit: 0.0519 SOL → 0.0046 USDT (gross: -0.047270 SOL)
+.
+📊 Scanning: 0.0519 SOL → mSOL...
+   No profit: 0.0519 SOL → 0.0380 mSOL (gross: -0.013888 SOL)
+.
+📊 Scanning: 0.0519 SOL → BONK...
+
+🎯 PROFITABLE OPPORTUNITY FOUND!
+   Input:  0.051910 SOL
+   Output: 77.340725 BONK
+   Gross:  77.288816 SOL
+   Net:    77.288816 SOL
+   Route:  1 hop(s)
+
+🚀 EXECUTING TRADE #2...
+📦 Building Ultra swap transaction...
+📡 Sending via Ultra (ShadowLane protected)...
+✅ Transaction sent!
+🔗 Explorer: https://solscan.io/tx/4zmKZrKPWRJgZkzdXX6SMCxwVhFBm27giRBchvp32yCC19S5Dy28HHdMesQ1e2zj8hdEd6FhScYkUiJBfgCFhuXm
+💸 Input: 0.051909689 SOL
+💰 Output: 77.340725345 DezXAZ8z...
+💰 New balance: 0.4672 SOL
+📈 P&L since last: -0.051915 SOL
+
+⏳ Waiting 5s before next scan...
+
+📊 Scanning: 0.0467 SOL → USDC...
+   No profit: 0.0467 SOL → 0.0042 USDC (gross: -0.042543 SOL)
+.
+📊 Scanning: 0.0467 SOL → USDT...
+   No profit: 0.0467 SOL → 0.0042 USDT (gross: -0.042542 SOL)
+.
+📊 Scanning: 0.0467 SOL → mSOL...
+   No profit: 0.0467 SOL → 0.0342 mSOL (gross: -0.012499 SOL)
+.
+📊 Scanning: 0.0467 SOL → BONK...
+
+🎯 PROFITABLE OPPORTUNITY FOUND!
+   Input:  0.046718 SOL
+   Output: 69.603152 BONK
+   Gross:  69.556433 SOL
+   Net:    69.556433 SOL
+   Route:  1 hop(s)
+
+🚀 EXECUTING TRADE #3...
+📦 Building Ultra swap transaction...
+📡 Sending via Ultra (ShadowLane protected)...
+✅ Transaction sent!
+🔗 Explorer: https://solscan.io/tx/6A2c4dJr4s34bpZVtfLSY3yhQH9Dq7zwgCMhtc9SDzJLsnrXDZEKJn9neFX2T4CpU2b9Z18Bgs1Ba3ra1FScuLU
+💸 Input: 0.04671822 SOL
+💰 Output: 69.603151695 DezXAZ8z...
+💰 New balance: 0.4205 SOL
+📈 P&L since last: -0.046723 SOL
+
+⏳ Waiting 5s before next scan...
+
+📊 Scanning: 0.0420 SOL → USDC...
+   No profit: 0.0420 SOL → 0.0038 USDC (gross: -0.038288 SOL)
+.
+📊 Scanning: 0.0420 SOL → USDT...
+   No profit: 0.0420 SOL → 0.0038 USDT (gross: -0.038287 SOL)
+.
+📊 Scanning: 0.0420 SOL → mSOL...
+   No profit: 0.0420 SOL → 0.0308 mSOL (gross: -0.011249 SOL)
+.
+📊 Scanning: 0.0420 SOL → BONK...
+
+🎯 PROFITABLE OPPORTUNITY FOUND!
+   Input:  0.042046 SOL
+   Output: 62.642048 BONK
+   Gross:  62.600002 SOL
+   Net:    62.600002 SOL
+   Route:  1 hop(s)
+
+🚀 EXECUTING TRADE #4...
+📦 Building Ultra swap transaction...
+📡 Sending via Ultra (ShadowLane protected)...
+✅ Transaction sent!
+🔗 Explorer: https://solscan.io/tx/66iSqLD7a6ZbjxmWmqnYTMpVr73XVE8HyjisJEqRYKYGuR8tuGMG57BhcpbvNtKCZZYq4y8jS7tiDLmidR7Vk7Ja
+💸 Input: 0.042045898 SOL
+💰 Output: 62.642048132 DezXAZ8z...
+💰 New balance: 0.3784 SOL
+📈 P&L since last: -0.042051 SOL
+
+⏳ Waiting 5s before next scan...
+
+📊 Scanning: 0.0378 SOL → USDC...
+   No profit: 0.0378 SOL → 0.0034 USDC (gross: -0.034459 SOL)
+.
+📊 Scanning: 0.0378 SOL → USDT...
+   No profit: 0.0378 SOL → 0.0034 USDT (gross: -0.034458 SOL)
+.
+📊 Scanning: 0.0378 SOL → mSOL...
+   No profit: 0.0378 SOL → 0.0277 mSOL (gross: -0.010124 SOL)
+.
+📊 Scanning: 0.0378 SOL → BONK...
+
+🎯 PROFITABLE OPPORTUNITY FOUND!
+   Input:  0.037841 SOL
+   Output: 56.458988 BONK
+   Gross:  56.421147 SOL
+   Net:    56.421147 SOL
+   Route:  2 hop(s)
+
+🚀 EXECUTING TRADE #5...
+📦 Building Ultra swap transaction...
+📡 Sending via Ultra (ShadowLane protected)...
+✅ Transaction sent!
+🔗 Explorer: https://solscan.io/tx/5x1hS9QVdeWWY2o6PdJUG9NnCdDUDroeXzRU9UXS6PJqZMnFSTPxgjxxHjV9gq1JesGTjEXLLmNFuN8Y2Zeo5oR3
+💸 Input: 0.037840808 SOL
+💰 Output: 56.458987953 DezXAZ8z...
+💰 New balance: 0.3405 SOL
+📈 P&L since last: -0.037892 SOL
+
+⏳ Waiting 5s before next scan...
+
+📊 Scanning: 0.0341 SOL → USDC...
+   No profit: 0.0341 SOL → 0.0030 USDC (gross: -0.031008 SOL)
+.
+📊 Scanning: 0.0341 SOL → USDT...
+   No profit: 0.0341 SOL → 0.0030 USDT (gross: -0.031008 SOL)
+.
+📊 Scanning: 0.0341 SOL → mSOL...
+   No profit: 0.0341 SOL → 0.0249 mSOL (gross: -0.009110 SOL)
+.
+📊 Scanning: 0.0341 SOL → BONK...
+
+🎯 PROFITABLE OPPORTUNITY FOUND!
+   Input:  0.034052 SOL
+   Output: 50.796957 BONK
+   Gross:  50.762905 SOL
+   Net:    50.762905 SOL
+   Route:  2 hop(s)
+
+🚀 EXECUTING TRADE #6...
+📦 Building Ultra swap transaction...
+📡 Sending via Ultra (ShadowLane protected)...
+✅ Transaction sent!
+🔗 Explorer: https://solscan.io/tx/2iE7pCByhCT6PYFoKD75g186MUpZ9wz9Y7aXhLp3uDQXe68nQQwagWC6NgDPNEUjT6rFmgB9e7v4S2NmgHJcxXXZ
+💸 Input: 0.034051614 SOL
+💰 Output: 50.796957065 DezXAZ8z...
+💰 New balance: 0.3064 SOL
+📈 P&L since last: -0.034103 SOL
+
+⏳ Waiting 5s before next scan...
+
+📊 Scanning: 0.0306 SOL → USDC...
+   No profit: 0.0306 SOL → 0.0027 USDC (gross: -0.027902 SOL)
+.
+📊 Scanning: 0.0306 SOL → USDT...
+   No profit: 0.0306 SOL → 0.0027 USDT (gross: -0.027902 SOL)
+.
+📊 Scanning: 0.0306 SOL → mSOL...
+   No profit: 0.0306 SOL → 0.0224 mSOL (gross: -0.008198 SOL)
+.
+📊 Scanning: 0.0306 SOL → BONK...
+
+🎯 PROFITABLE OPPORTUNITY FOUND!
+   Input:  0.030641 SOL
+   Output: 45.704908 BONK
+   Gross:  45.674267 SOL
+   Net:    45.674267 SOL
+   Route:  2 hop(s)
+
+🚀 EXECUTING TRADE #7...
+📦 Building Ultra swap transaction...
+📡 Sending via Ultra (ShadowLane protected)...
+✅ Transaction sent!
+🔗 Explorer: https://solscan.io/tx/3PSw8cwUo9hJ6jafYpVZvMkW6U1HgiYkU9giD3FYxFx6BErjUuFHCAyG7e1BAg5GyyBLh7CvMDAAcqQ7BHArn7Lm
+💸 Input: 0.030641336 SOL
+💰 Output: 45.704907911 DezXAZ8z...
+💰 New balance: 0.2757 SOL
+📈 P&L since last: -0.030693 SOL
+
+⏳ Waiting 5s before next scan...
+
+📊 Scanning: 0.0276 SOL → USDC...
+   No profit: 0.0276 SOL → 0.0025 USDC (gross: -0.025108 SOL)
+.
+📊 Scanning: 0.0276 SOL → USDT...
+   No profit: 0.0276 SOL → 0.0025 USDT (gross: -0.025108 SOL)
+.
+📊 Scanning: 0.0276 SOL → mSOL...
+   No profit: 0.0276 SOL → 0.0202 mSOL (gross: -0.007376 SOL)
+.
+📊 Scanning: 0.0276 SOL → BONK...
+
+🎯 PROFITABLE OPPORTUNITY FOUND!
+   Input:  0.027572 SOL
+   Output: 41.123258 BONK
+   Gross:  41.095686 SOL
+   Net:    41.095686 SOL
+   Route:  2 hop(s)
+
+🚀 EXECUTING TRADE #8...
+📦 Building Ultra swap transaction...
+📡 Sending via Ultra (ShadowLane protected)...
+✅ Transaction sent!
+🔗 Explorer: https://solscan.io/tx/2gRbbdjceHuW3g8EY6xxayQU8YaUtCKAfFDgrHP3Y3XVY965rVAhFEKrDC3kio82Y4sq6smVxcGSWPV63Vr8tpV9
+💸 Input: 0.027572085 SOL
+💰 Output: 41.123257659 DezXAZ8z...
+💰 New balance: 0.2481 SOL
+📈 P&L since last: -0.027591 SOL
+
+⏳ Waiting 5s before next scan...
+
+📊 Scanning: 0.0248 SOL → USDC...
+   No profit: 0.0248 SOL → 0.0022 USDC (gross: -0.022595 SOL)
+.
+📊 Scanning: 0.0248 SOL → USDT...
+   No profit: 0.0248 SOL → 0.0022 USDT (gross: -0.022595 SOL)
+.
+📊 Scanning: 0.0248 SOL → mSOL...
+   No profit: 0.0248 SOL → 0.0182 mSOL (gross: -0.006638 SOL)
+.
+📊 Scanning: 0.0248 SOL → BONK...
+
+🎯 PROFITABLE OPPORTUNITY FOUND!
+   Input:  0.024813 SOL
+   Output: 37.026275 BONK
+   Gross:  37.001462 SOL
+   Net:    37.001462 SOL
+   Route:  2 hop(s)
+
+🚀 EXECUTING TRADE #9...
+📦 Building Ultra swap transaction...
+📡 Sending via Ultra (ShadowLane protected)...
+✅ Transaction sent!
+🔗 Explorer: https://solscan.io/tx/1SRxj8iiwYfT5EYmUCdnhbs9Szc7MWxAuoLShgc1ksvj9DxpjucCqL82zZwpEfqzyM2WYBFCLvtAVKWsT8jvXcL
+💸 Input: 0.024812992 SOL
+💰 Output: 37.026275038 DezXAZ8z...
+💰 New balance: 0.2232 SOL
+📈 P&L since last: -0.024884 SOL
+
+⏳ Waiting 5s before next scan...
+
+📊 Scanning: 0.0223 SOL → USDC...
+   No profit: 0.0223 SOL → 0.0020 USDC (gross: -0.020329 SOL)
+.
+📊 Scanning: 0.0223 SOL → USDT...
+   No profit: 0.0223 SOL → 0.0020 USDT (gross: -0.020329 SOL)
+.
+📊 Scanning: 0.0223 SOL → mSOL...
+   No profit: 0.0223 SOL → 0.0164 mSOL (gross: -0.005973 SOL)
+.
+📊 Scanning: 0.0223 SOL → BONK...
+
+🎯 PROFITABLE OPPORTUNITY FOUND!
+   Input:  0.022325 SOL
+   Output: 33.288545 BONK
+   Gross:  33.266221 SOL
+   Net:    33.266221 SOL
+   Route:  2 hop(s)
+
+🚀 EXECUTING TRADE #10...
+📦 Building Ultra swap transaction...
+📡 Sending via Ultra (ShadowLane protected)...
+✅ Transaction sent!
+🔗 Explorer: https://solscan.io/tx/7YxP7DJSzU5rzGHNc43gdYLir3jKsPkKqvRkC92y2t2Xfg7Jk5Nk39D6cQizXvrM7MMr6r9CNBp8FT5mAYs4aKY
+💸 Input: 0.022324627 SOL
+💰 Output: 33.288545363 DezXAZ8z...
+💰 New balance: 0.2009 SOL
+📈 P&L since last: -0.022338 SOL
+
+⏳ Waiting 5s before next scan...
+
+📊 Scanning: 0.0201 SOL → USDC...
+   No profit: 0.0201 SOL → 0.0018 USDC (gross: -0.018295 SOL)
+.
+📊 Scanning: 0.0201 SOL → USDT...
+   No profit: 0.0201 SOL → 0.0018 USDT (gross: -0.018295 SOL)
+.
+📊 Scanning: 0.0201 SOL → mSOL...
+   No profit: 0.0201 SOL → 0.0147 mSOL (gross: -0.005375 SOL)
+.
+📊 Scanning: 0.0201 SOL → BONK...
+
+🎯 PROFITABLE OPPORTUNITY FOUND!
+   Input:  0.020091 SOL
+   Output: 29.948743 BONK
+   Gross:  29.928652 SOL
+   Net:    29.928652 SOL
+   Route:  1 hop(s)
+
+🚀 EXECUTING TRADE #11...
+📦 Building Ultra swap transaction...
+📡 Sending via Ultra (ShadowLane protected)...
+✅ Transaction sent!
+🔗 Explorer: https://solscan.io/tx/3SM2t3vdBsABbfpfFszfgvTxqNQs6EyXg5zJx5A1yb32C3jNFvpYvaTrmnLQRgVRHiUH57UU9nvj9ZVwy3UjAH2h
+💸 Input: 0.02009087 SOL
+💰 Output: 29.948742884 DezXAZ8z...
+💰 New balance: 0.1808 SOL
+📈 P&L since last: -0.020096 SOL
+
+⏳ Waiting 5s before next scan...
+
+📊 Scanning: 0.0181 SOL → USDC...
+   No profit: 0.0181 SOL → 0.0016 USDC (gross: -0.016465 SOL)
+.
+📊 Scanning: 0.0181 SOL → USDT...
+   No profit: 0.0181 SOL → 0.0016 USDT (gross: -0.016465 SOL)
+.
+📊 Scanning: 0.0181 SOL → mSOL...
+   No profit: 0.0181 SOL → 0.0132 mSOL (gross: -0.004837 SOL)
+.
+📊 Scanning: 0.0181 SOL → BONK...
+
+🎯 PROFITABLE OPPORTUNITY FOUND!
+   Input:  0.018081 SOL
+   Output: 26.950944 BONK
+   Gross:  26.932863 SOL
+   Net:    26.932863 SOL
+   Route:  1 hop(s)
+
+🚀 EXECUTING TRADE #12...
+📦 Building Ultra swap transaction...
+📡 Sending via Ultra (ShadowLane protected)...
+✅ Transaction sent!
+🔗 Explorer: https://solscan.io/tx/FpLpMGfceev1934CMhc6FQXC53xAM2Epjgq8brtk8afiJtboMSwmPgic1coD4qzcJFkptpeNgcw4oM9CpQDqwCR
+💸 Input: 0.018081283 SOL
+💰 Output: 26.950944392 DezXAZ8z...
+💰 New balance: 0.1627 SOL
+📈 P&L since last: -0.018086 SOL
+
+⏳ Waiting 5s before next scan...
+
+📊 Scanning: 0.0163 SOL → USDC...
+   No profit: 0.0163 SOL → 0.0015 USDC (gross: -0.014818 SOL)
+.
+📊 Scanning: 0.0163 SOL → USDT...
+   No profit: 0.0163 SOL → 0.0015 USDT (gross: -0.014818 SOL)
+.
+📊 Scanning: 0.0163 SOL → mSOL...
+   No profit: 0.0163 SOL → 0.0119 mSOL (gross: -0.004353 SOL)
+.
+📊 Scanning: 0.0163 SOL → BONK...
+
+🎯 PROFITABLE OPPORTUNITY FOUND!
+   Input:  0.016273 SOL
+   Output: 24.280762 BONK
+   Gross:  24.264489 SOL
+   Net:    24.264489 SOL
+   Route:  2 hop(s)
+
+🚀 EXECUTING TRADE #13...
+📦 Building Ultra swap transaction...
+📡 Sending via Ultra (ShadowLane protected)...
+✅ Transaction sent!
+🔗 Explorer: https://solscan.io/tx/3VZ1qJzisHqD2KkqjQn3NYozuUhwjfnkgwoT8HanQRKeC2uqf8DzaP7e3LRWWCKu5Th5BsWvbxbvbTRurL3KSnmy
+💸 Input: 0.016272654 SOL
+💰 Output: 24.280761681 DezXAZ8z...
+^C

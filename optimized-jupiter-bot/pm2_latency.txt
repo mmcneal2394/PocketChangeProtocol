@@ -1,0 +1,143 @@
+[1m[90m[TAILING] Tailing last 100 lines for [jupiter-ultra-bot] process (change the value with --lines option)[39m[22m
+[90mC:\Users\admin\.pm2\logs\jupiter-ultra-bot-out.log last 100 lines:[39m
+[32m0|jupiter- | [39m2026-03-20T07:22:41: 
+[32m0|jupiter- | [39m2026-03-20T07:22:41: 📊 Scanning: 0.0302 SOL → USDT...
+[32m0|jupiter- | [39m2026-03-20T07:22:41:    No profit: 0.0302 SOL → 0.0027 USDT (gross: -0.027471 SOL)
+[32m0|jupiter- | [39m2026-03-20T07:22:41: 
+[32m0|jupiter- | [39m2026-03-20T07:22:41: 📊 Scanning: 0.0302 SOL → mSOL...
+[32m0|jupiter- | [39m2026-03-20T07:22:41:    No profit: 0.0302 SOL → 0.0221 mSOL (gross: -0.008070 SOL)
+[32m0|jupiter- | [39m2026-03-20T07:22:41: 
+[32m0|jupiter- | [39m2026-03-20T07:22:41: 💼 Sell Check: Holding BONK (Spent 0.033517 SOL)
+[32m0|jupiter- | [39m2026-03-20T07:22:41:    Holding BONK... Exit yields 0.033515 SOL (Net: -0.000002 SOL)
+[32m0|jupiter- | [39m2026-03-20T07:22:46: 
+[32m0|jupiter- | [39m2026-03-20T07:22:46: 📊 Scanning: 0.0302 SOL → USDC...
+[32m0|jupiter- | [39m2026-03-20T07:22:46: ⏳ Rate limited, retrying in 1000ms...
+[32m0|jupiter- | [39m2026-03-20T07:22:47: ⏳ Rate limited, retrying in 2000ms...
+[32m0|jupiter- | [39m2026-03-20T07:22:49: ⏳ Rate limited, retrying in 4000ms...
+[32m0|jupiter- | [39m2026-03-20T07:22:53: [dotenv@17.3.1] injecting env (19) from .env -- tip: 🔐 prevent building .env in docker: https://dotenvx.com/prebuild
+[32m0|jupiter- | [39m2026-03-20T07:22:53: 🚀 Starting Jupiter Ultra Arbitrage Bot...
+[32m0|jupiter- | [39m2026-03-20T07:22:53: ✅ Wallet loaded: DnQhJawMXW7ZWA19XbzrV1q3KWZvMnpfyrxe4f74FHVj
+[32m0|jupiter- | [39m2026-03-20T07:22:53: 
+[32m0|jupiter- | [39m2026-03-20T07:22:53: 🔄 Bot running. Scanning every 5 seconds...
+[32m0|jupiter- | [39m2026-03-20T07:22:53: 💰 Min profit threshold: 0.001 SOL
+[32m0|jupiter- | [39m2026-03-20T07:22:53: 📊 Trade size: 10% of balance (max 1.0 SOL)
+[32m0|jupiter- | [39m2026-03-20T07:22:53: 🛡️ MEV Protection: ShadowLane (34x stronger) 
+[32m0|jupiter- | [39m2026-03-20T07:22:53: ⚡ Latency: 50-400ms target 
+[32m0|jupiter- | [39m2026-03-20T07:22:53: 
+[32m0|jupiter- | [39m2026-03-20T07:22:53: 
+[32m0|jupiter- | [39m2026-03-20T07:22:53: 📊 Scanning: 0.0302 SOL → USDC...
+[32m0|jupiter- | [39m2026-03-20T07:22:53: ⏳ Rate limited, retrying in 1000ms...
+[32m0|jupiter- | [39m2026-03-20T07:22:54: ⏳ Rate limited, retrying in 2000ms...
+[32m0|jupiter- | [39m2026-03-20T07:22:57: ⏳ Rate limited, retrying in 4000ms...
+[32m0|jupiter- | [39m2026-03-20T07:23:06: 
+[32m0|jupiter- | [39m2026-03-20T07:23:06: 📊 Scanning: 0.0302 SOL → USDC...
+[32m0|jupiter- | [39m2026-03-20T07:23:06:    No profit: 0.0302 SOL → 0.0027 USDC (gross: -0.027470 SOL)
+[32m0|jupiter- | [39m2026-03-20T07:23:06: 
+[32m0|jupiter- | [39m2026-03-20T07:23:06: 📊 Scanning: 0.0302 SOL → USDT...
+[32m0|jupiter- | [39m2026-03-20T07:23:06:    No profit: 0.0302 SOL → 0.0027 USDT (gross: -0.027469 SOL)
+[32m0|jupiter- | [39m2026-03-20T07:23:06: 
+[32m0|jupiter- | [39m2026-03-20T07:23:06: 📊 Scanning: 0.0302 SOL → mSOL...
+[32m0|jupiter- | [39m2026-03-20T07:23:06:    No profit: 0.0302 SOL → 0.0221 mSOL (gross: -0.008070 SOL)
+[32m0|jupiter- | [39m2026-03-20T07:23:06: .
+[32m0|jupiter- | [39m2026-03-20T07:23:06: 💼 Sell Check: Holding BONK (Spent 0.033517 SOL)
+[32m0|jupiter- | [39m2026-03-20T07:23:06:    Holding BONK... Exit yields 0.033509 SOL (Net: -0.000008 SOL)
+[32m0|jupiter- | [39m2026-03-20T07:23:06: 
+[32m0|jupiter- | [39m2026-03-20T07:23:06: 📊 Scanning: 0.0302 SOL → WIF...
+[32m0|jupiter- | [39m2026-03-20T07:23:06:    No profit: 0.0302 SOL → 0.0151 WIF (gross: -0.015073 SOL)
+[32m0|jupiter- | [39m2026-03-20T07:23:06: .
+[32m0|jupiter- | [39m2026-03-20T07:23:06: 
+[32m0|jupiter- | [39m2026-03-20T07:23:06: 📊 Scanning: 0.0302 SOL → JUP...
+[32m0|jupiter- | [39m2026-03-20T07:23:12: 
+[32m0|jupiter- | [39m2026-03-20T07:23:12: 📊 Scanning: 0.0302 SOL → USDC...
+[32m0|jupiter- | [39m2026-03-20T07:23:12:    No profit: 0.0302 SOL → 0.0027 USDC (gross: -0.027469 SOL)
+[32m0|jupiter- | [39m2026-03-20T07:23:12: .
+[32m0|jupiter- | [39m2026-03-20T07:23:12: 
+[32m0|jupiter- | [39m2026-03-20T07:23:12: 📊 Scanning: 0.0302 SOL → USDT...
+[32m0|jupiter- | [39m2026-03-20T07:23:12:    No profit: 0.0302 SOL → 0.0027 USDT (gross: -0.027469 SOL)
+[32m0|jupiter- | [39m2026-03-20T07:23:12: 
+[32m0|jupiter- | [39m2026-03-20T07:23:12: 📊 Scanning: 0.0302 SOL → mSOL...
+[32m0|jupiter- | [39m2026-03-20T07:23:12:    No profit: 0.0302 SOL → 0.0221 mSOL (gross: -0.008070 SOL)
+[32m0|jupiter- | [39m2026-03-20T07:23:12: .
+[32m0|jupiter- | [39m2026-03-20T07:23:12: 💼 Sell Check: Holding BONK (Spent 0.033517 SOL)
+[32m0|jupiter- | [39m2026-03-20T07:23:12:    Holding BONK... Exit yields 0.033526 SOL (Net: 0.000009 SOL)
+[32m0|jupiter- | [39m2026-03-20T07:23:12: 
+[32m0|jupiter- | [39m2026-03-20T07:23:12: 📊 Scanning: 0.0302 SOL → WIF...
+[32m0|jupiter- | [39m2026-03-20T07:23:12:    No profit: 0.0302 SOL → 0.0151 WIF (gross: -0.015073 SOL)
+[32m0|jupiter- | [39m2026-03-20T07:23:12: 
+[32m0|jupiter- | [39m2026-03-20T07:23:12: 📊 Scanning: 0.0302 SOL → JUP...
+[32m0|jupiter- | [39m2026-03-20T07:23:18: 
+[32m0|jupiter- | [39m2026-03-20T07:23:18: 📊 Scanning: 0.0302 SOL → USDC...
+[32m0|jupiter- | [39m2026-03-20T07:23:18:    No profit: 0.0302 SOL → 0.0027 USDC (gross: -0.027469 SOL)
+[32m0|jupiter- | [39m2026-03-20T07:23:18: 
+[32m0|jupiter- | [39m2026-03-20T07:23:18: 📊 Scanning: 0.0302 SOL → USDT...
+[32m0|jupiter- | [39m2026-03-20T07:23:18:    No profit: 0.0302 SOL → 0.0027 USDT (gross: -0.027469 SOL)
+[32m0|jupiter- | [39m2026-03-20T07:23:18: 
+[32m0|jupiter- | [39m2026-03-20T07:23:18: 📊 Scanning: 0.0302 SOL → mSOL...
+[32m0|jupiter- | [39m2026-03-20T07:23:18:    No profit: 0.0302 SOL → 0.0221 mSOL (gross: -0.008070 SOL)
+[32m0|jupiter- | [39m2026-03-20T07:23:18: 
+[32m0|jupiter- | [39m2026-03-20T07:23:18: 💼 Sell Check: Holding BONK (Spent 0.033517 SOL)
+[32m0|jupiter- | [39m2026-03-20T07:23:18:    Holding BONK... Exit yields 0.033509 SOL (Net: -0.000008 SOL)
+[32m0|jupiter- | [39m2026-03-20T07:23:18: 
+[32m0|jupiter- | [39m2026-03-20T07:23:18: 📊 Scanning: 0.0302 SOL → WIF...
+[32m0|jupiter- | [39m2026-03-20T07:23:18:    No profit: 0.0302 SOL → 0.0151 WIF (gross: -0.015073 SOL)
+[32m0|jupiter- | [39m2026-03-20T07:23:18: 
+[32m0|jupiter- | [39m2026-03-20T07:23:18: 📊 Scanning: 0.0302 SOL → JUP...
+[32m0|jupiter- | [39m2026-03-20T07:23:23: 
+[32m0|jupiter- | [39m2026-03-20T07:23:23: 📊 Scanning: 0.0302 SOL → USDC...
+[32m0|jupiter- | [39m2026-03-20T07:23:24:    No profit: 0.0302 SOL → 0.0027 USDC (gross: -0.027469 SOL)
+[32m0|jupiter- | [39m2026-03-20T07:23:24: 
+[32m0|jupiter- | [39m2026-03-20T07:23:24: 📊 Scanning: 0.0302 SOL → USDT...
+[32m0|jupiter- | [39m2026-03-20T07:23:24:    No profit: 0.0302 SOL → 0.0027 USDT (gross: -0.027469 SOL)
+[32m0|jupiter- | [39m2026-03-20T07:23:24: .
+[32m0|jupiter- | [39m2026-03-20T07:23:24: 
+[32m0|jupiter- | [39m2026-03-20T07:23:24: 📊 Scanning: 0.0302 SOL → mSOL...
+[32m0|jupiter- | [39m2026-03-20T07:23:24:    No profit: 0.0302 SOL → 0.0221 mSOL (gross: -0.008070 SOL)
+[32m0|jupiter- | [39m2026-03-20T07:23:24: 
+[32m0|jupiter- | [39m2026-03-20T07:23:24: 💼 Sell Check: Holding BONK (Spent 0.033517 SOL)
+[32m0|jupiter- | [39m2026-03-20T07:23:24:    Holding BONK... Exit yields 0.033509 SOL (Net: -0.000008 SOL)
+[32m0|jupiter- | [39m2026-03-20T07:23:24: 
+[32m0|jupiter- | [39m2026-03-20T07:23:24: 📊 Scanning: 0.0302 SOL → WIF...
+[32m0|jupiter- | [39m2026-03-20T07:23:24:    No profit: 0.0302 SOL → 0.0151 WIF (gross: -0.015073 SOL)
+[32m0|jupiter- | [39m2026-03-20T07:23:24: 
+[32m0|jupiter- | [39m2026-03-20T07:23:24: 📊 Scanning: 0.0302 SOL → JUP...
+
+[90mC:\Users\admin\.pm2\logs\jupiter-ultra-bot-error.log last 100 lines:[39m
+[31m0|jupiter- | [39m2026-03-20T07:23:01: 
+[31m0|jupiter- | [39m2026-03-20T07:23:01: ❌ Error in main loop: Max retries exceeded
+[31m0|jupiter- | [39m2026-03-20T07:23:01: Error: Max retries exceeded
+[31m0|jupiter- | [39m2026-03-20T07:23:01:     at withRetry (C:\pcprotocol\optimized-jupiter-bot\scripts\run_1min.js:64:9)
+[31m0|jupiter- | [39m2026-03-20T07:23:01:     at async findOpportunity (C:\pcprotocol\optimized-jupiter-bot\scripts\run_1min.js:206:17)
+[31m0|jupiter- | [39m2026-03-20T07:23:01:     at async main (C:\pcprotocol\optimized-jupiter-bot\scripts\run_1min.js:270:31)
+[31m0|jupiter- | [39m2026-03-20T07:23:06: 
+[31m0|jupiter- | [39m2026-03-20T07:23:06: ❌ Error in main loop: Response returned an error code
+[31m0|jupiter- | [39m2026-03-20T07:23:06: API Response Details: {"error":"The token JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbAbdEjZKmag is not tradable","errorCode":"TOKEN_NOT_TRADABLE"}
+[31m0|jupiter- | [39m2026-03-20T07:23:07: ResponseError: Response returned an error code
+[31m0|jupiter- | [39m2026-03-20T07:23:07:     at SwapApi.<anonymous> (C:\pcprotocol\optimized-jupiter-bot\node_modules\@jup-ag\api\dist\index.js:288:13)
+[31m0|jupiter- | [39m2026-03-20T07:23:07:     at Generator.next (<anonymous>)
+[31m0|jupiter- | [39m2026-03-20T07:23:07:     at fulfilled (C:\pcprotocol\optimized-jupiter-bot\node_modules\@jup-ag\api\dist\index.js:40:24)
+[31m0|jupiter- | [39m2026-03-20T07:23:07:     at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+[31m0|jupiter- | [39m2026-03-20T07:23:12: 
+[31m0|jupiter- | [39m2026-03-20T07:23:12: ❌ Error in main loop: Response returned an error code
+[31m0|jupiter- | [39m2026-03-20T07:23:12: API Response Details: {"error":"The token JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbAbdEjZKmag is not tradable","errorCode":"TOKEN_NOT_TRADABLE"}
+[31m0|jupiter- | [39m2026-03-20T07:23:12: ResponseError: Response returned an error code
+[31m0|jupiter- | [39m2026-03-20T07:23:12:     at SwapApi.<anonymous> (C:\pcprotocol\optimized-jupiter-bot\node_modules\@jup-ag\api\dist\index.js:288:13)
+[31m0|jupiter- | [39m2026-03-20T07:23:12:     at Generator.next (<anonymous>)
+[31m0|jupiter- | [39m2026-03-20T07:23:12:     at fulfilled (C:\pcprotocol\optimized-jupiter-bot\node_modules\@jup-ag\api\dist\index.js:40:24)
+[31m0|jupiter- | [39m2026-03-20T07:23:12:     at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+[31m0|jupiter- | [39m2026-03-20T07:23:18: 
+[31m0|jupiter- | [39m2026-03-20T07:23:18: ❌ Error in main loop: Response returned an error code
+[31m0|jupiter- | [39m2026-03-20T07:23:18: API Response Details: {"error":"The token JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbAbdEjZKmag is not tradable","errorCode":"TOKEN_NOT_TRADABLE"}
+[31m0|jupiter- | [39m2026-03-20T07:23:18: ResponseError: Response returned an error code
+[31m0|jupiter- | [39m2026-03-20T07:23:18:     at SwapApi.<anonymous> (C:\pcprotocol\optimized-jupiter-bot\node_modules\@jup-ag\api\dist\index.js:288:13)
+[31m0|jupiter- | [39m2026-03-20T07:23:18:     at Generator.next (<anonymous>)
+[31m0|jupiter- | [39m2026-03-20T07:23:18:     at fulfilled (C:\pcprotocol\optimized-jupiter-bot\node_modules\@jup-ag\api\dist\index.js:40:24)
+[31m0|jupiter- | [39m2026-03-20T07:23:18:     at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+[31m0|jupiter- | [39m2026-03-20T07:23:24: 
+[31m0|jupiter- | [39m2026-03-20T07:23:24: ❌ Error in main loop: Response returned an error code
+[31m0|jupiter- | [39m2026-03-20T07:23:24: API Response Details: {"error":"The token JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbAbdEjZKmag is not tradable","errorCode":"TOKEN_NOT_TRADABLE"}
+[31m0|jupiter- | [39m2026-03-20T07:23:24: ResponseError: Response returned an error code
+[31m0|jupiter- | [39m2026-03-20T07:23:24:     at SwapApi.<anonymous> (C:\pcprotocol\optimized-jupiter-bot\node_modules\@jup-ag\api\dist\index.js:288:13)
+[31m0|jupiter- | [39m2026-03-20T07:23:24:     at Generator.next (<anonymous>)
+[31m0|jupiter- | [39m2026-03-20T07:23:24:     at fulfilled (C:\pcprotocol\optimized-jupiter-bot\node_modules\@jup-ag\api\dist\index.js:40:24)
+[31m0|jupiter- | [39m2026-03-20T07:23:24:     at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+

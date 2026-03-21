@@ -1,0 +1,22 @@
+[dotenv@17.3.1] injecting env (16) from .env -- tip: ⚙️  specify custom .env file path with { path: '/custom/path/.env' }
+[dotenv@17.3.1] injecting env (0) from .env -- tip: ⚙️  write to custom object with { processEnv: myObject }
+[INFO] 2026-03-20T11:53:25.350Z - 🏁 Initiating 1-Hour Micro-Amount Arbitrage Refinement Test...
+[INFO] 2026-03-20T11:53:31.356Z - [BOOT] Executing initial boot test trace dynamically!
+[INFO] 2026-03-20T11:53:31.357Z - [COMPILATION] Constructing payload for Simple-2-Hop-Test with tip: 0.002 SOL
+[INFO] 2026-03-20T11:53:31.917Z - --- TRANSACTION PAYLOAD STRUCTURE (8 Instructions) ---
+[INFO] 2026-03-20T11:53:31.917Z - [IX 0] Program: ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL
+[INFO] 2026-03-20T11:53:31.919Z - [IX 1] Program: 11111111111111111111111111111111
+[INFO] 2026-03-20T11:53:31.919Z - [IX 2] Program: TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA
+[INFO] 2026-03-20T11:53:31.919Z - [IX 3] Program: JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4
+[INFO] 2026-03-20T11:53:31.920Z - [IX 4] Program: TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA
+[INFO] 2026-03-20T11:53:31.920Z - [IX 5] Program: ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL
+[INFO] 2026-03-20T11:53:31.920Z - [IX 6] Program: JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4
+[INFO] 2026-03-20T11:53:31.920Z - [IX 7] Program: TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA
+[INFO] 2026-03-20T11:53:31.920Z - -----------------------------------------------------
+[INFO] 2026-03-20T11:53:31.922Z - 🔥 Attached Strict Baseline Gas Priority: 250000 microLamports (Bypassing Priority Auctions!)
+[INFO] 2026-03-20T11:53:32.336Z - 💰 Appended DYNAMIC Jito Tip Execution successfully: 0.002 SOL to ADaUMi...
+[INFO] 2026-03-20T11:53:32.348Z - Executing MEV Bundle securely via High-Speed Chainstack Node + BloXroute + Jito for ultimate throughput...
+[INFO] 2026-03-20T11:53:32.358Z - [COMPILATION] Synced local Blockhash/ALT states sequentially mapping atomic instructions in 1.4ms!
+[INFO] 2026-03-20T11:53:32.358Z - Transmitting MEV traces recursively scaling alongside direct Helius RPC bypasses...
+[INFO] 2026-03-20T11:53:32.477Z - [HELIUS] Physical RPC Transmit Hash: 2qdxmyyqCGHFUZAdtSKCKgDsZFXvxJ2WLDXN5yPoUrpSxUZE4P96hqQdHHt1YhhkHi1G5hKzX6HkXUPEudvfaA5u
+^C

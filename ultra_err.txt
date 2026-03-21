@@ -1,0 +1,21 @@
+[WARN] 2026-03-20T11:32:33.248Z - Native Yellowstone gRPC bindings skipped. Injecting MOCK Geyser Stream to verify local structure.
+[WARN] 2026-03-20T11:32:33.258Z - Failed to fetch dynamic tokens: TypeError: fetch failed
+    at node:internal/deps/undici/undici:14902:13
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at refreshDynamicTokens (/opt/pcprotocol/optimized-jupiter-bot/dist/geyser/handlers.js:39:24) {
+  [cause]: Error: getaddrinfo ENOTFOUND token.jup.ag
+      at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26) {
+    errno: -3007,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'token.jup.ag'
+  }
+}
+[WARN] 2026-03-20T11:32:41.252Z - 🔥 [FORCED TEST START] Constructing comprehensive structural diagnostic trace explicitly via the core Arbitrage Engine natively (SOL -> USDC -> SOL)...
+[ERROR] 2026-03-20T11:32:41.611Z - Failed to build versioned transaction: TypeError: Cannot read properties of null (reading 'programId')
+    at /opt/pcprotocol/optimized-jupiter-bot/dist/execution/transaction.js:91:59
+    at Array.forEach (<anonymous>)
+    at buildVersionedTransaction (/opt/pcprotocol/optimized-jupiter-bot/dist/execution/transaction.js:90:22)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at ArbEngine.executeArbitrage (/opt/pcprotocol/optimized-jupiter-bot/dist/local_calc/arb_engine.js:276:33)
+    at Timeout._onTimeout (/opt/pcprotocol/optimized-jupiter-bot/dist/index.js:65:13)

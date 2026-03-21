@@ -1,0 +1,25 @@
+[dotenv@17.3.1] injecting env (19) from .env -- tip: ⚙️  load multiple .env files with { path: ['.env.local', '.env'] }
+🚦 Initiating explicit Atomic Arbitrage Bundle Structure Test...
+📊 Quote 1 [SOL -> WIF]: 5.023906 WIF
+📊 Quote 2 [WIF -> SOL]: 0.009995214 SOL
+📦 Requesting distinct Raw Execution Instructions...
+🔗 Executing Atomic Bundle Logic natively...
+[INFO] 2026-03-20T12:42:30.648Z - --- TRANSACTION PAYLOAD STRUCTURE (8 Instructions) ---
+[INFO] 2026-03-20T12:42:30.649Z - [IX 0] Program: ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL
+[INFO] 2026-03-20T12:42:30.649Z - [IX 1] Program: 11111111111111111111111111111111
+[INFO] 2026-03-20T12:42:30.650Z - [IX 2] Program: TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA
+[INFO] 2026-03-20T12:42:30.650Z - [IX 3] Program: JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4
+[INFO] 2026-03-20T12:42:30.650Z - [IX 4] Program: TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA
+[INFO] 2026-03-20T12:42:30.650Z - [IX 5] Program: ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL
+[INFO] 2026-03-20T12:42:30.650Z - [IX 6] Program: JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4
+[INFO] 2026-03-20T12:42:30.650Z - [IX 7] Program: TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA
+[INFO] 2026-03-20T12:42:30.650Z - -----------------------------------------------------
+[INFO] 2026-03-20T12:42:30.651Z - 🔥 Attached Strict Baseline Gas Priority: 250000 microLamports (Bypassing Priority Auctions!)
+[INFO] 2026-03-20T12:42:31.032Z - 💰 Appended DYNAMIC Jito Tip Execution successfully: 0.00001 SOL to Cw8CFy...
+
+✅ Atomic structural merge complete! Final Payload Buffer: 908 bytes.
+🔒 Valid Signature Elements: 1
+
+🚀 FIRE IN THE HOLE! Executing Live Atomic Sandbox Bundle over ShadowLane...
+⚡ Broadcast Complete! Network Insertion Latency: 163ms
+✅ Fully Synchronous Execution Complete! Payload Hash: https://solscan.io/tx/48q1zf3oscdmwA1vn7tP8dnNcFsCXZPESeAitzGncf453ABGLF2GjuYwbrMdKrYjKMLXdC9qidJniBfHrEBpgtba

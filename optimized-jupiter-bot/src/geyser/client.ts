@@ -5,23 +5,20 @@ import { globalPriceBook } from '../local_calc/price_book';
 import { globalArbEngine } from '../local_calc/arb_engine';
 
 export async function createGeyserClient() {
-  const endpoint = config.GEYSER_ENDPOINT;
-  const token = config.GEYSER_API_TOKEN;
-
-  logger.info(`Connecting to Geyser at: ${endpoint}`);
-  
-  try {
-    const Client = require('@triton-one/yellowstone-grpc').default || require('@triton-one/yellowstone-grpc');
-    const client = new Client(endpoint, token, undefined);
-    await client.connect();
+    logger.info(`Connecting natively to ${config.GEYSER_RPC}...`);
     
-    const stream = await client.subscribe();
+    try {
+        const Client = require('@triton-one/yellowstone-grpc').default || require('@triton-one/yellowstone-grpc');
+        const client = new Client(config.GEYSER_RPC, config.GEYSER_API_TOKEN, undefined);
+        await client.connect();
+        
+        const stream = await client.subscribe();
     
     stream.write({
       accounts: {
         raydium_pools: {
-          account: [],
-          owner: ["675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8"],
+          account: ["58oQChx4yWmvKdwLLZzBi4ChoCc2fqCUvbMT12EzEQBd"],
+          owner: [],
           filters: [],
         },
         orca_pools: {

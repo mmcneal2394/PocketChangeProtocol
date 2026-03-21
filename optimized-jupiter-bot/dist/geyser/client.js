@@ -4,20 +4,30 @@ exports.createGeyserClient = createGeyserClient;
 const config_1 = require("../utils/config");
 const logger_1 = require("../utils/logger");
 const events_1 = require("events");
+const price_book_1 = require("../local_calc/price_book");
+const arb_engine_1 = require("../local_calc/arb_engine");
 async function createGeyserClient() {
-    const endpoint = config_1.config.GEYSER_ENDPOINT;
-    const token = config_1.config.GEYSER_API_TOKEN;
-    logger_1.logger.info(`Connecting to Geyser at: ${endpoint}`);
+    logger_1.logger.info(`Connecting natively to ${config_1.config.GEYSER_RPC}...`);
     try {
         const Client = require('@triton-one/yellowstone-grpc').default || require('@triton-one/yellowstone-grpc');
-        const client = new Client(endpoint, token, undefined);
+        const client = new Client(config_1.config.GEYSER_RPC, config_1.config.GEYSER_API_TOKEN, undefined);
         await client.connect();
         const stream = await client.subscribe();
         stream.write({
             accounts: {
-                jupiter: {
+                raydium_pools: {
+                    account: ["58oQChx4yWmvKdwLLZzBi4ChoCc2fqCUvbMT12EzEQBd"],
+                    owner: [],
+                    filters: [],
+                },
+                orca_pools: {
                     account: [],
-                    owner: ["JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4"],
+                    owner: ["whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc"],
+                    filters: [],
+                },
+                meteora_pools: {
+                    account: [],
+                    owner: ["Eo7WjKq67rjJQSZxS6z3YkapzY3eMj6Xy8X5EQVn5UaB"],
                     filters: [],
                 }
             },
@@ -31,6 +41,12 @@ async function createGeyserClient() {
             ping: undefined,
             commitment: 1, // Processed
         });
+        stream.on('data', async (data) => {
+            if (data?.account) {
+                price_book_1.globalPriceBook.updatePool(data.account);
+                await arb_engine_1.globalArbEngine.runArbitrageScan();
+            }
+        });
         logger_1.logger.info("Successfully connected and subscribed to Geyser stream.");
         return { client, stream };
     }
@@ -41,18 +57,32 @@ async function createGeyserClient() {
             mockStream.write = (req) => {
                 logger_1.logger.info("[MOCK] Sent subscription request to Geyser.");
             };
-            // Emit a fake Jupiter account update every 3 seconds for testing the pipeline
-            setInterval(() => {
-                logger_1.logger.info("[MOCK] Injecting simulated Jupiter account update from Geyser.");
+            // Emit a fake pool account update every 100ms for testing the pipeline locally
+            setInterval(async () => {
+                // logger.info("[MOCK] Injecting simulated DEX pool update from Geyser.");
                 mockStream.emit('data', {
-                    filters: ['jupiter'],
                     account: {
                         account: {
-                            pubkey: Buffer.from("MOCK_PUBKEY_JUPITER")
-                        }
+                            owner: Buffer.from("675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8")
+                        },
+                        pubkey: Buffer.from("RAYDIUM_MOCK_POOL")
                     }
                 });
-            }, 3000);
+                mockStream.emit('data', {
+                    account: {
+                        account: {
+                            owner: Buffer.from("whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc")
+                        },
+                        pubkey: Buffer.from("ORCA_MOCK_POOL")
+                    }
+                });
+            }, 100);
+            mockStream.on('data', async (data) => {
+                if (data?.account) {
+                    price_book_1.globalPriceBook.updatePool(data.account);
+                    await arb_engine_1.globalArbEngine.runArbitrageScan();
+                }
+            });
             return { client: null, stream: mockStream };
         }
         logger_1.logger.error("Failed to connect to Geyser stream:", error);
