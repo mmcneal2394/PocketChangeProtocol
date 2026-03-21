@@ -2,31 +2,41 @@ import { Connection, AddressLookupTableAccount, PublicKey } from '@solana/web3.j
 import { config } from '../utils/config';
 import { logger } from '../utils/logger';
 
-const connection = new Connection(config.RPC_ENDPOINT, {
-  wsEndpoint: config.RPC_WEBSOCKET,
-  commitment: 'processed'
-});
+let cachedBlockhash: string | null = null;
+const connection = new Connection(config.RPC_ENDPOINT, { commitment: 'processed', confirmTransactionInitialTimeout: 5000 });
 
-let recentBlockhash: string | null = null;
 let altCache: Map<string, AddressLookupTableAccount> = new Map();
 
-export async function fetchRecentBlockhash() {
-  try {
-    const { blockhash } = await connection.getLatestBlockhash('processed');
-    recentBlockhash = blockhash;
-    return blockhash;
-  } catch (error) {
-    logger.error('Failed to update recent blockhash', error);
-  }
+async function fetchRecentBlockhash() {
+    try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 2500);
+        // Standard HTTP Fetch wrapper for blockhash to force timeout bypass if Web3 hangs on TCP drop!
+        const response = await fetch(config.RPC_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "getLatestBlockhash", params: [{"commitment":"confirmed"}] }),
+            signal: controller.signal
+        });
+        clearTimeout(timeout);
+        const data = await response.json();
+        if (data?.result?.value?.blockhash) {
+            cachedBlockhash = data.result.value.blockhash;
+        } else {
+            logger.warn("RPC Failed Blockhash Fetch: " + JSON.stringify(data));
+        }
+    } catch (e: any) {
+        logger.error(`Failed to update recent blockhash: ${e.message}`);
+    }
 }
+setInterval(fetchRecentBlockhash, 2000);
+fetchRecentBlockhash();
 
 export function getCachedBlockhash() {
-  return recentBlockhash;
-}
-
-export async function startBlockhashCache() {
-  await fetchRecentBlockhash();
-  setInterval(fetchRecentBlockhash, 200); // 200ms updates per PRD
+    if (!cachedBlockhash) {
+        throw new Error("No cached blockhash available");
+    }
+    return cachedBlockhash;
 }
 
 export async function getAddressLookupTable(address: string, forceRefresh = false) {

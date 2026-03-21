@@ -1,0 +1,1 @@
+﻿const fs = require('fs'); const db = require('better-sqlite3')('trades.db'); fs.writeFileSync('results.txt', 'Total Droplet Executions (1 Min): ' + db.prepare('SELECT COUNT(*) as c FROM trades').get().c + '\nWins: ' + db.prepare('SELECT COUNT(*) as c FROM trades WHERE expected_profit_bps > 0').get().c);

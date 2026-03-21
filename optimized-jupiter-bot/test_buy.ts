@@ -3,7 +3,7 @@ import fetch from 'node-fetch';
 import fs from 'fs';
 import { config } from './src/utils/config';
 
-const JUPITER_API = 'https://public.jupiterapi.com';
+const JUPITER_API = 'https://lite-api.jup.ag';
 
 async function testBuy() {
     console.log('⚡ Constructing physical test transaction (0.001 SOL -> USDC)...');
@@ -14,48 +14,50 @@ async function testBuy() {
     const wallet = Keypair.fromSecretKey(secretKeyArr);
     const connection = new Connection(config.RPC_ENDPOINT, 'confirmed');
 
-    // 2. Quote
-    const quoteRes = await fetch(`${JUPITER_API}/quote?inputMint=So11111111111111111111111111111111111111112&outputMint=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&amount=1000000&slippageBps=50`);
-    const quoteData = await quoteRes.json();
+    const API_KEY = config.JUPITER_API_KEY || '05aa94b2-05d5-4993-acfe-30e18dc35ff1';
+
+    // 2. Quote & Swap Ix via Ultra API
+    const orderRes = await fetch(`${JUPITER_API}/ultra/v1/order?inputMint=So11111111111111111111111111111111111111112&outputMint=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&amount=1000000&slippageBps=50&taker=${wallet.publicKey.toString()}`);
     
-    // 3. Swap Ix
-    const swapRes = await fetch(`${JUPITER_API}/swap`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            quoteResponse: quoteData,
-            userPublicKey: wallet.publicKey.toString(),
-            wrapAndUnwrapSol: true,
-            prioritizationFeeLamports: 10000
-        })
-    });
-    
-    if (!swapRes.ok) {
-        console.error("Jupiter Swap Error:", await swapRes.text());
+    if (!orderRes.ok) {
+        console.error("Jupiter Order Error:", await orderRes.text());
         return;
     }
     
-    const swapData: any = await swapRes.json();
-    const swapTransaction = swapData.swapTransaction;
+    const orderData: any = await orderRes.json();
+    const swapTransaction = orderData.swapTransaction;
+    const requestId = orderData.requestId;
     
-    // 4. Send
+    // 3. Sign
     const swapTransactionBuf = Buffer.from(swapTransaction, 'base64');
     var transaction = VersionedTransaction.deserialize(swapTransactionBuf);
     transaction.sign([wallet]);
     
-    console.log('🚀 Pushing to Chainstack RPC Mainnet...');
-    const rawTransaction = transaction.serialize();
+    // 4. Send via Ultra Execute
+    console.log('🚀 Pushing to Jupiter Ultra RPC-less server...');
+    const signedTransaction = Buffer.from(transaction.serialize()).toString('base64');
     
     try {
-        const txid = await connection.sendRawTransaction(rawTransaction, {
-            skipPreflight: true,
-            maxRetries: 2
+        const executeRes = await fetch(`${JUPITER_API}/ultra/v1/execute`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                signedTransaction,
+                requestId
+            })
         });
         
+        if (!executeRes.ok) {
+            console.error("Jupiter Execute Error:", await executeRes.text());
+            return;
+        }
+        
+        const executeData = await executeRes.text();
+        const txid = executeData.replace(/["\n]/g, ''); // Could be generic string or part of JSON depending on implementation. Usually string for txid.
         console.log(`\n✅ Transaction Landed Successfully!`);
         console.log(`🔗 Verification Link: https://solscan.io/tx/${txid}`);
     } catch(e) {
-        console.error("RPC Error:", e);
+        console.error("Execution Error:", e);
     }
 }
 

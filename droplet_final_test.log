@@ -1,0 +1,11 @@
+[dotenv@17.3.1] injecting env (16) from .env -- tip: 🔐 encrypt with Dotenvx: https://dotenvx.com
+[dotenv@17.3.1] injecting env (0) from .env -- tip: ⚙️  override existing env vars with { override: true }
+[INFO] 2026-03-20T08:51:23.750Z - 🏁 Initiating 60-Second Micro-Amount Arbitrage Refinement Test...
+[INFO] 2026-03-20T08:51:26.753Z - [BOOT] Executing initial boot test trace dynamically!
+[INFO] 2026-03-20T08:51:26.753Z - [COMPILATION] Constructing payload for Simple-2-Hop-Test with tip: 0.002 SOL
+[ERROR] 2026-03-20T08:51:27.573Z - Failed to build versioned transaction: Error: No cached blockhash available
+    at buildVersionedTransaction (/opt/pcprotocol/optimized-jupiter-bot/dist/execution/transaction.js:49:19)
+    at ArbEngine.executeArbitrage (/opt/pcprotocol/optimized-jupiter-bot/dist/local_calc/arb_engine.js:283:83)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/opt/pcprotocol/optimized-jupiter-bot/scripts/run_1min.js:16:9)
+[INFO] 2026-03-20T08:52:23.752Z - ✅ 60-Second Refinement Concluded. Exiting gracefully.

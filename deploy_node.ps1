@@ -1,0 +1,3 @@
+scp -o StrictHostKeyChecking=no -i C:\Users\admin\.ssh\do_droplet_key c:\pcprotocol\scripts\live_arbitrage_engine.mjs root@64.23.173.160:/opt/pcprotocol/scripts/live_arbitrage_engine.mjs
+scp -o StrictHostKeyChecking=no -i C:\Users\admin\.ssh\do_droplet_key c:\pcprotocol\optimized-jupiter-bot\new_wallet.json root@64.23.173.160:/opt/pcprotocol/new_wallet.json
+ssh -o StrictHostKeyChecking=no -i C:\Users\admin\.ssh\do_droplet_key root@64.23.173.160 "pkill -f live_arbitrage_engine || true ; bash -lc 'cd /opt/pcprotocol && nohup node scripts/live_arbitrage_engine.mjs > node_engine.log 2>&1 & sleep 3 && tail -n 20 node_engine.log'"

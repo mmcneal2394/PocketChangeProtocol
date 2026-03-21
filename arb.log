@@ -1,0 +1,83 @@
+[TAILING] Tailing last 200 lines for [node_engine] process (change the value with --lines option)
+/root/.pm2/logs/node-engine-error.log last 200 lines:
+/root/.pm2/logs/node-engine-out.log last 200 lines:
+1|node_eng | 
+1|node_eng | ======================================================
+1|node_eng | 🟢 ArbitraSaaS CORE METEOR-ENGINE LIVE DAEMON
+1|node_eng | ======================================================
+1|node_eng | [CORE] Initialized Engine with Active Wallet: DnQhJawMXW7ZWA19XbzrV1q3KWZvMnpfyrxe4f74FHVj
+1|node_eng | [CORE] Initializing mempool listeners starting at Block Height:  407445318
+1|node_eng | 
+1|node_eng | 💼 [BAGS.FM] Syncing Protocol Analytics for PocketChange (PKC)...
+1|node_eng | [SCANNER] Subscribing to Raydium AMM V4 & Pump.fun Migration Events...
+1|node_eng | 
+1|node_eng | ⚡ [EXEC] Scanning public DEX liquidity (Jupiter V6) & pushing to fleet...
+1|node_eng |    📡 [MULTIPLEXER] Sweep allocated to 1 pair (QuickNode Throttle)...
+1|node_eng |    📊 [TRIANGULAR] Route: SOL -> WIF -> SOL | Est Profit: -0.000260 SOL
+1|node_eng | 
+1|node_eng | ⚡ [EXEC] Scanning public DEX liquidity (Jupiter V6) & pushing to fleet...
+1|node_eng |    📡 [MULTIPLEXER] Sweep allocated to 1 pair (QuickNode Throttle)...
+1|node_eng | 
+1|node_eng |    🌐 [SPATIAL CEX-DEX SCANNER] Testing RAY Spread...
+1|node_eng |       [BITGET]  Bid: $0.617000 | Ask: $0.618000
+1|node_eng |       [JUPITER] Bid: $0.616468 | Ask: $0.619584
+1|node_eng |       🔴 No >0.001% Threshold Spread for RAY. Best Route: -0.248%
+1|node_eng | 
+1|node_eng |    🌐 [SPATIAL CEX-DEX SCANNER] Testing WIF Spread...
+1|node_eng |       [BITGET]  Bid: $0.174600 | Ask: $0.174700
+1|node_eng |       [JUPITER] Bid: $0.174048 | Ask: $0.175559
+1|node_eng |       🔴 No >0.001% Threshold Spread for WIF. Best Route: -0.373%
+1|node_eng |    --> [DEBUG DEX COMM] Leg 1 Instructions Keys Object:  [
+1|node_eng |   'tokenLedgerInstruction',
+1|node_eng |   'computeBudgetInstructions',
+1|node_eng |   'setupInstructions',
+1|node_eng |   'swapInstruction',
+1|node_eng |   'cleanupInstruction',
+1|node_eng |   'otherInstructions',
+1|node_eng |   'addressLookupTableAddresses',
+1|node_eng |   'prioritizationFeeLamports',
+1|node_eng |   'computeUnitLimit',
+1|node_eng |   'prioritizationType',
+1|node_eng |   'simulationSlot',
+1|node_eng |   'dynamicSlippageReport',
+1|node_eng |   'simulationError',
+1|node_eng |   'addressesByLookupTableAddress',
+1|node_eng |   'blockhashWithMetadata'
+1|node_eng | ]
+1|node_eng |    --> [DEBUG DEX COMM] Leg 2 Instructions Keys Object:  [
+1|node_eng |   'tokenLedgerInstruction',
+1|node_eng |   'computeBudgetInstructions',
+1|node_eng |   'setupInstructions',
+1|node_eng |   'swapInstruction',
+1|node_eng |   'cleanupInstruction',
+1|node_eng |   'otherInstructions',
+1|node_eng |   'addressLookupTableAddresses',
+1|node_eng |   'prioritizationFeeLamports',
+1|node_eng |   'computeUnitLimit',
+1|node_eng |   'prioritizationType',
+1|node_eng |   'simulationSlot',
+1|node_eng |   'dynamicSlippageReport',
+1|node_eng |   'simulationError',
+1|node_eng |   'addressesByLookupTableAddress',
+1|node_eng |   'blockhashWithMetadata'
+1|node_eng | ]
+1|node_eng |    --> [DEBUG LEG CONSTRUCTION] Assembling ALTs (Count: 2)...
+1|node_eng |    🏁 [MULTIPLEXER] Completed concurrent target sweep block.
+1|node_eng |    --> [DEBUG LEG CONSTRUCTION] Total Binary Instructions Array Length Filtered: 11
+1|node_eng |    --> [DEBUG LEG CONSTRUCTION] Total Serialized Payload Size: 938 bytes / MTU limit = 1232
+1|node_eng |    🚀 [WIF] Atomic Arbitrage Payload Built! Dispatching via RPC...
+1|node_eng |    ✅ [HELIUS-PREMIUM] Subsumed transaction fallback! TX Signature: 2GD3oyq6P7qD9fWSwxpU8u5XeVVTPRB4xsidUfBD8ref1jjRmWr1b2hqYQbp7Kj4FqzPPfno2oMa9iraUppuqKvS
+1|node_eng |    🏁 [MULTIPLEXER] Completed concurrent target sweep block.
+1|node_eng | 
+1|node_eng | ⚡ [EXEC] Scanning public DEX liquidity (Jupiter V6) & pushing to fleet...
+1|node_eng |    📡 [MULTIPLEXER] Sweep allocated to 1 pair (QuickNode Throttle)...
+1|node_eng | 
+1|node_eng |    🌐 [SPATIAL CEX-DEX SCANNER] Testing WIF Spread...
+1|node_eng |       [BITGET]  Bid: $0.174600 | Ask: $0.174700
+1|node_eng |       [JUPITER] Bid: $0.174047 | Ask: $0.175561
+1|node_eng |       🔴 No >0.001% Threshold Spread for WIF. Best Route: -0.374%
+1|node_eng |    🏁 [MULTIPLEXER] Completed concurrent target sweep block.
+1|node_eng | 
+1|node_eng | ⚡ [EXEC] Scanning public DEX liquidity (Jupiter V6) & pushing to fleet...
+1|node_eng |    📡 [MULTIPLEXER] Sweep allocated to 1 pair (QuickNode Throttle)...
+

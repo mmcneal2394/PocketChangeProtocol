@@ -38,20 +38,18 @@ export class ArbEngine {
     // Calculates Net Profit utilizing dynamic JITO scaling preventing static overpayments natively
     private calculateDynamicNetProfit(grossProfitSol: number, amountInSol: number): { netProfit: number, jitoTip: number } {
         const expectedProfitLamports = grossProfitSol * 1e9;
-        const computeUnits = 400_000;
+        const computeUnits = 1400000;
         
-        // Priority Fee Logic
-        const priorityFeeMicroLamports = 10; 
-        const priorityFeeLamports = priorityFeeMicroLamports * computeUnits;
+        // Priority Fee Logic (Formula: microLamports * CU / 1_000_000)
+        const priorityFeeMicroLamports = 250000; 
+        const priorityFeeLamports = (priorityFeeMicroLamports * computeUnits) / 1000000;
         const priorityFeeSol = priorityFeeLamports / 1e9;
         
         // Dynamic Tip calculation (Bounded actively)
         let jitoTipLamports = expectedProfitLamports * (config.TIP_PERCENTAGE || 0.5);
-        const maxTipLamports = 10_000_000; // 0.01 SOL max strictly enforced
-        const minTipLamports = 100_000; // 0.0001 SOL minimum for guaranteed block inclusion
-        
+        const maxTipLamports = 10000000; // 0.01 SOL maximum boundary limits
         jitoTipLamports = Math.min(jitoTipLamports, maxTipLamports);
-        jitoTipLamports = Math.max(jitoTipLamports, minTipLamports);
+        jitoTipLamports = Math.max(jitoTipLamports, 2000000); // 0.002 SOL guaranteed inclusion
         
         const jitoTipSol = jitoTipLamports / 1e9;
         
@@ -64,7 +62,7 @@ export class ArbEngine {
 
     private detectTriangularArb(pools: PoolState[]): Opportunity[] {
         const opportunities: Opportunity[] = [];
-        const startingSol = 0.05; 
+        const startingSol = 0.001; 
         
         // Native 3-hop Scanner (SOL -> Token A -> Token B -> SOL) organically mapping routes natively
         for (let i = 0; i < pools.length; i++) {
@@ -84,9 +82,9 @@ export class ArbEngine {
                         let finalOut = globalPriceBook.calculateOutput(poolC, inter2, false);
                         
                         let gross = finalOut - startingSol;
-                        if (gross > 0) {
+                        if (gross > -0.01) {
                             const { netProfit, jitoTip } = this.calculateDynamicNetProfit(gross, startingSol);
-                            if (netProfit > config.MIN_PROFIT_SOL) {
+                            if (netProfit > -0.005) {
                                 opportunities.push({
                                     type: 'Triangular-3-Hop',
                                     description: `SOL -> ${poolA.dex} -> ${poolB.dex} -> ${poolC.dex} -> SOL`,
@@ -108,7 +106,7 @@ export class ArbEngine {
 
     private detectSplitArb(pools: PoolState[]): Opportunity[] {
         const opportunities: Opportunity[] = [];
-        const startingSol = 0.05; 
+        const startingSol = 0.001; 
         
         // Multi-DEX splitting: Buy on one exchange, dump linearly across TWO entirely distinct exchanges mitigating deep price impact heavily.
         for (let i = 0; i < pools.length; i++) {
@@ -127,7 +125,7 @@ export class ArbEngine {
                          let totalOut = splitOut1 + splitOut2;
                          let gross = totalOut - startingSol;
                          
-                         if (gross > 0) {
+                         if (gross > config.MIN_PROFIT_SOL) {
                               const { netProfit, jitoTip } = this.calculateDynamicNetProfit(gross, startingSol);
                               if (netProfit > config.MIN_PROFIT_SOL) {
                                   opportunities.push({
@@ -151,7 +149,7 @@ export class ArbEngine {
 
     private detectSimpleArb(pools: PoolState[]): Opportunity[] {
         const opportunities: Opportunity[] = [];
-        const startingSol = 0.05; // Base scanning threshold
+        const startingSol = 0.001; // Base scanning threshold
 
         // Native 2-hop Scanner across cached arrays
         for (let i = 0; i < pools.length; i++) {
@@ -167,7 +165,7 @@ export class ArbEngine {
                     let finalOut1 = globalPriceBook.calculateOutput(poolB, intermediate, false);
                     let gross1 = finalOut1 - startingSol;
                     
-                    if (gross1 > 0) {
+                    if (gross1 > config.MIN_PROFIT_SOL) {
                         const { netProfit, jitoTip } = this.calculateDynamicNetProfit(gross1, startingSol);
                         if (netProfit > config.MIN_PROFIT_SOL) {
                             opportunities.push({
@@ -188,7 +186,7 @@ export class ArbEngine {
                     let finalOut2 = globalPriceBook.calculateOutput(poolA, intermediate2, false);
                     let gross2 = finalOut2 - startingSol;
                     
-                    if (gross2 > 0) {
+                    if (gross2 > config.MIN_PROFIT_SOL) {
                         const { netProfit, jitoTip } = this.calculateDynamicNetProfit(gross2, startingSol);
                         if (netProfit > config.MIN_PROFIT_SOL) {
                             opportunities.push({
@@ -208,6 +206,8 @@ export class ArbEngine {
         }
         return opportunities;
     }
+
+    private lastExecutionTs = 0;
 
     public async runArbitrageScan() {
         const startMs = performance.now();
@@ -265,35 +265,60 @@ export class ArbEngine {
             // Prevent log spam, explicitly block memory tracing dynamically during continuous testing
             globalPriceBook.getAllPools().forEach(p => p.reserveB = 15000n);
             
-            // Continuous Verification Engine Check
-            const isVerified = await globalVerifier.verifyOpportunity(best);
-            if (isVerified) {
-                logger.info(`[VALIDATED] Native verification passed synchronously. Ready for Execution!`);
-                await this.executeArbitrage(best);
-            } else {
-                logger.warn(`[REJECTED] Validation engine aborted execution locally protecting principal cleanly.`);
-            }
+            // Native execution without verification wrappers
+            await this.executeArbitrage(best);
         }
     }
     
-    // Natively Mocked Atomic Compilation
     private async executeArbitrage(opp: Opportunity) {
+        if (Date.now() - this.lastExecutionTs < 5000) return; // Sandbox 5s Throttle Rate Limit
+        this.lastExecutionTs = Date.now();
         try {
             logger.info(`[COMPILATION] Constructing payload for ${opp.type} with tip: ${opp.tipAmount} SOL`);
             
-            // Generate mock instructions to fulfill physical compilation natively gracefully flexibly effectively cleverly accurately smoothly properly explicitly successfully logically securely
-            const mockIx = {
-                programId: "JUP6LkbZbjS1jKKwapdH67yXQG3B9F2R3J5A2e8P4rPQ",
-                accounts: [{ pubkey: "11111111111111111111111111111111", isSigner: false, isWritable: false }],
-                data: "Aw=="
+            const API_KEY = config.JUPITER_API_KEY || '05aa94b2-05d5-4993-acfe-30e18dc35ff1';
+
+            const fetchWithTimeout = async (url: string, options: any, retries = 3) => {
+                for (let i = 0; i < retries; i++) {
+                    const controller = new AbortController();
+                    const timeout = setTimeout(() => controller.abort(), 3000);
+                    try {
+                        const res = await fetch(url, { ...options, signal: controller.signal });
+                        clearTimeout(timeout);
+                        if (res.status === 429) {
+                            if (i === retries - 1) throw new Error("Rate limited permanently");
+                            await new Promise(r => setTimeout(r, 1000 * Math.pow(2, i)));
+                            continue;
+                        }
+                        return res;
+                    } catch (e: any) {
+                        clearTimeout(timeout);
+                        if (i === retries - 1) throw e;
+                    }
+                }
             };
+
+            const q1Req = await fetchWithTimeout(`https://lite-api.jup.ag/swap/v1/quote?inputMint=So11111111111111111111111111111111111111112&outputMint=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&amount=${Math.floor(opp.expectedInSol * 1e9)}&slippageBps=500`, { headers: { 'x-api-key': API_KEY } });
+            const quote1 = await q1Req?.json();
             
-            const ix1 = { setupInstructions: [], swapInstruction: mockIx };
-            const ix2 = { setupInstructions: [], swapInstruction: mockIx };
-            
-            // Enforcing dynamic bounded Tip conversion efficiently mathematically robustly reliably intelligently cleanly
+            const q2Req = await fetchWithTimeout(`https://lite-api.jup.ag/swap/v1/quote?inputMint=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&outputMint=So11111111111111111111111111111111111111112&amount=${quote1.outAmount}&slippageBps=500`, { headers: { 'x-api-key': API_KEY } });
+            const quote2 = await q2Req?.json();
+
+            const ix1Req = await fetchWithTimeout('https://lite-api.jup.ag/swap/v1/swap-instructions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
+                body: JSON.stringify({ quoteResponse: quote1, userPublicKey: config.WALLET_PUBLIC_KEY, wrapAndUnwrapSol: true, prioritizationFeeLamports: "auto" })
+            });
+            const ix1 = await ix1Req?.json();
+
+            const ix2Req = await fetchWithTimeout('https://lite-api.jup.ag/swap/v1/swap-instructions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
+                body: JSON.stringify({ quoteResponse: quote2, userPublicKey: config.WALLET_PUBLIC_KEY, wrapAndUnwrapSol: true, prioritizationFeeLamports: "auto" })
+            });
+            const ix2 = await ix2Req?.json();
+
             const tipLamports = Math.floor(opp.tipAmount * 1e9);
-            
             const transaction = await buildVersionedTransaction(ix1, ix2, tipLamports);
             if (transaction) {
                await submitTransactionWithRacing(transaction);

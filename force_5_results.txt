@@ -1,0 +1,4 @@
+✅ [USDC] Physical Payload Sent! TX: 3NWSoyiaG7uEqvTC64HMJ2faHz1a4Jd1FmrkcJqWAqz6kPRiwKcaoi8cA6QbUmAWCPdxgU9rACuzvzB8VmrXTQ6a
+✅ [RAY] Physical Payload Sent! TX: 6s2Wmd4nkqHwWhhTrGnhykMkzndNZX4YabqqJwixGVwFetfAPCnzEkiHUZt7qExc2WrisfZuza7E1y9KNtfFGdR
+✅ [USDT] Physical Payload Sent! TX: 5B64nQSMwkWyoXLscxEHJjsXXXXdMDrgkqU9zSX1ypZcyw9TevrvhKN2tDD1vD8Ka54jjM67NFrdQvErK53Q8Ktb
+✅ [BONK] Physical Payload Sent! TX: 48VeewG137wPw65rx4vBetK3V18qao1xvkWFpH9MqfX3E3Y1mZ5WVxseMmgpMfYagZnrXzPoXK6pHrbgeQgJxfwf

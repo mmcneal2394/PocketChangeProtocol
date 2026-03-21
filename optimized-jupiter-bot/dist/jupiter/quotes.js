@@ -16,8 +16,10 @@ async function fetchJupiterQuote(inputToken, outputToken, amount) {
         const quoteRes = await fetch(`${config_1.config.JUPITER_ENDPOINT}/quote?${params.toString()}`, {
             headers: { 'x-api-key': config_1.config.JUPITER_API_KEY }
         });
-        if (!quoteRes.ok)
-            throw new Error(`Quote failed: ${quoteRes.statusText}`);
+        if (!quoteRes.ok) {
+            const errText = await quoteRes.text();
+            throw new Error(`Quote failed: ${quoteRes.statusText} - ${errText}`);
+        }
         return await quoteRes.json();
     }
     catch (error) {

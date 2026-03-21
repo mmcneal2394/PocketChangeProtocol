@@ -1,0 +1,1873 @@
+🏁 Initiating 60-Second Micro-Amount Arbitrage Refinement Test...
+[dotenv@17.3.1] injecting env (15) from .env -- tip: ⚙️  write to custom object with { processEnv: myObject }
+[INFO] 2026-03-20T08:32:40.797Z - Starting Optimized Jupiter Arbitrage Bot...
+[INFO] 2026-03-20T08:32:40.798Z - Initializing fast-path caching...
+[WARN] 2026-03-20T08:32:40.813Z - Failed to fetch dynamic tokens: TypeError: fetch failed
+    at node:internal/deps/undici/undici:14902:13
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async refreshDynamicTokens (/opt/pcprotocol/optimized-jupiter-bot/src/geyser/handlers.ts:39:20) {
+  [cause]: Error: getaddrinfo ENOTFOUND tokens.jup.ag
+      at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26) {
+    errno: -3007,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'tokens.jup.ag'
+  }
+}
+[INFO] 2026-03-20T08:32:40.952Z - Connecting to Chainstack Geyser gRPC...
+[INFO] 2026-03-20T08:32:40.953Z - Connecting to Geyser at: http://yellowstone.solana.placeholder.com
+[WARN] 2026-03-20T08:32:40.981Z - Native Yellowstone gRPC bindings skipped. Injecting MOCK Geyser Stream to verify local structure.
+[INFO] 2026-03-20T08:32:40.981Z - Attaching gRPC stream handlers...
+[INFO] 2026-03-20T08:32:40.981Z - Bot is successfully running and waiting for stream updates.
+[INFO] 2026-03-20T08:32:41.084Z - [FOUND] SOL/USDC: Orca-Raydium (331.3% spread | EMA: 331.34%)
+[INFO] 2026-03-20T08:32:41.084Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:41.084Z - [PERF] Detection latency: 0.85ms
+
+[INFO] 2026-03-20T08:32:41.090Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:41.090Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+[INFO] 2026-03-20T08:32:41.091Z - [COMPILATION] Constructing payload for Simple-2-Hop with tip: 0.002 SOL
+[INFO] 2026-03-20T08:32:41.183Z - [FOUND] SOL/USDC: Orca-Raydium (331.3% spread | EMA: 331.32%)
+[INFO] 2026-03-20T08:32:41.183Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:41.183Z - [PERF] Detection latency: 0.13ms
+
+[INFO] 2026-03-20T08:32:41.187Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:41.188Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+[INFO] 2026-03-20T08:32:41.283Z - [FOUND] SOL/USDC: Orca-Raydium (332.0% spread | EMA: 331.54%)
+[INFO] 2026-03-20T08:32:41.283Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:41.283Z - [PERF] Detection latency: 0.16ms
+
+[INFO] 2026-03-20T08:32:41.287Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:41.287Z - [MICRO-TEST] Initiating 0.001 SOL physical test for route: USDC -> USDC
+[INFO] 2026-03-20T08:32:41.291Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+[INFO] 2026-03-20T08:32:41.383Z - [FOUND] SOL/USDC: Orca-Raydium (331.1% spread | EMA: 331.43%)
+[INFO] 2026-03-20T08:32:41.383Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:41.383Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:41.389Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:41.389Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+[INFO] 2026-03-20T08:32:41.484Z - [FOUND] SOL/USDC: Orca-Raydium (332.3% spread | EMA: 331.61%)
+[INFO] 2026-03-20T08:32:41.484Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:41.484Z - [PERF] Detection latency: 0.25ms
+
+[INFO] 2026-03-20T08:32:41.487Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:41.488Z - [MICRO-TEST] Initiating 0.001 SOL physical test for route: USDC -> USDC
+[INFO] 2026-03-20T08:32:41.496Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+[INFO] 2026-03-20T08:32:41.584Z - [FOUND] SOL/USDC: Orca-Raydium (332.0% spread | EMA: 331.67%)
+[INFO] 2026-03-20T08:32:41.585Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:41.585Z - [PERF] Detection latency: 0.20ms
+
+[INFO] 2026-03-20T08:32:41.591Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:41.591Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+[INFO] 2026-03-20T08:32:41.685Z - [FOUND] SOL/USDC: Orca-Raydium (332.3% spread | EMA: 331.76%)
+[INFO] 2026-03-20T08:32:41.685Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:41.685Z - [PERF] Detection latency: 0.12ms
+
+[INFO] 2026-03-20T08:32:41.689Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:41.690Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+[INFO] 2026-03-20T08:32:41.807Z - [FOUND] SOL/USDC: Orca-Raydium (332.2% spread | EMA: 331.82%)
+[INFO] 2026-03-20T08:32:41.807Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:41.807Z - [PERF] Detection latency: 0.12ms
+
+[INFO] 2026-03-20T08:32:41.811Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:41.811Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+[INFO] 2026-03-20T08:32:41.908Z - [FOUND] SOL/USDC: Orca-Raydium (331.4% spread | EMA: 331.77%)
+[INFO] 2026-03-20T08:32:41.908Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:41.908Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:41.911Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:41.911Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+[INFO] 2026-03-20T08:32:41.925Z - --- TRANSACTION PAYLOAD STRUCTURE (9 Instructions) ---
+[INFO] 2026-03-20T08:32:41.925Z - [IX 0] Program: ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL
+[INFO] 2026-03-20T08:32:41.926Z - [IX 1] Program: 11111111111111111111111111111111
+[INFO] 2026-03-20T08:32:41.926Z - [IX 2] Program: TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA
+[INFO] 2026-03-20T08:32:41.926Z - [IX 3] Program: ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL
+[INFO] 2026-03-20T08:32:41.926Z - [IX 4] Program: JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4
+[INFO] 2026-03-20T08:32:41.927Z - [IX 5] Program: TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA
+[INFO] 2026-03-20T08:32:41.927Z - [IX 6] Program: ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL
+[INFO] 2026-03-20T08:32:41.927Z - [IX 7] Program: JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4
+[INFO] 2026-03-20T08:32:41.927Z - [IX 8] Program: TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA
+[INFO] 2026-03-20T08:32:41.927Z - -----------------------------------------------------
+[INFO] 2026-03-20T08:32:41.928Z - 🔥 Attached Strict Baseline Gas Priority: 250000 microLamports (Bypassing Priority Auctions!)
+[INFO] 2026-03-20T08:32:41.929Z - 💰 Appended Jito Tip Execution successfully: 0.002 SOL to AD15vs...
+[INFO] 2026-03-20T08:32:41.960Z - Executing MEV Bundle securely via High-Speed Chainstack Node + BloXroute + Jito for ultimate throughput...
+[INFO] 2026-03-20T08:32:41.971Z - [COMPILATION] Synced local Blockhash/ALT states sequentially mapping atomic instructions in 1.4ms!
+[INFO] 2026-03-20T08:32:42.009Z - [FOUND] SOL/USDC: Orca-Raydium (331.7% spread | EMA: 331.77%)
+[INFO] 2026-03-20T08:32:42.009Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:42.009Z - [PERF] Detection latency: 0.04ms
+
+[INFO] 2026-03-20T08:32:42.013Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:42.013Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:42.108Z - [FOUND] SOL/USDC: Orca-Raydium (330.9% spread | EMA: 331.69%)
+[INFO] 2026-03-20T08:32:42.108Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:42.109Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:42.114Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:42.114Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+[WARN] 2026-03-20T08:32:42.204Z - ❌ [Chainstack-RPC] Failed: Simulation failed. 
+Message: Transaction simulation failed: Transaction did not pass signature verification. 
+Logs: 
+[]. 
+Catch the `SendTransactionError` and call `getLogs()` on it for full details.
+[WARN] 2026-03-20T08:32:42.204Z - ❌ [Jito-BlockEngine] Failed: Network congested. Endpoint is globally rate limited.
+[WARN] 2026-03-20T08:32:42.204Z - ❌ [BloXroute-OFR] Failed: Unexpected token 'c', "could not "... is not valid JSON
+[INFO] 2026-03-20T08:32:42.209Z - [FOUND] SOL/USDC: Orca-Raydium (332.0% spread | EMA: 331.71%)
+[INFO] 2026-03-20T08:32:42.209Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:42.209Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:42.220Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:42.220Z - [MICRO-TEST] Initiating 0.001 SOL physical test for route: USDC -> USDC
+[INFO] 2026-03-20T08:32:42.223Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:42.309Z - [FOUND] SOL/USDC: Orca-Raydium (332.0% spread | EMA: 331.74%)
+[INFO] 2026-03-20T08:32:42.310Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:42.310Z - [PERF] Detection latency: 0.10ms
+
+[INFO] 2026-03-20T08:32:42.313Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:42.313Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+[INFO] 2026-03-20T08:32:42.409Z - [FOUND] SOL/USDC: Orca-Raydium (331.9% spread | EMA: 331.75%)
+[INFO] 2026-03-20T08:32:42.410Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:42.410Z - [PERF] Detection latency: 0.27ms
+
+[INFO] 2026-03-20T08:32:42.415Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:42.415Z - [MICRO-TEST] Initiating 0.001 SOL physical test for route: USDC -> USDC
+[INFO] 2026-03-20T08:32:42.419Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:42.510Z - [FOUND] SOL/USDC: Orca-Raydium (330.9% spread | EMA: 331.69%)
+[INFO] 2026-03-20T08:32:42.510Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:42.510Z - [PERF] Detection latency: 0.07ms
+
+[INFO] 2026-03-20T08:32:42.516Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:42.516Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+[INFO] 2026-03-20T08:32:42.611Z - [FOUND] SOL/USDC: Orca-Raydium (332.5% spread | EMA: 331.74%)
+[INFO] 2026-03-20T08:32:42.611Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:42.611Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:42.621Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:42.621Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:42.712Z - [FOUND] SOL/USDC: Orca-Raydium (332.0% spread | EMA: 331.76%)
+[INFO] 2026-03-20T08:32:42.712Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:42.712Z - [PERF] Detection latency: 0.07ms
+
+[INFO] 2026-03-20T08:32:42.717Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:42.718Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+[INFO] 2026-03-20T08:32:42.812Z - [FOUND] SOL/USDC: Orca-Raydium (331.5% spread | EMA: 331.74%)
+[INFO] 2026-03-20T08:32:42.813Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:42.813Z - [PERF] Detection latency: 0.07ms
+
+[INFO] 2026-03-20T08:32:42.818Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:42.818Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:42.912Z - [FOUND] SOL/USDC: Orca-Raydium (331.3% spread | EMA: 331.72%)
+[INFO] 2026-03-20T08:32:42.912Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:42.912Z - [PERF] Detection latency: 0.05ms
+
+[INFO] 2026-03-20T08:32:42.916Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:42.916Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+[INFO] 2026-03-20T08:32:43.013Z - [FOUND] SOL/USDC: Orca-Raydium (331.5% spread | EMA: 331.71%)
+[INFO] 2026-03-20T08:32:43.013Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:43.013Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:43.017Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:43.017Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:43.113Z - [FOUND] SOL/USDC: Orca-Raydium (331.5% spread | EMA: 331.70%)
+[INFO] 2026-03-20T08:32:43.113Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:43.113Z - [PERF] Detection latency: 0.07ms
+
+[INFO] 2026-03-20T08:32:43.122Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:43.123Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+[INFO] 2026-03-20T08:32:43.213Z - [FOUND] SOL/USDC: Orca-Raydium (331.3% spread | EMA: 331.68%)
+[INFO] 2026-03-20T08:32:43.213Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:43.213Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:43.218Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:43.219Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:43.313Z - [FOUND] SOL/USDC: Orca-Raydium (331.3% spread | EMA: 331.66%)
+[INFO] 2026-03-20T08:32:43.313Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:43.313Z - [PERF] Detection latency: 0.08ms
+
+[INFO] 2026-03-20T08:32:43.319Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:43.320Z - [MICRO-TEST] Initiating 0.001 SOL physical test for route: USDC -> USDC
+[INFO] 2026-03-20T08:32:43.324Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+[INFO] 2026-03-20T08:32:43.413Z - [FOUND] SOL/USDC: Orca-Raydium (331.9% spread | EMA: 331.67%)
+[INFO] 2026-03-20T08:32:43.413Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:43.413Z - [PERF] Detection latency: 0.05ms
+
+[INFO] 2026-03-20T08:32:43.418Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:43.418Z - [MICRO-TEST] Initiating 0.001 SOL physical test for route: USDC -> USDC
+[INFO] 2026-03-20T08:32:43.424Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:43.513Z - [FOUND] SOL/USDC: Orca-Raydium (331.3% spread | EMA: 331.66%)
+[INFO] 2026-03-20T08:32:43.513Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:43.513Z - [PERF] Detection latency: 0.05ms
+
+[INFO] 2026-03-20T08:32:43.517Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:43.518Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+[INFO] 2026-03-20T08:32:43.613Z - [FOUND] SOL/USDC: Orca-Raydium (332.1% spread | EMA: 331.67%)
+[INFO] 2026-03-20T08:32:43.614Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:43.614Z - [PERF] Detection latency: 0.08ms
+
+[INFO] 2026-03-20T08:32:43.620Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:43.620Z - [MICRO-TEST] Initiating 0.001 SOL physical test for route: USDC -> USDC
+[INFO] 2026-03-20T08:32:43.624Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+[INFO] 2026-03-20T08:32:43.713Z - [FOUND] SOL/USDC: Orca-Raydium (331.9% spread | EMA: 331.68%)
+[INFO] 2026-03-20T08:32:43.714Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:43.714Z - [PERF] Detection latency: 0.07ms
+
+[INFO] 2026-03-20T08:32:43.722Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:43.722Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+[INFO] 2026-03-20T08:32:43.814Z - [FOUND] SOL/USDC: Orca-Raydium (331.1% spread | EMA: 331.66%)
+[INFO] 2026-03-20T08:32:43.814Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:43.814Z - [PERF] Detection latency: 0.08ms
+
+[INFO] 2026-03-20T08:32:43.824Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:43.824Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:43.914Z - [FOUND] SOL/USDC: Orca-Raydium (331.0% spread | EMA: 331.64%)
+[INFO] 2026-03-20T08:32:43.914Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:43.914Z - [PERF] Detection latency: 0.07ms
+
+[INFO] 2026-03-20T08:32:43.918Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:43.919Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+[INFO] 2026-03-20T08:32:44.014Z - [FOUND] SOL/USDC: Orca-Raydium (332.0% spread | EMA: 331.65%)
+[INFO] 2026-03-20T08:32:44.014Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:44.014Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:44.018Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:44.018Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:44.116Z - [FOUND] SOL/USDC: Orca-Raydium (331.3% spread | EMA: 331.64%)
+[INFO] 2026-03-20T08:32:44.116Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:44.116Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:44.121Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:44.121Z - [MICRO-TEST] Initiating 0.001 SOL physical test for route: USDC -> USDC
+[INFO] 2026-03-20T08:32:44.128Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+[INFO] 2026-03-20T08:32:44.216Z - [FOUND] SOL/USDC: Orca-Raydium (332.1% spread | EMA: 331.65%)
+[INFO] 2026-03-20T08:32:44.216Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:44.216Z - [PERF] Detection latency: 0.07ms
+
+[INFO] 2026-03-20T08:32:44.222Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:44.222Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+[INFO] 2026-03-20T08:32:44.315Z - [FOUND] SOL/USDC: Orca-Raydium (331.6% spread | EMA: 331.65%)
+[INFO] 2026-03-20T08:32:44.315Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:44.316Z - [PERF] Detection latency: 0.04ms
+
+[INFO] 2026-03-20T08:32:44.319Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:44.319Z - [MICRO-TEST] Initiating 0.001 SOL physical test for route: USDC -> USDC
+[INFO] 2026-03-20T08:32:44.322Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+[INFO] 2026-03-20T08:32:44.415Z - [FOUND] SOL/USDC: Orca-Raydium (332.4% spread | EMA: 331.67%)
+[INFO] 2026-03-20T08:32:44.415Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:44.415Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:44.419Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:44.419Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:44.516Z - [FOUND] SOL/USDC: Orca-Raydium (331.8% spread | EMA: 331.67%)
+[INFO] 2026-03-20T08:32:44.516Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:44.516Z - [PERF] Detection latency: 0.10ms
+
+[INFO] 2026-03-20T08:32:44.522Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:44.522Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+[INFO] 2026-03-20T08:32:44.616Z - [FOUND] SOL/USDC: Orca-Raydium (331.8% spread | EMA: 331.68%)
+[INFO] 2026-03-20T08:32:44.616Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:44.616Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:44.624Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:44.624Z - [MICRO-TEST] Initiating 0.001 SOL physical test for route: USDC -> USDC
+[INFO] 2026-03-20T08:32:44.628Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:44.716Z - [FOUND] SOL/USDC: Orca-Raydium (331.0% spread | EMA: 331.66%)
+[INFO] 2026-03-20T08:32:44.716Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:44.716Z - [PERF] Detection latency: 0.05ms
+
+[INFO] 2026-03-20T08:32:44.721Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:44.721Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+[INFO] 2026-03-20T08:32:44.816Z - [FOUND] SOL/USDC: Orca-Raydium (332.1% spread | EMA: 331.67%)
+[INFO] 2026-03-20T08:32:44.816Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:44.816Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:44.822Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:44.822Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:44.916Z - [FOUND] SOL/USDC: Orca-Raydium (332.4% spread | EMA: 331.69%)
+[INFO] 2026-03-20T08:32:44.916Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:44.916Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:44.923Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:44.923Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+[INFO] 2026-03-20T08:32:45.015Z - [FOUND] SOL/USDC: Orca-Raydium (332.1% spread | EMA: 331.70%)
+[INFO] 2026-03-20T08:32:45.016Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:45.016Z - [PERF] Detection latency: 0.10ms
+
+[INFO] 2026-03-20T08:32:45.019Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:45.020Z - [MICRO-TEST] Initiating 0.001 SOL physical test for route: USDC -> USDC
+[INFO] 2026-03-20T08:32:45.025Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:45.115Z - [FOUND] SOL/USDC: Orca-Raydium (331.4% spread | EMA: 331.69%)
+[INFO] 2026-03-20T08:32:45.116Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:45.116Z - [PERF] Detection latency: 0.07ms
+
+[INFO] 2026-03-20T08:32:45.123Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:45.123Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+[INFO] 2026-03-20T08:32:45.216Z - [FOUND] SOL/USDC: Orca-Raydium (331.7% spread | EMA: 331.69%)
+[INFO] 2026-03-20T08:32:45.216Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:45.216Z - [PERF] Detection latency: 0.07ms
+
+[INFO] 2026-03-20T08:32:45.222Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:45.222Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:45.317Z - [FOUND] SOL/USDC: Orca-Raydium (331.1% spread | EMA: 331.68%)
+[INFO] 2026-03-20T08:32:45.317Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:45.317Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:45.325Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:45.325Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+[INFO] 2026-03-20T08:32:45.417Z - [FOUND] SOL/USDC: Orca-Raydium (331.3% spread | EMA: 331.67%)
+[INFO] 2026-03-20T08:32:45.418Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:45.418Z - [PERF] Detection latency: 0.07ms
+
+[INFO] 2026-03-20T08:32:45.428Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:45.429Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:45.518Z - [FOUND] SOL/USDC: Orca-Raydium (331.7% spread | EMA: 331.67%)
+[INFO] 2026-03-20T08:32:45.518Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:45.518Z - [PERF] Detection latency: 0.07ms
+
+[INFO] 2026-03-20T08:32:45.522Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:45.522Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+[INFO] 2026-03-20T08:32:45.617Z - [FOUND] SOL/USDC: Orca-Raydium (331.6% spread | EMA: 331.67%)
+[INFO] 2026-03-20T08:32:45.617Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:45.618Z - [PERF] Detection latency: 0.05ms
+
+[INFO] 2026-03-20T08:32:45.624Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:45.624Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:45.720Z - [FOUND] SOL/USDC: Orca-Raydium (331.2% spread | EMA: 331.66%)
+[INFO] 2026-03-20T08:32:45.720Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:45.720Z - [PERF] Detection latency: 0.05ms
+
+[INFO] 2026-03-20T08:32:45.755Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:45.755Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+[INFO] 2026-03-20T08:32:45.820Z - [FOUND] SOL/USDC: Orca-Raydium (331.3% spread | EMA: 331.65%)
+[INFO] 2026-03-20T08:32:45.820Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:45.820Z - [PERF] Detection latency: 0.10ms
+
+[INFO] 2026-03-20T08:32:45.824Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:45.824Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:45.920Z - [FOUND] SOL/USDC: Orca-Raydium (331.2% spread | EMA: 331.64%)
+[INFO] 2026-03-20T08:32:45.920Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:45.920Z - [PERF] Detection latency: 0.07ms
+
+[INFO] 2026-03-20T08:32:45.924Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:45.924Z - [MICRO-TEST] Initiating 0.001 SOL physical test for route: USDC -> USDC
+[INFO] 2026-03-20T08:32:45.929Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[INFO] 2026-03-20T08:32:46.023Z - [FOUND] SOL/USDC: Orca-Raydium (331.7% spread | EMA: 331.65%)
+[INFO] 2026-03-20T08:32:46.024Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:46.024Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:46.027Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:46.027Z - [MICRO-TEST] Initiating 0.001 SOL physical test for route: USDC -> USDC
+[INFO] 2026-03-20T08:32:46.031Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+[INFO] 2026-03-20T08:32:46.125Z - [FOUND] SOL/USDC: Orca-Raydium (331.0% spread | EMA: 331.63%)
+[INFO] 2026-03-20T08:32:46.125Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:46.126Z - [PERF] Detection latency: 0.05ms
+
+[INFO] 2026-03-20T08:32:46.131Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:46.131Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+[INFO] 2026-03-20T08:32:46.131Z - [COMPILATION] Constructing payload for Simple-2-Hop with tip: 0.002 SOL
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[INFO] 2026-03-20T08:32:46.226Z - [FOUND] SOL/USDC: Orca-Raydium (331.8% spread | EMA: 331.63%)
+[INFO] 2026-03-20T08:32:46.226Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:46.227Z - [PERF] Detection latency: 0.07ms
+
+[INFO] 2026-03-20T08:32:46.233Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:46.233Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+[INFO] 2026-03-20T08:32:46.326Z - [FOUND] SOL/USDC: Orca-Raydium (331.9% spread | EMA: 331.64%)
+[INFO] 2026-03-20T08:32:46.326Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:46.326Z - [PERF] Detection latency: 0.04ms
+
+[INFO] 2026-03-20T08:32:46.333Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:46.333Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[INFO] 2026-03-20T08:32:46.426Z - [SCAN] Checking 2 pools internally mapped...
+[INFO] 2026-03-20T08:32:46.427Z - [FOUND] SOL/USDC: Orca-Raydium (331.3% spread | EMA: 331.63%)
+[INFO] 2026-03-20T08:32:46.427Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:46.427Z - [PERF] Detection latency: 0.25ms
+
+[INFO] 2026-03-20T08:32:46.431Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:46.431Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:46.527Z - [FOUND] SOL/USDC: Orca-Raydium (331.6% spread | EMA: 331.63%)
+[INFO] 2026-03-20T08:32:46.527Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:46.527Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:46.530Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:46.530Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[INFO] 2026-03-20T08:32:46.627Z - [FOUND] SOL/USDC: Orca-Raydium (332.2% spread | EMA: 331.64%)
+[INFO] 2026-03-20T08:32:46.628Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:46.628Z - [PERF] Detection latency: 0.05ms
+
+[INFO] 2026-03-20T08:32:46.634Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:46.635Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+[INFO] 2026-03-20T08:32:46.728Z - [FOUND] SOL/USDC: Orca-Raydium (331.9% spread | EMA: 331.65%)
+[INFO] 2026-03-20T08:32:46.728Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:46.728Z - [PERF] Detection latency: 0.07ms
+
+[INFO] 2026-03-20T08:32:46.733Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:46.733Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[INFO] 2026-03-20T08:32:46.827Z - [FOUND] SOL/USDC: Orca-Raydium (331.1% spread | EMA: 331.64%)
+[INFO] 2026-03-20T08:32:46.828Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:46.828Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:46.834Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:46.834Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:46.930Z - [FOUND] SOL/USDC: Orca-Raydium (331.1% spread | EMA: 331.63%)
+[INFO] 2026-03-20T08:32:46.930Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:46.930Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:46.937Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:46.937Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[INFO] 2026-03-20T08:32:47.030Z - [FOUND] SOL/USDC: Orca-Raydium (332.0% spread | EMA: 331.64%)
+[INFO] 2026-03-20T08:32:47.030Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:47.030Z - [PERF] Detection latency: 0.08ms
+
+[INFO] 2026-03-20T08:32:47.039Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:47.039Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+[INFO] 2026-03-20T08:32:47.130Z - [FOUND] SOL/USDC: Orca-Raydium (331.6% spread | EMA: 331.63%)
+[INFO] 2026-03-20T08:32:47.131Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:47.131Z - [PERF] Detection latency: 0.05ms
+
+[INFO] 2026-03-20T08:32:47.138Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:47.138Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[INFO] 2026-03-20T08:32:47.231Z - [FOUND] SOL/USDC: Orca-Raydium (331.9% spread | EMA: 331.64%)
+[INFO] 2026-03-20T08:32:47.232Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:47.232Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:47.248Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:47.248Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:47.332Z - [FOUND] SOL/USDC: Orca-Raydium (331.0% spread | EMA: 331.63%)
+[INFO] 2026-03-20T08:32:47.332Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:47.332Z - [PERF] Detection latency: 0.05ms
+
+[INFO] 2026-03-20T08:32:47.338Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:47.338Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+[INFO] 2026-03-20T08:32:47.432Z - [FOUND] SOL/USDC: Orca-Raydium (331.7% spread | EMA: 331.63%)
+[INFO] 2026-03-20T08:32:47.432Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:47.432Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:47.437Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:47.437Z - [MICRO-TEST] Initiating 0.001 SOL physical test for route: USDC -> USDC
+[INFO] 2026-03-20T08:32:47.452Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:47.533Z - [FOUND] SOL/USDC: Orca-Raydium (332.3% spread | EMA: 331.64%)
+[INFO] 2026-03-20T08:32:47.533Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:47.533Z - [PERF] Detection latency: 0.07ms
+
+[INFO] 2026-03-20T08:32:47.541Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:47.541Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[INFO] 2026-03-20T08:32:47.633Z - [FOUND] SOL/USDC: Orca-Raydium (331.3% spread | EMA: 331.63%)
+[INFO] 2026-03-20T08:32:47.633Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:47.633Z - [PERF] Detection latency: 0.07ms
+
+[INFO] 2026-03-20T08:32:47.647Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:47.647Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:47.733Z - [FOUND] SOL/USDC: Orca-Raydium (331.0% spread | EMA: 331.62%)
+[INFO] 2026-03-20T08:32:47.733Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:47.734Z - [PERF] Detection latency: 0.11ms
+
+[INFO] 2026-03-20T08:32:47.741Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:47.741Z - [MICRO-TEST] Initiating 0.001 SOL physical test for route: USDC -> USDC
+[INFO] 2026-03-20T08:32:47.749Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[INFO] 2026-03-20T08:32:47.834Z - [FOUND] SOL/USDC: Orca-Raydium (331.9% spread | EMA: 331.63%)
+[INFO] 2026-03-20T08:32:47.834Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:47.834Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:47.839Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:47.839Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:47.937Z - [FOUND] SOL/USDC: Orca-Raydium (331.1% spread | EMA: 331.62%)
+[INFO] 2026-03-20T08:32:47.937Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:47.937Z - [PERF] Detection latency: 0.05ms
+
+[INFO] 2026-03-20T08:32:47.951Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:47.951Z - [MICRO-TEST] Initiating 0.001 SOL physical test for route: USDC -> USDC
+[INFO] 2026-03-20T08:32:47.955Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[INFO] 2026-03-20T08:32:48.037Z - [FOUND] SOL/USDC: Orca-Raydium (332.5% spread | EMA: 331.63%)
+[INFO] 2026-03-20T08:32:48.037Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:48.037Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:48.042Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:48.042Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:48.137Z - [FOUND] SOL/USDC: Orca-Raydium (331.6% spread | EMA: 331.63%)
+[INFO] 2026-03-20T08:32:48.137Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:48.137Z - [PERF] Detection latency: 0.08ms
+
+[INFO] 2026-03-20T08:32:48.142Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:48.142Z - [MICRO-TEST] Initiating 0.001 SOL physical test for route: USDC -> USDC
+[INFO] 2026-03-20T08:32:48.146Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[INFO] 2026-03-20T08:32:48.237Z - [FOUND] SOL/USDC: Orca-Raydium (331.6% spread | EMA: 331.63%)
+[INFO] 2026-03-20T08:32:48.237Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:48.237Z - [PERF] Detection latency: 0.07ms
+
+[INFO] 2026-03-20T08:32:48.244Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:48.244Z - [MICRO-TEST] Initiating 0.001 SOL physical test for route: USDC -> USDC
+[INFO] 2026-03-20T08:32:48.250Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:48.337Z - [FOUND] SOL/USDC: Orca-Raydium (331.8% spread | EMA: 331.63%)
+[INFO] 2026-03-20T08:32:48.337Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:48.338Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:48.358Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:48.358Z - [MICRO-TEST] Initiating 0.001 SOL physical test for route: USDC -> USDC
+[INFO] 2026-03-20T08:32:48.362Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+[INFO] 2026-03-20T08:32:48.438Z - [FOUND] SOL/USDC: Orca-Raydium (332.1% spread | EMA: 331.64%)
+[INFO] 2026-03-20T08:32:48.438Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:48.438Z - [PERF] Detection latency: 0.04ms
+
+[INFO] 2026-03-20T08:32:48.445Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:48.445Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:48.545Z - [FOUND] SOL/USDC: Orca-Raydium (331.3% spread | EMA: 331.63%)
+[INFO] 2026-03-20T08:32:48.545Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:48.545Z - [PERF] Detection latency: 0.07ms
+
+[INFO] 2026-03-20T08:32:48.554Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:48.554Z - [MICRO-TEST] Initiating 0.001 SOL physical test for route: USDC -> USDC
+[INFO] 2026-03-20T08:32:48.561Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[INFO] 2026-03-20T08:32:48.645Z - [FOUND] SOL/USDC: Orca-Raydium (332.2% spread | EMA: 331.64%)
+[INFO] 2026-03-20T08:32:48.645Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:48.645Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:48.653Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:48.653Z - [MICRO-TEST] Initiating 0.001 SOL physical test for route: USDC -> USDC
+[INFO] 2026-03-20T08:32:48.667Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+[INFO] 2026-03-20T08:32:48.746Z - [FOUND] SOL/USDC: Orca-Raydium (332.3% spread | EMA: 331.65%)
+[INFO] 2026-03-20T08:32:48.746Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:48.746Z - [PERF] Detection latency: 0.07ms
+
+[INFO] 2026-03-20T08:32:48.772Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:48.772Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+[INFO] 2026-03-20T08:32:48.845Z - [FOUND] SOL/USDC: Orca-Raydium (331.4% spread | EMA: 331.65%)
+[INFO] 2026-03-20T08:32:48.845Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:48.846Z - [PERF] Detection latency: 0.05ms
+
+[INFO] 2026-03-20T08:32:48.851Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:48.852Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:48.946Z - [FOUND] SOL/USDC: Orca-Raydium (332.2% spread | EMA: 331.65%)
+[INFO] 2026-03-20T08:32:48.946Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:48.946Z - [PERF] Detection latency: 0.05ms
+
+[INFO] 2026-03-20T08:32:48.951Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:48.951Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[INFO] 2026-03-20T08:32:49.048Z - [FOUND] SOL/USDC: Orca-Raydium (331.4% spread | EMA: 331.65%)
+[INFO] 2026-03-20T08:32:49.048Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:49.048Z - [PERF] Detection latency: 0.04ms
+
+[INFO] 2026-03-20T08:32:49.067Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:49.068Z - [MICRO-TEST] Initiating 0.001 SOL physical test for route: USDC -> USDC
+[INFO] 2026-03-20T08:32:49.072Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:49.148Z - [FOUND] SOL/USDC: Orca-Raydium (331.3% spread | EMA: 331.65%)
+[INFO] 2026-03-20T08:32:49.148Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:49.148Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:49.159Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:49.159Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[INFO] 2026-03-20T08:32:49.249Z - [FOUND] SOL/USDC: Orca-Raydium (331.1% spread | EMA: 331.64%)
+[INFO] 2026-03-20T08:32:49.249Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:49.249Z - [PERF] Detection latency: 0.07ms
+
+[INFO] 2026-03-20T08:32:49.266Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:49.266Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+[INFO] 2026-03-20T08:32:49.350Z - [FOUND] SOL/USDC: Orca-Raydium (331.7% spread | EMA: 331.64%)
+[INFO] 2026-03-20T08:32:49.350Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:49.350Z - [PERF] Detection latency: 0.07ms
+
+[INFO] 2026-03-20T08:32:49.359Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:49.359Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[INFO] 2026-03-20T08:32:49.451Z - [FOUND] SOL/USDC: Orca-Raydium (331.4% spread | EMA: 331.64%)
+[INFO] 2026-03-20T08:32:49.452Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:49.452Z - [PERF] Detection latency: 0.07ms
+
+[INFO] 2026-03-20T08:32:49.456Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:49.456Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:49.552Z - [FOUND] SOL/USDC: Orca-Raydium (332.5% spread | EMA: 331.65%)
+[INFO] 2026-03-20T08:32:49.552Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:49.552Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:49.558Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:49.559Z - [MICRO-TEST] Initiating 0.001 SOL physical test for route: USDC -> USDC
+[INFO] 2026-03-20T08:32:49.563Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[INFO] 2026-03-20T08:32:49.652Z - [FOUND] SOL/USDC: Orca-Raydium (331.9% spread | EMA: 331.65%)
+[INFO] 2026-03-20T08:32:49.652Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:49.652Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:49.656Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:49.657Z - [MICRO-TEST] Initiating 0.001 SOL physical test for route: USDC -> USDC
+[INFO] 2026-03-20T08:32:49.659Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:49.753Z - [FOUND] SOL/USDC: Orca-Raydium (331.1% spread | EMA: 331.64%)
+[INFO] 2026-03-20T08:32:49.754Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:49.754Z - [PERF] Detection latency: 0.05ms
+
+[INFO] 2026-03-20T08:32:49.760Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:49.760Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[ERROR] 2026-03-20T08:32:49.832Z - Failed to update recent blockhash Error: failed to get recent blockhash: Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "1a65cb8f-b1f4-46cd-9ed3-3f2b3ac2e30d" } 
+
+    at Connection.getLatestBlockhash (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:4705:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout.fetchRecentBlockhash [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/src/jupiter/cache.ts:15:27)
+[INFO] 2026-03-20T08:32:49.870Z - [FOUND] SOL/USDC: Orca-Raydium (331.2% spread | EMA: 331.64%)
+[INFO] 2026-03-20T08:32:49.870Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:49.870Z - [PERF] Detection latency: 0.05ms
+
+[INFO] 2026-03-20T08:32:49.876Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:49.876Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+[INFO] 2026-03-20T08:32:49.970Z - [FOUND] SOL/USDC: Orca-Raydium (332.2% spread | EMA: 331.65%)
+[INFO] 2026-03-20T08:32:49.970Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:49.970Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:49.976Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:49.976Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+[ERROR] 2026-03-20T08:32:50.027Z - Failed to update recent blockhash Error: failed to get recent blockhash: Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "60f7a12b-b6d9-4800-95ea-825f14b0361a" } 
+
+    at Connection.getLatestBlockhash (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:4705:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout.fetchRecentBlockhash [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/src/jupiter/cache.ts:15:27)
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[INFO] 2026-03-20T08:32:50.070Z - [FOUND] SOL/USDC: Orca-Raydium (331.7% spread | EMA: 331.65%)
+[INFO] 2026-03-20T08:32:50.070Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:50.070Z - [PERF] Detection latency: 0.05ms
+
+[INFO] 2026-03-20T08:32:50.075Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:50.075Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+[INFO] 2026-03-20T08:32:50.170Z - [FOUND] SOL/USDC: Orca-Raydium (331.8% spread | EMA: 331.65%)
+[INFO] 2026-03-20T08:32:50.170Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:50.170Z - [PERF] Detection latency: 0.07ms
+
+[INFO] 2026-03-20T08:32:50.180Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:50.180Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[INFO] 2026-03-20T08:32:50.273Z - [FOUND] SOL/USDC: Orca-Raydium (332.1% spread | EMA: 331.65%)
+[INFO] 2026-03-20T08:32:50.273Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:50.273Z - [PERF] Detection latency: 0.05ms
+
+[INFO] 2026-03-20T08:32:50.285Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:50.285Z - [MICRO-TEST] Initiating 0.001 SOL physical test for route: USDC -> USDC
+[INFO] 2026-03-20T08:32:50.299Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+[ERROR] 2026-03-20T08:32:50.302Z - Failed to update recent blockhash Error: failed to get recent blockhash: Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "f6780d3b-5c9e-4c28-aa39-18c456e3ef1e" } 
+
+    at Connection.getLatestBlockhash (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:4705:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout.fetchRecentBlockhash [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/src/jupiter/cache.ts:15:27)
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:50.374Z - [FOUND] SOL/USDC: Orca-Raydium (332.3% spread | EMA: 331.66%)
+[INFO] 2026-03-20T08:32:50.374Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:50.374Z - [PERF] Detection latency: 0.03ms
+
+[INFO] 2026-03-20T08:32:50.381Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:50.381Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[ERROR] 2026-03-20T08:32:50.452Z - Failed to update recent blockhash Error: failed to get recent blockhash: Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "cb8b54a5-a0d5-4ae0-93b8-fa059c5642da" } 
+
+    at Connection.getLatestBlockhash (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:4705:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout.fetchRecentBlockhash [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/src/jupiter/cache.ts:15:27)
+[INFO] 2026-03-20T08:32:50.474Z - [FOUND] SOL/USDC: Orca-Raydium (331.8% spread | EMA: 331.66%)
+[INFO] 2026-03-20T08:32:50.475Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:50.475Z - [PERF] Detection latency: 0.03ms
+
+[INFO] 2026-03-20T08:32:50.479Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:50.480Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+[INFO] 2026-03-20T08:32:50.574Z - [FOUND] SOL/USDC: Orca-Raydium (332.0% spread | EMA: 331.66%)
+[INFO] 2026-03-20T08:32:50.575Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:50.575Z - [PERF] Detection latency: 0.07ms
+
+[INFO] 2026-03-20T08:32:50.580Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:50.580Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[ERROR] 2026-03-20T08:32:50.669Z - Failed to update recent blockhash Error: failed to get recent blockhash: Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "9df17b2b-f4f6-481d-8af4-a6d843efcd6a" } 
+
+    at Connection.getLatestBlockhash (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:4705:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout.fetchRecentBlockhash [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/src/jupiter/cache.ts:15:27)
+[INFO] 2026-03-20T08:32:50.674Z - [FOUND] SOL/USDC: Orca-Raydium (331.8% spread | EMA: 331.66%)
+[INFO] 2026-03-20T08:32:50.674Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:50.674Z - [PERF] Detection latency: 0.04ms
+
+[INFO] 2026-03-20T08:32:50.681Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:50.681Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+[INFO] 2026-03-20T08:32:50.775Z - [FOUND] SOL/USDC: Orca-Raydium (332.4% spread | EMA: 331.67%)
+[INFO] 2026-03-20T08:32:50.775Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:50.775Z - [PERF] Detection latency: 0.05ms
+
+[INFO] 2026-03-20T08:32:50.781Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:50.781Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[INFO] 2026-03-20T08:32:50.894Z - [FOUND] SOL/USDC: Orca-Raydium (331.9% spread | EMA: 331.67%)
+[INFO] 2026-03-20T08:32:50.894Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:50.894Z - [PERF] Detection latency: 0.08ms
+
+[INFO] 2026-03-20T08:32:50.901Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:50.902Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+[ERROR] 2026-03-20T08:32:50.904Z - Failed to update recent blockhash Error: failed to get recent blockhash: Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "ee914a7a-d4b0-47cc-9cf8-fe0974e14dea" } 
+
+    at Connection.getLatestBlockhash (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:4705:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout.fetchRecentBlockhash [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/src/jupiter/cache.ts:15:27)
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:50.994Z - [FOUND] SOL/USDC: Orca-Raydium (332.3% spread | EMA: 331.68%)
+[INFO] 2026-03-20T08:32:50.994Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:50.994Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:51.004Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:51.004Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[INFO] 2026-03-20T08:32:51.109Z - [FOUND] SOL/USDC: Orca-Raydium (331.1% spread | EMA: 331.68%)
+[INFO] 2026-03-20T08:32:51.109Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:51.109Z - [PERF] Detection latency: 0.05ms
+
+[INFO] 2026-03-20T08:32:51.121Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:51.121Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+[ERROR] 2026-03-20T08:32:51.124Z - Failed to update recent blockhash Error: failed to get recent blockhash: Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "daf5ad32-f9f5-4357-8dbc-f42f9726a84b" } 
+
+    at Connection.getLatestBlockhash (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:4705:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout.fetchRecentBlockhash [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/src/jupiter/cache.ts:15:27)
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+[INFO] 2026-03-20T08:32:51.209Z - [FOUND] SOL/USDC: Orca-Raydium (331.1% spread | EMA: 331.67%)
+[INFO] 2026-03-20T08:32:51.209Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:51.209Z - [PERF] Detection latency: 0.22ms
+
+[INFO] 2026-03-20T08:32:51.215Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:51.215Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+[INFO] 2026-03-20T08:32:51.215Z - [COMPILATION] Constructing payload for Simple-2-Hop with tip: 0.002 SOL
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[ERROR] 2026-03-20T08:32:51.274Z - Failed to update recent blockhash Error: failed to get recent blockhash: Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "f0f22035-9f1f-485a-ab55-772c3e12c072" } 
+
+    at Connection.getLatestBlockhash (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:4705:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout.fetchRecentBlockhash [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/src/jupiter/cache.ts:15:27)
+[INFO] 2026-03-20T08:32:51.318Z - [FOUND] SOL/USDC: Orca-Raydium (331.8% spread | EMA: 331.67%)
+[INFO] 2026-03-20T08:32:51.318Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:51.318Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:51.323Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:51.323Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+[ERROR] 2026-03-20T08:32:51.420Z - Failed to update recent blockhash Error: failed to get recent blockhash: Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "b8f43d30-f64c-4afb-b115-cd9f905a9efc" } 
+
+    at Connection.getLatestBlockhash (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:4705:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout.fetchRecentBlockhash [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/src/jupiter/cache.ts:15:27)
+[INFO] 2026-03-20T08:32:51.421Z - [FOUND] SOL/USDC: Orca-Raydium (331.9% spread | EMA: 331.67%)
+[INFO] 2026-03-20T08:32:51.421Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:51.421Z - [PERF] Detection latency: 0.04ms
+
+[INFO] 2026-03-20T08:32:51.427Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:51.427Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[INFO] 2026-03-20T08:32:51.525Z - [FOUND] SOL/USDC: Orca-Raydium (332.2% spread | EMA: 331.68%)
+[INFO] 2026-03-20T08:32:51.525Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:51.526Z - [PERF] Detection latency: 0.05ms
+
+[INFO] 2026-03-20T08:32:51.532Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:51.532Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+[INFO] 2026-03-20T08:32:51.625Z - [FOUND] SOL/USDC: Orca-Raydium (331.9% spread | EMA: 331.68%)
+[INFO] 2026-03-20T08:32:51.626Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:51.626Z - [PERF] Detection latency: 0.05ms
+
+[INFO] 2026-03-20T08:32:51.629Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:51.629Z - [MICRO-TEST] Initiating 0.001 SOL physical test for route: USDC -> USDC
+[INFO] 2026-03-20T08:32:51.632Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[ERROR] 2026-03-20T08:32:51.683Z - Failed to update recent blockhash Error: failed to get recent blockhash: Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "d8b061ac-c8f7-4e78-8698-3c6b1917f58b" } 
+
+    at Connection.getLatestBlockhash (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:4705:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout.fetchRecentBlockhash [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/src/jupiter/cache.ts:15:27)
+[INFO] 2026-03-20T08:32:51.728Z - [FOUND] SOL/USDC: Orca-Raydium (331.9% spread | EMA: 331.68%)
+[INFO] 2026-03-20T08:32:51.728Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:51.728Z - [PERF] Detection latency: 0.04ms
+
+[INFO] 2026-03-20T08:32:51.732Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:51.732Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+[INFO] 2026-03-20T08:32:51.828Z - [FOUND] SOL/USDC: Orca-Raydium (332.2% spread | EMA: 331.69%)
+[INFO] 2026-03-20T08:32:51.828Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:51.829Z - [PERF] Detection latency: 0.07ms
+
+[INFO] 2026-03-20T08:32:51.834Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:51.834Z - [MICRO-TEST] Initiating 0.001 SOL physical test for route: USDC -> USDC
+[INFO] 2026-03-20T08:32:51.840Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[ERROR] 2026-03-20T08:32:51.911Z - Failed to update recent blockhash Error: failed to get recent blockhash: Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "aef7f9e6-e967-4c5d-90dc-9d61cac8156c" } 
+
+    at Connection.getLatestBlockhash (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:4705:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout.fetchRecentBlockhash [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/src/jupiter/cache.ts:15:27)
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:51.929Z - [FOUND] SOL/USDC: Orca-Raydium (331.2% spread | EMA: 331.68%)
+[INFO] 2026-03-20T08:32:51.929Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:51.929Z - [PERF] Detection latency: 0.05ms
+
+[INFO] 2026-03-20T08:32:51.934Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:51.935Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[INFO] 2026-03-20T08:32:52.028Z - [SCAN] Checking 2 pools internally mapped...
+[INFO] 2026-03-20T08:32:52.029Z - [FOUND] SOL/USDC: Orca-Raydium (331.6% spread | EMA: 331.68%)
+[INFO] 2026-03-20T08:32:52.029Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:52.029Z - [PERF] Detection latency: 0.21ms
+
+[INFO] 2026-03-20T08:32:52.033Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:52.034Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+[ERROR] 2026-03-20T08:32:52.090Z - Failed to update recent blockhash Error: failed to get recent blockhash: Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "83c0234a-0712-4fdc-b759-cea59eea5bea" } 
+
+    at Connection.getLatestBlockhash (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:4705:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout.fetchRecentBlockhash [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/src/jupiter/cache.ts:15:27)
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+[INFO] 2026-03-20T08:32:52.128Z - [FOUND] SOL/USDC: Orca-Raydium (331.7% spread | EMA: 331.68%)
+[INFO] 2026-03-20T08:32:52.128Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:52.128Z - [PERF] Detection latency: 0.04ms
+
+[INFO] 2026-03-20T08:32:52.134Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:52.134Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[INFO] 2026-03-20T08:32:52.229Z - [FOUND] SOL/USDC: Orca-Raydium (331.8% spread | EMA: 331.69%)
+[INFO] 2026-03-20T08:32:52.229Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:52.229Z - [PERF] Detection latency: 0.05ms
+
+[INFO] 2026-03-20T08:32:52.235Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:52.235Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+[ERROR] 2026-03-20T08:32:52.266Z - Failed to update recent blockhash Error: failed to get recent blockhash: Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "cdd20a79-7eea-4340-8a86-529689f143da" } 
+
+    at Connection.getLatestBlockhash (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:4705:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout.fetchRecentBlockhash [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/src/jupiter/cache.ts:15:27)
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+[INFO] 2026-03-20T08:32:52.332Z - [FOUND] SOL/USDC: Orca-Raydium (332.3% spread | EMA: 331.69%)
+[INFO] 2026-03-20T08:32:52.332Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:52.332Z - [PERF] Detection latency: 0.04ms
+
+[INFO] 2026-03-20T08:32:52.339Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:52.340Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+[INFO] 2026-03-20T08:32:52.432Z - [FOUND] SOL/USDC: Orca-Raydium (331.7% spread | EMA: 331.69%)
+[INFO] 2026-03-20T08:32:52.432Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:52.432Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:52.436Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:52.437Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+[ERROR] 2026-03-20T08:32:52.497Z - Failed to update recent blockhash Error: failed to get recent blockhash: Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "39b5ff5e-fbc5-4fa4-8541-649b756d77ab" } 
+
+    at Connection.getLatestBlockhash (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:4705:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout.fetchRecentBlockhash [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/src/jupiter/cache.ts:15:27)
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+[INFO] 2026-03-20T08:32:52.532Z - [FOUND] SOL/USDC: Orca-Raydium (331.6% spread | EMA: 331.69%)
+[INFO] 2026-03-20T08:32:52.532Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:52.532Z - [PERF] Detection latency: 0.07ms
+
+[INFO] 2026-03-20T08:32:52.538Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:52.538Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+[INFO] 2026-03-20T08:32:52.632Z - [FOUND] SOL/USDC: Orca-Raydium (331.9% spread | EMA: 331.69%)
+[INFO] 2026-03-20T08:32:52.632Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:52.632Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:52.651Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:52.651Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[ERROR] 2026-03-20T08:32:52.722Z - Failed to update recent blockhash Error: failed to get recent blockhash: Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "bfb35980-ec56-4303-962e-37e689424165" } 
+
+    at Connection.getLatestBlockhash (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:4705:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout.fetchRecentBlockhash [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/src/jupiter/cache.ts:15:27)
+[INFO] 2026-03-20T08:32:52.733Z - [FOUND] SOL/USDC: Orca-Raydium (332.2% spread | EMA: 331.70%)
+[INFO] 2026-03-20T08:32:52.733Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:52.733Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:52.749Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:52.750Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+[INFO] 2026-03-20T08:32:52.833Z - [FOUND] SOL/USDC: Orca-Raydium (331.8% spread | EMA: 331.70%)
+[INFO] 2026-03-20T08:32:52.833Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:52.833Z - [PERF] Detection latency: 0.04ms
+
+[INFO] 2026-03-20T08:32:52.837Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:52.837Z - [MICRO-TEST] Initiating 0.001 SOL physical test for route: USDC -> USDC
+[INFO] 2026-03-20T08:32:52.841Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+[ERROR] 2026-03-20T08:32:52.925Z - Failed to update recent blockhash Error: failed to get recent blockhash: Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "01419ca4-840d-403e-aa51-368cc9c1490a" } 
+
+    at Connection.getLatestBlockhash (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:4705:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout.fetchRecentBlockhash [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/src/jupiter/cache.ts:15:27)
+[INFO] 2026-03-20T08:32:52.935Z - [FOUND] SOL/USDC: Orca-Raydium (331.9% spread | EMA: 331.70%)
+[INFO] 2026-03-20T08:32:52.935Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:52.935Z - [PERF] Detection latency: 0.03ms
+
+[INFO] 2026-03-20T08:32:52.938Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:52.939Z - [MICRO-TEST] Initiating 0.001 SOL physical test for route: USDC -> USDC
+[INFO] 2026-03-20T08:32:52.941Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+[INFO] 2026-03-20T08:32:53.036Z - [FOUND] SOL/USDC: Orca-Raydium (332.2% spread | EMA: 331.70%)
+[INFO] 2026-03-20T08:32:53.036Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:53.036Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:53.040Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:53.041Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[ERROR] 2026-03-20T08:32:53.080Z - Failed to update recent blockhash Error: failed to get recent blockhash: Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "d077c201-3020-424d-93a9-69e1c8d18516" } 
+
+    at Connection.getLatestBlockhash (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:4705:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout.fetchRecentBlockhash [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/src/jupiter/cache.ts:15:27)
+[INFO] 2026-03-20T08:32:53.137Z - [FOUND] SOL/USDC: Orca-Raydium (331.1% spread | EMA: 331.70%)
+[INFO] 2026-03-20T08:32:53.137Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:53.137Z - [PERF] Detection latency: 0.05ms
+
+[INFO] 2026-03-20T08:32:53.160Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:53.160Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+[INFO] 2026-03-20T08:32:53.237Z - [FOUND] SOL/USDC: Orca-Raydium (331.2% spread | EMA: 331.69%)
+[INFO] 2026-03-20T08:32:53.237Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:53.237Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:53.243Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:53.243Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[ERROR] 2026-03-20T08:32:53.288Z - Failed to update recent blockhash Error: failed to get recent blockhash: Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "022325b3-427c-4ab0-9b94-1839db94774e" } 
+
+    at Connection.getLatestBlockhash (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:4705:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout.fetchRecentBlockhash [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/src/jupiter/cache.ts:15:27)
+[INFO] 2026-03-20T08:32:53.339Z - [FOUND] SOL/USDC: Orca-Raydium (331.0% spread | EMA: 331.69%)
+[INFO] 2026-03-20T08:32:53.339Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:53.339Z - [PERF] Detection latency: 0.04ms
+
+[INFO] 2026-03-20T08:32:53.344Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:53.344Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+[INFO] 2026-03-20T08:32:53.438Z - [FOUND] SOL/USDC: Orca-Raydium (331.6% spread | EMA: 331.69%)
+[INFO] 2026-03-20T08:32:53.439Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:53.439Z - [PERF] Detection latency: 0.04ms
+
+[INFO] 2026-03-20T08:32:53.443Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:53.443Z - [MICRO-TEST] Initiating 0.001 SOL physical test for route: USDC -> USDC
+[INFO] 2026-03-20T08:32:53.446Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[ERROR] 2026-03-20T08:32:53.486Z - Failed to update recent blockhash Error: failed to get recent blockhash: Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "9059f765-ccf1-4ccf-91b4-393e87e112dc" } 
+
+    at Connection.getLatestBlockhash (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:4705:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout.fetchRecentBlockhash [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/src/jupiter/cache.ts:15:27)
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+[INFO] 2026-03-20T08:32:53.538Z - [FOUND] SOL/USDC: Orca-Raydium (331.9% spread | EMA: 331.69%)
+[INFO] 2026-03-20T08:32:53.539Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:53.539Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:53.543Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:53.543Z - [MICRO-TEST] Initiating 0.001 SOL physical test for route: USDC -> USDC
+[INFO] 2026-03-20T08:32:53.547Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+[INFO] 2026-03-20T08:32:53.639Z - [FOUND] SOL/USDC: Orca-Raydium (331.4% spread | EMA: 331.69%)
+[INFO] 2026-03-20T08:32:53.639Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:53.639Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:53.647Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:53.648Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[ERROR] 2026-03-20T08:32:53.695Z - Failed to update recent blockhash Error: failed to get recent blockhash: Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "f2cf87b9-671f-4d47-8ace-6f40fe3409d3" } 
+
+    at Connection.getLatestBlockhash (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:4705:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout.fetchRecentBlockhash [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/src/jupiter/cache.ts:15:27)
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+[INFO] 2026-03-20T08:32:53.740Z - [FOUND] SOL/USDC: Orca-Raydium (331.4% spread | EMA: 331.68%)
+[INFO] 2026-03-20T08:32:53.740Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:53.740Z - [PERF] Detection latency: 0.05ms
+
+[INFO] 2026-03-20T08:32:53.745Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:53.745Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+[INFO] 2026-03-20T08:32:53.839Z - [FOUND] SOL/USDC: Orca-Raydium (332.0% spread | EMA: 331.69%)
+[INFO] 2026-03-20T08:32:53.840Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:53.840Z - [PERF] Detection latency: 0.07ms
+
+[INFO] 2026-03-20T08:32:53.846Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:53.846Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[ERROR] 2026-03-20T08:32:53.898Z - Failed to update recent blockhash Error: failed to get recent blockhash: Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "1d35f6f2-2450-45d9-9fee-83cff6cdf1e1" } 
+
+    at Connection.getLatestBlockhash (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:4705:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout.fetchRecentBlockhash [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/src/jupiter/cache.ts:15:27)
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+[INFO] 2026-03-20T08:32:53.941Z - [FOUND] SOL/USDC: Orca-Raydium (332.3% spread | EMA: 331.69%)
+[INFO] 2026-03-20T08:32:53.941Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:53.941Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:53.946Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:53.946Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+[INFO] 2026-03-20T08:32:54.042Z - [FOUND] SOL/USDC: Orca-Raydium (331.9% spread | EMA: 331.69%)
+[INFO] 2026-03-20T08:32:54.042Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:54.042Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:54.054Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:54.054Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[ERROR] 2026-03-20T08:32:54.123Z - Failed to update recent blockhash Error: failed to get recent blockhash: Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "3b682f87-c86e-46f1-b49f-f742474a74ab" } 
+
+    at Connection.getLatestBlockhash (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:4705:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout.fetchRecentBlockhash [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/src/jupiter/cache.ts:15:27)
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+[INFO] 2026-03-20T08:32:54.142Z - [FOUND] SOL/USDC: Orca-Raydium (331.7% spread | EMA: 331.69%)
+[INFO] 2026-03-20T08:32:54.142Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:54.142Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:54.146Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:54.146Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+[INFO] 2026-03-20T08:32:54.241Z - [FOUND] SOL/USDC: Orca-Raydium (331.2% spread | EMA: 331.69%)
+[INFO] 2026-03-20T08:32:54.242Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:54.242Z - [PERF] Detection latency: 0.03ms
+
+[INFO] 2026-03-20T08:32:54.246Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:54.246Z - [MICRO-TEST] Initiating 0.001 SOL physical test for route: USDC -> USDC
+[INFO] 2026-03-20T08:32:54.250Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[ERROR] 2026-03-20T08:32:54.296Z - Failed to update recent blockhash Error: failed to get recent blockhash: Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "b2b22495-e3c0-4086-a8f7-19a33aef1e84" } 
+
+    at Connection.getLatestBlockhash (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:4705:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout.fetchRecentBlockhash [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/src/jupiter/cache.ts:15:27)
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+[INFO] 2026-03-20T08:32:54.342Z - [FOUND] SOL/USDC: Orca-Raydium (332.0% spread | EMA: 331.69%)
+[INFO] 2026-03-20T08:32:54.342Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:54.342Z - [PERF] Detection latency: 0.07ms
+
+[INFO] 2026-03-20T08:32:54.348Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:54.348Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+[INFO] 2026-03-20T08:32:54.441Z - [FOUND] SOL/USDC: Orca-Raydium (331.0% spread | EMA: 331.69%)
+[INFO] 2026-03-20T08:32:54.441Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:54.441Z - [PERF] Detection latency: 0.05ms
+
+[INFO] 2026-03-20T08:32:54.446Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:54.446Z - [MICRO-TEST] Initiating 0.001 SOL physical test for route: USDC -> USDC
+[INFO] 2026-03-20T08:32:54.450Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[ERROR] 2026-03-20T08:32:54.501Z - Failed to update recent blockhash Error: failed to get recent blockhash: Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "e6fdb2ee-f0e4-42b2-891f-ace09b9ef2cf" } 
+
+    at Connection.getLatestBlockhash (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:4705:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout.fetchRecentBlockhash [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/src/jupiter/cache.ts:15:27)
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+[INFO] 2026-03-20T08:32:54.541Z - [FOUND] SOL/USDC: Orca-Raydium (331.9% spread | EMA: 331.69%)
+[INFO] 2026-03-20T08:32:54.541Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:54.541Z - [PERF] Detection latency: 0.05ms
+
+[INFO] 2026-03-20T08:32:54.546Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:54.547Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[ERROR] 2026-03-20T08:32:54.588Z - Failed to fetch ALT G6EBADumaU4MaifUPMYY77Ao74ogBSwGDsavzcmYRkUA Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "dce1567d-6691-466f-bc79-c34e5853ccbd" } 
+
+    at ClientBrowser.callServer (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:1703:18)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+[ERROR] 2026-03-20T08:32:54.624Z - Failed to fetch ALT HVck7rwUxqFPNxbzdrsFGcCHDpMVEkCAoUh6ZiZXsSow Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "de75d016-61d4-46fb-9484-1b8a3bdf24a4" } 
+
+    at ClientBrowser.callServer (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:1703:18)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+[INFO] 2026-03-20T08:32:54.626Z - --- TRANSACTION PAYLOAD STRUCTURE (9 Instructions) ---
+[INFO] 2026-03-20T08:32:54.626Z - [IX 0] Program: ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL
+[INFO] 2026-03-20T08:32:54.626Z - [IX 1] Program: 11111111111111111111111111111111
+[INFO] 2026-03-20T08:32:54.626Z - [IX 2] Program: TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA
+[INFO] 2026-03-20T08:32:54.626Z - [IX 3] Program: ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL
+[INFO] 2026-03-20T08:32:54.626Z - [IX 4] Program: JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4
+[INFO] 2026-03-20T08:32:54.626Z - [IX 5] Program: TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA
+[INFO] 2026-03-20T08:32:54.626Z - [IX 6] Program: ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL
+[INFO] 2026-03-20T08:32:54.627Z - [IX 7] Program: JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4
+[INFO] 2026-03-20T08:32:54.627Z - [IX 8] Program: TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA
+[INFO] 2026-03-20T08:32:54.627Z - -----------------------------------------------------
+[INFO] 2026-03-20T08:32:54.627Z - 🔥 Attached Strict Baseline Gas Priority: 250000 microLamports (Bypassing Priority Auctions!)
+[INFO] 2026-03-20T08:32:54.627Z - 💰 Appended Jito Tip Execution successfully: 0.002 SOL to DfXygS...
+[INFO] 2026-03-20T08:32:54.634Z - Executing MEV Bundle securely via High-Speed Chainstack Node + BloXroute + Jito for ultimate throughput...
+[INFO] 2026-03-20T08:32:54.654Z - [COMPILATION] Synced local Blockhash/ALT states sequentially mapping atomic instructions in 1.4ms!
+[INFO] 2026-03-20T08:32:54.665Z - [FOUND] SOL/USDC: Orca-Raydium (331.3% spread | EMA: 331.68%)
+[INFO] 2026-03-20T08:32:54.665Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:54.665Z - [PERF] Detection latency: 0.05ms
+
+[INFO] 2026-03-20T08:32:54.669Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:54.670Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[ERROR] 2026-03-20T08:32:54.750Z - Failed to update recent blockhash Error: failed to get recent blockhash: Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "75fa2d02-aeea-4705-b3e5-5fcae4b16c3a" } 
+
+    at Connection.getLatestBlockhash (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:4705:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout.fetchRecentBlockhash [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/src/jupiter/cache.ts:15:27)
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+[INFO] 2026-03-20T08:32:54.765Z - [FOUND] SOL/USDC: Orca-Raydium (331.1% spread | EMA: 331.68%)
+[INFO] 2026-03-20T08:32:54.765Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:54.765Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:54.772Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:54.772Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+[INFO] 2026-03-20T08:32:54.866Z - [FOUND] SOL/USDC: Orca-Raydium (331.5% spread | EMA: 331.68%)
+[INFO] 2026-03-20T08:32:54.866Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:54.866Z - [PERF] Detection latency: 0.07ms
+
+[INFO] 2026-03-20T08:32:54.874Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:54.874Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+[ERROR] 2026-03-20T08:32:54.957Z - Failed to update recent blockhash Error: failed to get recent blockhash: Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "6091cc90-d39f-4691-a6c1-9210aad27b47" } 
+
+    at Connection.getLatestBlockhash (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:4705:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout.fetchRecentBlockhash [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/src/jupiter/cache.ts:15:27)
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:54.967Z - [SCAN] Checking 2 pools internally mapped...
+[INFO] 2026-03-20T08:32:54.967Z - [FOUND] SOL/USDC: Orca-Raydium (331.8% spread | EMA: 331.68%)
+[INFO] 2026-03-20T08:32:54.967Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:54.967Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:54.971Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:54.972Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+[INFO] 2026-03-20T08:32:55.067Z - [FOUND] SOL/USDC: Orca-Raydium (331.4% spread | EMA: 331.68%)
+[INFO] 2026-03-20T08:32:55.067Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:55.067Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:55.070Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:55.070Z - [MICRO-TEST] Initiating 0.001 SOL physical test for route: USDC -> USDC
+[INFO] 2026-03-20T08:32:55.074Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[ERROR] 2026-03-20T08:32:55.100Z - Failed to update recent blockhash Error: failed to get recent blockhash: Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "48363e86-04a6-406e-9006-a0526c943e57" } 
+
+    at Connection.getLatestBlockhash (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:4705:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout.fetchRecentBlockhash [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/src/jupiter/cache.ts:15:27)
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:55.168Z - [FOUND] SOL/USDC: Orca-Raydium (331.4% spread | EMA: 331.68%)
+[INFO] 2026-03-20T08:32:55.168Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:55.168Z - [PERF] Detection latency: 0.05ms
+
+[INFO] 2026-03-20T08:32:55.171Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:55.172Z - [MICRO-TEST] Initiating 0.001 SOL physical test for route: USDC -> USDC
+[INFO] 2026-03-20T08:32:55.174Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+[INFO] 2026-03-20T08:32:55.268Z - [FOUND] SOL/USDC: Orca-Raydium (331.0% spread | EMA: 331.67%)
+[INFO] 2026-03-20T08:32:55.268Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:55.268Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:55.273Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:55.273Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+[ERROR] 2026-03-20T08:32:55.326Z - Failed to update recent blockhash Error: failed to get recent blockhash: Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "76994ca5-dc09-48c3-b4a8-52d4f23ca014" } 
+
+    at Connection.getLatestBlockhash (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:4705:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout.fetchRecentBlockhash [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/src/jupiter/cache.ts:15:27)
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:55.368Z - [FOUND] SOL/USDC: Orca-Raydium (331.3% spread | EMA: 331.67%)
+[INFO] 2026-03-20T08:32:55.368Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:55.368Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:55.372Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:55.372Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[INFO] 2026-03-20T08:32:55.468Z - [FOUND] SOL/USDC: Orca-Raydium (331.3% spread | EMA: 331.67%)
+[INFO] 2026-03-20T08:32:55.468Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:55.468Z - [PERF] Detection latency: 0.04ms
+
+[INFO] 2026-03-20T08:32:55.471Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:55.472Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+[ERROR] 2026-03-20T08:32:55.525Z - Failed to update recent blockhash Error: failed to get recent blockhash: Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "a1288de4-d3be-48e7-80c0-fa21f3d6f9e3" } 
+
+    at Connection.getLatestBlockhash (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:4705:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout.fetchRecentBlockhash [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/src/jupiter/cache.ts:15:27)
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:55.569Z - [FOUND] SOL/USDC: Orca-Raydium (331.4% spread | EMA: 331.66%)
+[INFO] 2026-03-20T08:32:55.569Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:55.569Z - [PERF] Detection latency: 0.05ms
+
+[INFO] 2026-03-20T08:32:55.578Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:55.578Z - [MICRO-TEST] Initiating 0.001 SOL physical test for route: USDC -> USDC
+[INFO] 2026-03-20T08:32:55.582Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[INFO] 2026-03-20T08:32:55.670Z - [FOUND] SOL/USDC: Orca-Raydium (332.2% spread | EMA: 331.67%)
+[INFO] 2026-03-20T08:32:55.670Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:55.670Z - [PERF] Detection latency: 0.05ms
+
+[INFO] 2026-03-20T08:32:55.676Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:55.676Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+[ERROR] 2026-03-20T08:32:55.708Z - Failed to update recent blockhash Error: failed to get recent blockhash: Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "0b2222c6-ff79-45b8-85f5-e955122da1e0" } 
+
+    at Connection.getLatestBlockhash (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:4705:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout.fetchRecentBlockhash [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/src/jupiter/cache.ts:15:27)
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:55.769Z - [FOUND] SOL/USDC: Orca-Raydium (331.3% spread | EMA: 331.67%)
+[INFO] 2026-03-20T08:32:55.769Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:55.770Z - [PERF] Detection latency: 0.05ms
+
+[INFO] 2026-03-20T08:32:55.775Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:55.775Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+[INFO] 2026-03-20T08:32:55.870Z - [FOUND] SOL/USDC: Orca-Raydium (331.9% spread | EMA: 331.67%)
+[INFO] 2026-03-20T08:32:55.870Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:55.870Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:55.875Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:55.875Z - [MICRO-TEST] Initiating 0.001 SOL physical test for route: USDC -> USDC
+[INFO] 2026-03-20T08:32:55.879Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[ERROR] 2026-03-20T08:32:55.912Z - Failed to update recent blockhash Error: failed to get recent blockhash: Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "3a407bbe-4cad-4400-9bc6-dde56cfea3f5" } 
+
+    at Connection.getLatestBlockhash (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:4705:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout.fetchRecentBlockhash [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/src/jupiter/cache.ts:15:27)
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:55.971Z - [FOUND] SOL/USDC: Orca-Raydium (332.2% spread | EMA: 331.67%)
+[INFO] 2026-03-20T08:32:55.971Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:55.972Z - [PERF] Detection latency: 0.05ms
+
+[INFO] 2026-03-20T08:32:55.983Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:55.983Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+[INFO] 2026-03-20T08:32:55.990Z - 🔥 Triggering synthetic 'Force-Hop' to validate JITO tipping/compilation mechanics dynamically...
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[INFO] 2026-03-20T08:32:56.073Z - [FOUND] SOL/USDC: Orca-Raydium (332.3% spread | EMA: 331.67%)
+[INFO] 2026-03-20T08:32:56.073Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:56.073Z - [PERF] Detection latency: 0.04ms
+
+[INFO] 2026-03-20T08:32:56.079Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:56.079Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+[ERROR] 2026-03-20T08:32:56.093Z - Failed to update recent blockhash Error: failed to get recent blockhash: Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "1465bbed-b0a1-46aa-bee2-8c3bd2e9d48d" } 
+
+    at Connection.getLatestBlockhash (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:4705:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout.fetchRecentBlockhash [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/src/jupiter/cache.ts:15:27)
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:56.173Z - [FOUND] SOL/USDC: Orca-Raydium (331.5% spread | EMA: 331.67%)
+[INFO] 2026-03-20T08:32:56.173Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:56.173Z - [PERF] Detection latency: 0.08ms
+
+[INFO] 2026-03-20T08:32:56.186Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:56.186Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+[INFO] 2026-03-20T08:32:56.273Z - [FOUND] SOL/USDC: Orca-Raydium (332.2% spread | EMA: 331.68%)
+[INFO] 2026-03-20T08:32:56.273Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:56.273Z - [PERF] Detection latency: 0.05ms
+
+[INFO] 2026-03-20T08:32:56.280Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:56.280Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+[INFO] 2026-03-20T08:32:56.280Z - [COMPILATION] Constructing payload for Simple-2-Hop with tip: 0.002 SOL
+[ERROR] 2026-03-20T08:32:56.288Z - Failed to update recent blockhash Error: failed to get recent blockhash: Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "ce4205e6-0b26-428d-bd48-08e6ff43605b" } 
+
+    at Connection.getLatestBlockhash (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:4705:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout.fetchRecentBlockhash [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/src/jupiter/cache.ts:15:27)
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:56.374Z - [FOUND] SOL/USDC: Orca-Raydium (331.6% spread | EMA: 331.68%)
+[INFO] 2026-03-20T08:32:56.374Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:56.374Z - [PERF] Detection latency: 0.05ms
+
+[INFO] 2026-03-20T08:32:56.378Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:56.378Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+[INFO] 2026-03-20T08:32:56.474Z - [FOUND] SOL/USDC: Orca-Raydium (332.2% spread | EMA: 331.68%)
+[INFO] 2026-03-20T08:32:56.474Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:56.474Z - [PERF] Detection latency: 0.07ms
+
+[INFO] 2026-03-20T08:32:56.479Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:56.479Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[ERROR] 2026-03-20T08:32:56.572Z - Failed to update recent blockhash Error: failed to get recent blockhash: Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "2c4caab2-9a64-4953-a4a7-3115fade4753" } 
+
+    at Connection.getLatestBlockhash (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:4705:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout.fetchRecentBlockhash [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/src/jupiter/cache.ts:15:27)
+[INFO] 2026-03-20T08:32:56.574Z - [FOUND] SOL/USDC: Orca-Raydium (331.8% spread | EMA: 331.68%)
+[INFO] 2026-03-20T08:32:56.575Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:56.575Z - [PERF] Detection latency: 0.05ms
+
+[INFO] 2026-03-20T08:32:56.578Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:56.578Z - [MICRO-TEST] Initiating 0.001 SOL physical test for route: USDC -> USDC
+[INFO] 2026-03-20T08:32:56.583Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+[INFO] 2026-03-20T08:32:56.675Z - [FOUND] SOL/USDC: Orca-Raydium (331.6% spread | EMA: 331.68%)
+[INFO] 2026-03-20T08:32:56.675Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:56.675Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:56.679Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:56.679Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[ERROR] 2026-03-20T08:32:56.726Z - Failed to update recent blockhash Error: failed to get recent blockhash: Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "bdf028ff-d2f3-4e4e-9045-ef95da37ce78" } 
+
+    at Connection.getLatestBlockhash (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:4705:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout.fetchRecentBlockhash [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/src/jupiter/cache.ts:15:27)
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:56.774Z - [FOUND] SOL/USDC: Orca-Raydium (331.0% spread | EMA: 331.68%)
+[INFO] 2026-03-20T08:32:56.774Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:56.774Z - [PERF] Detection latency: 0.05ms
+
+[INFO] 2026-03-20T08:32:56.778Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:56.779Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+[INFO] 2026-03-20T08:32:56.874Z - [FOUND] SOL/USDC: Orca-Raydium (331.9% spread | EMA: 331.68%)
+[INFO] 2026-03-20T08:32:56.874Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:56.874Z - [PERF] Detection latency: 0.05ms
+
+[INFO] 2026-03-20T08:32:56.879Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:56.879Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[ERROR] 2026-03-20T08:32:56.910Z - Failed to update recent blockhash Error: failed to get recent blockhash: Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "fb0bcd9c-6209-41eb-ad99-4c71aa8a2257" } 
+
+    at Connection.getLatestBlockhash (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:4705:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout.fetchRecentBlockhash [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/src/jupiter/cache.ts:15:27)
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:56.974Z - [SCAN] Checking 2 pools internally mapped...
+[INFO] 2026-03-20T08:32:56.974Z - [FOUND] SOL/USDC: Orca-Raydium (331.2% spread | EMA: 331.67%)
+[INFO] 2026-03-20T08:32:56.975Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:56.975Z - [PERF] Detection latency: 0.21ms
+
+[INFO] 2026-03-20T08:32:56.978Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:56.978Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:57.076Z - [FOUND] SOL/USDC: Orca-Raydium (331.5% spread | EMA: 331.67%)
+[INFO] 2026-03-20T08:32:57.076Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:57.076Z - [PERF] Detection latency: 0.05ms
+
+[INFO] 2026-03-20T08:32:57.080Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:57.080Z - [MICRO-TEST] Initiating 0.001 SOL physical test for route: USDC -> USDC
+[INFO] 2026-03-20T08:32:57.082Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+[ERROR] 2026-03-20T08:32:57.146Z - Failed to update recent blockhash Error: failed to get recent blockhash: Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "acd6248a-8bcb-4708-9967-776e761d1641" } 
+
+    at Connection.getLatestBlockhash (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:4705:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout.fetchRecentBlockhash [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/src/jupiter/cache.ts:15:27)
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:57.177Z - [FOUND] SOL/USDC: Orca-Raydium (331.8% spread | EMA: 331.67%)
+[INFO] 2026-03-20T08:32:57.177Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:57.177Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:57.181Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:57.181Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[INFO] 2026-03-20T08:32:57.277Z - [FOUND] SOL/USDC: Orca-Raydium (331.3% spread | EMA: 331.67%)
+[INFO] 2026-03-20T08:32:57.277Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:57.277Z - [PERF] Detection latency: 0.07ms
+
+[INFO] 2026-03-20T08:32:57.281Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:57.282Z - [MICRO-TEST] Initiating 0.001 SOL physical test for route: USDC -> USDC
+[INFO] 2026-03-20T08:32:57.285Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+[ERROR] 2026-03-20T08:32:57.362Z - Failed to update recent blockhash Error: failed to get recent blockhash: Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "aa490a83-80fc-4aee-8931-1be954017721" } 
+
+    at Connection.getLatestBlockhash (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:4705:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout.fetchRecentBlockhash [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/src/jupiter/cache.ts:15:27)
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:57.378Z - [FOUND] SOL/USDC: Orca-Raydium (331.3% spread | EMA: 331.67%)
+[INFO] 2026-03-20T08:32:57.378Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:57.378Z - [PERF] Detection latency: 0.07ms
+
+[INFO] 2026-03-20T08:32:57.383Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:57.383Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[INFO] 2026-03-20T08:32:57.479Z - [SCAN] Checking 2 pools internally mapped...
+[INFO] 2026-03-20T08:32:57.479Z - [FOUND] SOL/USDC: Orca-Raydium (331.6% spread | EMA: 331.67%)
+[INFO] 2026-03-20T08:32:57.479Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:57.479Z - [PERF] Detection latency: 0.11ms
+
+[INFO] 2026-03-20T08:32:57.483Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:57.483Z - [MICRO-TEST] Initiating 0.001 SOL physical test for route: USDC -> USDC
+[INFO] 2026-03-20T08:32:57.487Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+[ERROR] 2026-03-20T08:32:57.531Z - Failed to update recent blockhash Error: failed to get recent blockhash: Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "3ab94a42-1be0-4a1b-bd31-ca6761c880b1" } 
+
+    at Connection.getLatestBlockhash (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:4705:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout.fetchRecentBlockhash [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/src/jupiter/cache.ts:15:27)
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:57.579Z - [FOUND] SOL/USDC: Orca-Raydium (331.2% spread | EMA: 331.67%)
+[INFO] 2026-03-20T08:32:57.579Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:57.579Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:57.583Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:57.583Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[INFO] 2026-03-20T08:32:57.679Z - [FOUND] SOL/USDC: Orca-Raydium (331.7% spread | EMA: 331.67%)
+[INFO] 2026-03-20T08:32:57.679Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:57.679Z - [PERF] Detection latency: 0.03ms
+
+[INFO] 2026-03-20T08:32:57.683Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:57.683Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+[ERROR] 2026-03-20T08:32:57.746Z - Failed to update recent blockhash Error: failed to get recent blockhash: Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "7b7dbde7-953f-47c9-9505-0bdf1dd199f5" } 
+
+    at Connection.getLatestBlockhash (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:4705:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout.fetchRecentBlockhash [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/src/jupiter/cache.ts:15:27)
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:57.779Z - [FOUND] SOL/USDC: Orca-Raydium (332.4% spread | EMA: 331.67%)
+[INFO] 2026-03-20T08:32:57.779Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:57.779Z - [PERF] Detection latency: 0.05ms
+
+[INFO] 2026-03-20T08:32:57.783Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:57.783Z - [MICRO-TEST] Initiating 0.001 SOL physical test for route: USDC -> USDC
+[INFO] 2026-03-20T08:32:57.786Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+[INFO] 2026-03-20T08:32:57.881Z - [FOUND] SOL/USDC: Orca-Raydium (331.2% spread | EMA: 331.67%)
+[INFO] 2026-03-20T08:32:57.881Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:57.881Z - [PERF] Detection latency: 0.05ms
+
+[INFO] 2026-03-20T08:32:57.884Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:57.884Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+[ERROR] 2026-03-20T08:32:57.952Z - Failed to update recent blockhash Error: failed to get recent blockhash: Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "7f05b470-a127-452d-beba-780d9910b98f" } 
+
+    at Connection.getLatestBlockhash (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:4705:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout.fetchRecentBlockhash [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/src/jupiter/cache.ts:15:27)
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:57.981Z - [FOUND] SOL/USDC: Orca-Raydium (331.5% spread | EMA: 331.67%)
+[INFO] 2026-03-20T08:32:57.981Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:57.981Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:57.991Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:57.991Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[INFO] 2026-03-20T08:32:58.080Z - [FOUND] SOL/USDC: Orca-Raydium (331.5% spread | EMA: 331.66%)
+[INFO] 2026-03-20T08:32:58.080Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:58.080Z - [PERF] Detection latency: 0.07ms
+
+[INFO] 2026-03-20T08:32:58.084Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:58.084Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:58.180Z - [FOUND] SOL/USDC: Orca-Raydium (332.0% spread | EMA: 331.67%)
+[INFO] 2026-03-20T08:32:58.181Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:58.181Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:58.184Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:58.184Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+[ERROR] 2026-03-20T08:32:58.193Z - Failed to update recent blockhash Error: failed to get recent blockhash: Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "9a202da0-8904-47fe-b1cd-d2bf0e546224" } 
+
+    at Connection.getLatestBlockhash (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:4705:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout.fetchRecentBlockhash [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/src/jupiter/cache.ts:15:27)
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[INFO] 2026-03-20T08:32:58.282Z - [FOUND] SOL/USDC: Orca-Raydium (332.1% spread | EMA: 331.67%)
+[INFO] 2026-03-20T08:32:58.282Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:58.282Z - [PERF] Detection latency: 0.04ms
+
+[INFO] 2026-03-20T08:32:58.286Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:58.287Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+[ERROR] 2026-03-20T08:32:58.334Z - Failed to update recent blockhash Error: failed to get recent blockhash: Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "9b26ad1a-1bb2-4633-8599-a5a36d8ee0b6" } 
+
+    at Connection.getLatestBlockhash (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:4705:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout.fetchRecentBlockhash [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/src/jupiter/cache.ts:15:27)
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:58.386Z - [FOUND] SOL/USDC: Orca-Raydium (331.1% spread | EMA: 331.67%)
+[INFO] 2026-03-20T08:32:58.386Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:58.386Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:58.390Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:58.390Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[INFO] 2026-03-20T08:32:58.486Z - [FOUND] SOL/USDC: Orca-Raydium (332.0% spread | EMA: 331.67%)
+[INFO] 2026-03-20T08:32:58.486Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:58.486Z - [PERF] Detection latency: 0.08ms
+
+[INFO] 2026-03-20T08:32:58.489Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:58.489Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+[ERROR] 2026-03-20T08:32:58.565Z - Failed to update recent blockhash Error: failed to get recent blockhash: Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "f594673a-0743-47c7-a82f-c4868f89ccc6" } 
+
+    at Connection.getLatestBlockhash (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:4705:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout.fetchRecentBlockhash [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/src/jupiter/cache.ts:15:27)
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:58.586Z - [FOUND] SOL/USDC: Orca-Raydium (331.6% spread | EMA: 331.67%)
+[INFO] 2026-03-20T08:32:58.586Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:58.586Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:58.590Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:58.590Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+[INFO] 2026-03-20T08:32:58.686Z - [FOUND] SOL/USDC: Orca-Raydium (331.7% spread | EMA: 331.67%)
+[INFO] 2026-03-20T08:32:58.686Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:58.686Z - [PERF] Detection latency: 0.04ms
+
+[INFO] 2026-03-20T08:32:58.690Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:58.690Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:58.790Z - [FOUND] SOL/USDC: Orca-Raydium (331.7% spread | EMA: 331.67%)
+[INFO] 2026-03-20T08:32:58.791Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:58.791Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:58.794Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:58.794Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+[ERROR] 2026-03-20T08:32:58.811Z - Failed to update recent blockhash Error: failed to get recent blockhash: Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "4f254a28-6f70-4d34-ad32-eac9416abb7b" } 
+
+    at Connection.getLatestBlockhash (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:4705:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout.fetchRecentBlockhash [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/src/jupiter/cache.ts:15:27)
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[INFO] 2026-03-20T08:32:58.891Z - [FOUND] SOL/USDC: Orca-Raydium (332.1% spread | EMA: 331.67%)
+[INFO] 2026-03-20T08:32:58.891Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:58.891Z - [PERF] Detection latency: 0.05ms
+
+[INFO] 2026-03-20T08:32:58.895Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:58.895Z - [MICRO-TEST] Initiating 0.001 SOL physical test for route: USDC -> USDC
+[INFO] 2026-03-20T08:32:58.898Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[ERROR] 2026-03-20T08:32:58.974Z - Failed to update recent blockhash Error: failed to get recent blockhash: Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "86b988d8-c39b-4b83-96df-6aa5a15526ab" } 
+
+    at Connection.getLatestBlockhash (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:4705:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout.fetchRecentBlockhash [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/src/jupiter/cache.ts:15:27)
+[INFO] 2026-03-20T08:32:58.990Z - [FOUND] SOL/USDC: Orca-Raydium (331.1% spread | EMA: 331.67%)
+[INFO] 2026-03-20T08:32:58.991Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:58.991Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:58.995Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:58.995Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[INFO] 2026-03-20T08:32:59.091Z - [FOUND] SOL/USDC: Orca-Raydium (332.2% spread | EMA: 331.67%)
+[INFO] 2026-03-20T08:32:59.091Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:59.091Z - [PERF] Detection latency: 0.07ms
+
+[INFO] 2026-03-20T08:32:59.095Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:59.095Z - [MICRO-TEST] Initiating 0.001 SOL physical test for route: USDC -> USDC
+[INFO] 2026-03-20T08:32:59.101Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+[ERROR] 2026-03-20T08:32:59.154Z - Failed to update recent blockhash Error: failed to get recent blockhash: Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "f2323867-6a12-40b9-b3de-066f6fcf386a" } 
+
+    at Connection.getLatestBlockhash (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:4705:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout.fetchRecentBlockhash [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/src/jupiter/cache.ts:15:27)
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:59.191Z - [SCAN] Checking 2 pools internally mapped...
+[INFO] 2026-03-20T08:32:59.191Z - [FOUND] SOL/USDC: Orca-Raydium (331.2% spread | EMA: 331.67%)
+[INFO] 2026-03-20T08:32:59.191Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:59.191Z - [PERF] Detection latency: 0.22ms
+
+[INFO] 2026-03-20T08:32:59.197Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:59.197Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+[INFO] 2026-03-20T08:32:59.293Z - [FOUND] SOL/USDC: Orca-Raydium (331.1% spread | EMA: 331.66%)
+[INFO] 2026-03-20T08:32:59.294Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:59.294Z - [PERF] Detection latency: 0.10ms
+
+[INFO] 2026-03-20T08:32:59.298Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:59.299Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+[ERROR] 2026-03-20T08:32:59.393Z - Failed to update recent blockhash Error: failed to get recent blockhash: Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "161941c1-bda6-453c-b8c3-885ffbb98eab" } 
+
+    at Connection.getLatestBlockhash (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:4705:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout.fetchRecentBlockhash [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/src/jupiter/cache.ts:15:27)
+[INFO] 2026-03-20T08:32:59.394Z - [FOUND] SOL/USDC: Orca-Raydium (332.1% spread | EMA: 331.67%)
+[INFO] 2026-03-20T08:32:59.394Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:59.394Z - [PERF] Detection latency: 0.05ms
+
+[INFO] 2026-03-20T08:32:59.402Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:59.402Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[INFO] 2026-03-20T08:32:59.494Z - [FOUND] SOL/USDC: Orca-Raydium (331.5% spread | EMA: 331.67%)
+[INFO] 2026-03-20T08:32:59.494Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:59.494Z - [PERF] Detection latency: 0.05ms
+
+[INFO] 2026-03-20T08:32:59.501Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:59.501Z - [MICRO-TEST] Initiating 0.001 SOL physical test for route: USDC -> USDC
+[INFO] 2026-03-20T08:32:59.506Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+[ERROR] 2026-03-20T08:32:59.552Z - Failed to update recent blockhash Error: failed to get recent blockhash: Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "076bda0d-6704-4375-b081-b01cbf9c5219" } 
+
+    at Connection.getLatestBlockhash (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:4705:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout.fetchRecentBlockhash [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/src/jupiter/cache.ts:15:27)
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[INFO] 2026-03-20T08:32:59.596Z - [FOUND] SOL/USDC: Orca-Raydium (332.0% spread | EMA: 331.67%)
+[INFO] 2026-03-20T08:32:59.596Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:59.596Z - [PERF] Detection latency: 0.06ms
+
+[INFO] 2026-03-20T08:32:59.599Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:59.599Z - [MICRO-TEST] Initiating 0.001 SOL physical test for route: USDC -> USDC
+[INFO] 2026-03-20T08:32:59.602Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[INFO] 2026-03-20T08:32:59.695Z - [FOUND] SOL/USDC: Orca-Raydium (331.8% spread | EMA: 331.67%)
+[INFO] 2026-03-20T08:32:59.695Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:59.695Z - [PERF] Detection latency: 0.14ms
+
+[INFO] 2026-03-20T08:32:59.698Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:59.699Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+[ERROR] 2026-03-20T08:32:59.723Z - Failed to fetch ALT G6EBADumaU4MaifUPMYY77Ao74ogBSwGDsavzcmYRkUA Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "71b64170-9ebe-4794-8c15-2b39934bfeeb" } 
+
+    at ClientBrowser.callServer (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:1703:18)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+[ERROR] 2026-03-20T08:32:59.730Z - Failed to fetch ALT FqeeFKhvn4d19iJA7G4qU9tcfjHNUkEo2rKsht5Btztm Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "a4991cac-d193-46d5-a181-f15bcd65dcb8" } 
+
+    at ClientBrowser.callServer (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:1703:18)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+[INFO] 2026-03-20T08:32:59.732Z - --- TRANSACTION PAYLOAD STRUCTURE (9 Instructions) ---
+[INFO] 2026-03-20T08:32:59.732Z - [IX 0] Program: ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL
+[INFO] 2026-03-20T08:32:59.732Z - [IX 1] Program: 11111111111111111111111111111111
+[INFO] 2026-03-20T08:32:59.732Z - [IX 2] Program: TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA
+[INFO] 2026-03-20T08:32:59.732Z - [IX 3] Program: ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL
+[INFO] 2026-03-20T08:32:59.733Z - [IX 4] Program: JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4
+[INFO] 2026-03-20T08:32:59.733Z - [IX 5] Program: TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA
+[INFO] 2026-03-20T08:32:59.733Z - [IX 6] Program: ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL
+[INFO] 2026-03-20T08:32:59.733Z - [IX 7] Program: JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4
+[INFO] 2026-03-20T08:32:59.733Z - [IX 8] Program: TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA
+[INFO] 2026-03-20T08:32:59.733Z - -----------------------------------------------------
+[INFO] 2026-03-20T08:32:59.733Z - 🔥 Attached Strict Baseline Gas Priority: 250000 microLamports (Bypassing Priority Auctions!)
+[INFO] 2026-03-20T08:32:59.733Z - 💰 Appended Jito Tip Execution successfully: 0.002 SOL to 96gYZG...
+[INFO] 2026-03-20T08:32:59.741Z - Executing MEV Bundle securely via High-Speed Chainstack Node + BloXroute + Jito for ultimate throughput...
+[INFO] 2026-03-20T08:32:59.751Z - [COMPILATION] Synced local Blockhash/ALT states sequentially mapping atomic instructions in 1.4ms!
+Server responded with 429 Too Many Requests.  Retrying after 1000ms delay...
+[INFO] 2026-03-20T08:32:59.796Z - [FOUND] SOL/USDC: Orca-Raydium (331.2% spread | EMA: 331.67%)
+[INFO] 2026-03-20T08:32:59.796Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:59.796Z - [PERF] Detection latency: 0.07ms
+
+[INFO] 2026-03-20T08:32:59.800Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:59.801Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+[ERROR] 2026-03-20T08:32:59.814Z - Failed to update recent blockhash Error: failed to get recent blockhash: Error: 429 Too Many Requests:  {"jsonrpc":"2.0","error":{"code": 429, "message":"Too many requests from your IP"}, "id": "c25496de-60fa-44cd-a99f-dea8c1f5c934" } 
+
+    at Connection.getLatestBlockhash (/opt/pcprotocol/optimized-jupiter-bot/node_modules/@solana/web3.js/src/connection.ts:4705:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout.fetchRecentBlockhash [as _onTimeout] (/opt/pcprotocol/optimized-jupiter-bot/src/jupiter/cache.ts:15:27)
+Server responded with 429 Too Many Requests.  Retrying after 500ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 2000ms delay...
+Server responded with 429 Too Many Requests.  Retrying after 4000ms delay...
+[INFO] 2026-03-20T08:32:59.896Z - [FOUND] SOL/USDC: Orca-Raydium (331.0% spread | EMA: 331.66%)
+[INFO] 2026-03-20T08:32:59.896Z - [PROFIT] Gross: 0.0033 SOL | Tip: 0.0020 SOL | Net: -0.0027 SOL ✅
+[INFO] 2026-03-20T08:32:59.896Z - [PERF] Detection latency: 0.08ms
+
+[INFO] 2026-03-20T08:32:59.900Z - [SIMULATION] Executing local pre-flight simulation for Simple-2-Hop...
+[INFO] 2026-03-20T08:32:59.900Z - [MICRO-TEST] Initiating 0.001 SOL physical test for route: USDC -> USDC
+[INFO] 2026-03-20T08:32:59.903Z - [VALIDATED] Native verification passed synchronously. Ready for Execution!

@@ -1,0 +1,187 @@
+[dotenv@17.3.1] injecting env (19) from .env -- tip: ⚡️ secrets for agents: https://dotenvx.com/as2
+🚀 Starting Jupiter Ultra Arbitrage Bot...
+✅ Wallet loaded: DnQhJawMXW7ZWA19XbzrV1q3KWZvMnpfyrxe4f74FHVj
+
+🔄 Bot running. Scanning every 5 seconds...
+💰 Min profit threshold: 0.001 SOL
+📊 Trade size: 10% of balance (max 1.0 SOL)
+🛡️ MEV Protection: ShadowLane (34x stronger) 
+⚡ Latency: 50-400ms target 
+
+
+📊 Scanning: 0.0577 SOL → USDC...
+   No profit: 0.0577 SOL → 0.0052 USDC (gross: -0.052520 SOL)
+.
+📊 Scanning: 0.0577 SOL → USDT...
+   No profit: 0.0577 SOL → 0.0052 USDT (gross: -0.052520 SOL)
+.
+📊 Scanning: 0.0577 SOL → mSOL...
+   No profit: 0.0577 SOL → 0.0422 mSOL (gross: -0.015431 SOL)
+.
+📊 Scanning: 0.0577 SOL → BONK...
+
+🎯 PROFITABLE OPPORTUNITY FOUND!
+   Input:  0.057678 SOL
+   Output: 85.840957 BONK
+   Gross:  85.783279 SOL
+   Net:    85.783279 SOL
+   Route:  1 hop(s)
+
+🚀 EXECUTING TRADE #1...
+📦 Building Ultra swap transaction...
+
+❌ Error in main loop: Cannot use 'in' operator to search for 'jitoTipLamports' in auto
+TypeError: Cannot use 'in' operator to search for 'jitoTipLamports' in auto
+    at instanceOfJitoTipLamports (C:\pcprotocol\optimized-jupiter-bot\node_modules\@jup-ag\api\dist\index.js:558:48)
+    at SwapRequestPrioritizationFeeLamportsToJSON (C:\pcprotocol\optimized-jupiter-bot\node_modules\@jup-ag\api\dist\index.js:959:7)
+    at SwapRequestToJSON (C:\pcprotocol\optimized-jupiter-bot\node_modules\@jup-ag\api\dist\index.js:1018:34)
+    at SwapApi.<anonymous> (C:\pcprotocol\optimized-jupiter-bot\node_modules\@jup-ag\api\dist\index.js:1189:15)
+    at Generator.next (<anonymous>)
+    at C:\pcprotocol\optimized-jupiter-bot\node_modules\@jup-ag\api\dist\index.js:53:61
+    at new Promise (<anonymous>)
+    at __async (C:\pcprotocol\optimized-jupiter-bot\node_modules\@jup-ag\api\dist\index.js:37:10)
+    at SwapApi.swapInstructionsPostRaw (C:\pcprotocol\optimized-jupiter-bot\node_modules\@jup-ag\api\dist\index.js:1177:12)
+    at SwapApi.<anonymous> (C:\pcprotocol\optimized-jupiter-bot\node_modules\@jup-ag\api\dist\index.js:1200:35)
+
+📊 Scanning: 0.0577 SOL → USDC...
+   No profit: 0.0577 SOL → 0.0052 USDC (gross: -0.052519 SOL)
+.
+📊 Scanning: 0.0577 SOL → USDT...
+   No profit: 0.0577 SOL → 0.0052 USDT (gross: -0.052519 SOL)
+.
+📊 Scanning: 0.0577 SOL → mSOL...
+   No profit: 0.0577 SOL → 0.0422 mSOL (gross: -0.015431 SOL)
+.
+📊 Scanning: 0.0577 SOL → BONK...
+
+🎯 PROFITABLE OPPORTUNITY FOUND!
+   Input:  0.057678 SOL
+   Output: 85.841713 BONK
+   Gross:  85.784035 SOL
+   Net:    85.784035 SOL
+   Route:  3 hop(s)
+
+🚀 EXECUTING TRADE #2...
+📦 Building Ultra swap transaction...
+
+❌ Error in main loop: Cannot use 'in' operator to search for 'jitoTipLamports' in auto
+TypeError: Cannot use 'in' operator to search for 'jitoTipLamports' in auto
+    at instanceOfJitoTipLamports (C:\pcprotocol\optimized-jupiter-bot\node_modules\@jup-ag\api\dist\index.js:558:48)
+    at SwapRequestPrioritizationFeeLamportsToJSON (C:\pcprotocol\optimized-jupiter-bot\node_modules\@jup-ag\api\dist\index.js:959:7)
+    at SwapRequestToJSON (C:\pcprotocol\optimized-jupiter-bot\node_modules\@jup-ag\api\dist\index.js:1018:34)
+    at SwapApi.<anonymous> (C:\pcprotocol\optimized-jupiter-bot\node_modules\@jup-ag\api\dist\index.js:1189:15)
+    at Generator.next (<anonymous>)
+    at C:\pcprotocol\optimized-jupiter-bot\node_modules\@jup-ag\api\dist\index.js:53:61
+    at new Promise (<anonymous>)
+    at __async (C:\pcprotocol\optimized-jupiter-bot\node_modules\@jup-ag\api\dist\index.js:37:10)
+    at SwapApi.swapInstructionsPostRaw (C:\pcprotocol\optimized-jupiter-bot\node_modules\@jup-ag\api\dist\index.js:1177:12)
+    at SwapApi.<anonymous> (C:\pcprotocol\optimized-jupiter-bot\node_modules\@jup-ag\api\dist\index.js:1200:35)
+
+📊 Scanning: 0.0577 SOL → USDC...
+   No profit: 0.0577 SOL → 0.0052 USDC (gross: -0.052520 SOL)
+.
+📊 Scanning: 0.0577 SOL → USDT...
+   No profit: 0.0577 SOL → 0.0052 USDT (gross: -0.052520 SOL)
+.
+📊 Scanning: 0.0577 SOL → mSOL...
+   No profit: 0.0577 SOL → 0.0422 mSOL (gross: -0.015431 SOL)
+.
+📊 Scanning: 0.0577 SOL → BONK...
+
+🎯 PROFITABLE OPPORTUNITY FOUND!
+   Input:  0.057678 SOL
+   Output: 85.841117 BONK
+   Gross:  85.783439 SOL
+   Net:    85.783439 SOL
+   Route:  1 hop(s)
+
+🚀 EXECUTING TRADE #3...
+📦 Building Ultra swap transaction...
+
+❌ Error in main loop: Cannot use 'in' operator to search for 'jitoTipLamports' in auto
+TypeError: Cannot use 'in' operator to search for 'jitoTipLamports' in auto
+    at instanceOfJitoTipLamports (C:\pcprotocol\optimized-jupiter-bot\node_modules\@jup-ag\api\dist\index.js:558:48)
+    at SwapRequestPrioritizationFeeLamportsToJSON (C:\pcprotocol\optimized-jupiter-bot\node_modules\@jup-ag\api\dist\index.js:959:7)
+    at SwapRequestToJSON (C:\pcprotocol\optimized-jupiter-bot\node_modules\@jup-ag\api\dist\index.js:1018:34)
+    at SwapApi.<anonymous> (C:\pcprotocol\optimized-jupiter-bot\node_modules\@jup-ag\api\dist\index.js:1189:15)
+    at Generator.next (<anonymous>)
+    at C:\pcprotocol\optimized-jupiter-bot\node_modules\@jup-ag\api\dist\index.js:53:61
+    at new Promise (<anonymous>)
+    at __async (C:\pcprotocol\optimized-jupiter-bot\node_modules\@jup-ag\api\dist\index.js:37:10)
+    at SwapApi.swapInstructionsPostRaw (C:\pcprotocol\optimized-jupiter-bot\node_modules\@jup-ag\api\dist\index.js:1177:12)
+    at SwapApi.<anonymous> (C:\pcprotocol\optimized-jupiter-bot\node_modules\@jup-ag\api\dist\index.js:1200:35)
+
+📊 Scanning: 0.0577 SOL → USDC...
+   No profit: 0.0577 SOL → 0.0052 USDC (gross: -0.052520 SOL)
+.
+📊 Scanning: 0.0577 SOL → USDT...
+   No profit: 0.0577 SOL → 0.0052 USDT (gross: -0.052520 SOL)
+.
+📊 Scanning: 0.0577 SOL → mSOL...
+   No profit: 0.0577 SOL → 0.0422 mSOL (gross: -0.015431 SOL)
+.
+📊 Scanning: 0.0577 SOL → BONK...
+
+🎯 PROFITABLE OPPORTUNITY FOUND!
+   Input:  0.057678 SOL
+   Output: 85.841117 BONK
+   Gross:  85.783439 SOL
+   Net:    85.783439 SOL
+   Route:  1 hop(s)
+
+🚀 EXECUTING TRADE #4...
+📦 Building Ultra swap transaction...
+
+❌ Error in main loop: Cannot use 'in' operator to search for 'jitoTipLamports' in auto
+TypeError: Cannot use 'in' operator to search for 'jitoTipLamports' in auto
+    at instanceOfJitoTipLamports (C:\pcprotocol\optimized-jupiter-bot\node_modules\@jup-ag\api\dist\index.js:558:48)
+    at SwapRequestPrioritizationFeeLamportsToJSON (C:\pcprotocol\optimized-jupiter-bot\node_modules\@jup-ag\api\dist\index.js:959:7)
+    at SwapRequestToJSON (C:\pcprotocol\optimized-jupiter-bot\node_modules\@jup-ag\api\dist\index.js:1018:34)
+    at SwapApi.<anonymous> (C:\pcprotocol\optimized-jupiter-bot\node_modules\@jup-ag\api\dist\index.js:1189:15)
+    at Generator.next (<anonymous>)
+    at C:\pcprotocol\optimized-jupiter-bot\node_modules\@jup-ag\api\dist\index.js:53:61
+    at new Promise (<anonymous>)
+    at __async (C:\pcprotocol\optimized-jupiter-bot\node_modules\@jup-ag\api\dist\index.js:37:10)
+    at SwapApi.swapInstructionsPostRaw (C:\pcprotocol\optimized-jupiter-bot\node_modules\@jup-ag\api\dist\index.js:1177:12)
+    at SwapApi.<anonymous> (C:\pcprotocol\optimized-jupiter-bot\node_modules\@jup-ag\api\dist\index.js:1200:35)
+
+📊 Scanning: 0.0577 SOL → USDC...
+   No profit: 0.0577 SOL → 0.0052 USDC (gross: -0.052522 SOL)
+.
+📊 Scanning: 0.0577 SOL → USDT...
+   No profit: 0.0577 SOL → 0.0052 USDT (gross: -0.052522 SOL)
+.
+📊 Scanning: 0.0577 SOL → mSOL...
+   No profit: 0.0577 SOL → 0.0422 mSOL (gross: -0.015431 SOL)
+.
+📊 Scanning: 0.0577 SOL → BONK...
+
+🎯 PROFITABLE OPPORTUNITY FOUND!
+   Input:  0.057678 SOL
+   Output: 85.841117 BONK
+   Gross:  85.783439 SOL
+   Net:    85.783439 SOL
+   Route:  1 hop(s)
+
+🚀 EXECUTING TRADE #5...
+📦 Building Ultra swap transaction...
+
+❌ Error in main loop: Cannot use 'in' operator to search for 'jitoTipLamports' in auto
+TypeError: Cannot use 'in' operator to search for 'jitoTipLamports' in auto
+    at instanceOfJitoTipLamports (C:\pcprotocol\optimized-jupiter-bot\node_modules\@jup-ag\api\dist\index.js:558:48)
+    at SwapRequestPrioritizationFeeLamportsToJSON (C:\pcprotocol\optimized-jupiter-bot\node_modules\@jup-ag\api\dist\index.js:959:7)
+    at SwapRequestToJSON (C:\pcprotocol\optimized-jupiter-bot\node_modules\@jup-ag\api\dist\index.js:1018:34)
+    at SwapApi.<anonymous> (C:\pcprotocol\optimized-jupiter-bot\node_modules\@jup-ag\api\dist\index.js:1189:15)
+    at Generator.next (<anonymous>)
+    at C:\pcprotocol\optimized-jupiter-bot\node_modules\@jup-ag\api\dist\index.js:53:61
+    at new Promise (<anonymous>)
+    at __async (C:\pcprotocol\optimized-jupiter-bot\node_modules\@jup-ag\api\dist\index.js:37:10)
+    at SwapApi.swapInstructionsPostRaw (C:\pcprotocol\optimized-jupiter-bot\node_modules\@jup-ag\api\dist\index.js:1177:12)
+    at SwapApi.<anonymous> (C:\pcprotocol\optimized-jupiter-bot\node_modules\@jup-ag\api\dist\index.js:1200:35)
+
+📊 Scanning: 0.0577 SOL → USDC...
+   No profit: 0.0577 SOL → 0.0052 USDC (gross: -0.052521 SOL)
+.
+📊 Scanning: 0.0577 SOL → USDT...
+   No profit: 0.0577 SOL → 0.0052 USDT (gross: -0.052521 SOL)
+.^C

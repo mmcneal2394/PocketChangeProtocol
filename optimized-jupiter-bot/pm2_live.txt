@@ -1,0 +1,64 @@
+[1m[90m[TAILING] Tailing last 60 lines for [jupiter-ultra-bot] process (change the value with --lines option)[39m[22m
+[90mC:\Users\admin\.pm2\logs\jupiter-ultra-bot-out.log last 60 lines:[39m
+[90mC:\Users\admin\.pm2\logs\jupiter-ultra-bot-error.log last 60 lines:[39m
+[31m0|jupiter- | [39mC:\PROGRAM FILES\NODEJS\NPX.CMD:1
+[31m0|jupiter- | [39m:: Created by npm, please don't edit manually.
+[31m0|jupiter- | [39m^
+[31m0|jupiter- | [39m
+[31m0|jupiter- | [39mSyntaxError: Unexpected token ':'
+[31m0|jupiter- | [39m    at wrapSafe (node:internal/modules/cjs/loader:1743:18)
+[31m0|jupiter- | [39m    at Module._compile (node:internal/modules/cjs/loader:1786:20)
+[31m0|jupiter- | [39m    at Object..js (node:internal/modules/cjs/loader:1943:10)
+[31m0|jupiter- | [39m    at Module.load (node:internal/modules/cjs/loader:1533:32)
+[31m0|jupiter- | [39m    at Module._load (node:internal/modules/cjs/loader:1335:12)
+[31m0|jupiter- | [39m    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+[31m0|jupiter- | [39m    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+[31m0|jupiter- | [39m    at node:internal/main/run_main_module:33:47
+[31m0|jupiter- | [39m
+[31m0|jupiter- | [39mNode.js v24.14.0
+[31m0|jupiter- | [39mC:\PROGRAM FILES\NODEJS\NPX.CMD:1
+[31m0|jupiter- | [39m:: Created by npm, please don't edit manually.
+[31m0|jupiter- | [39m^
+[31m0|jupiter- | [39m
+[31m0|jupiter- | [39mSyntaxError: Unexpected token ':'
+[31m0|jupiter- | [39m    at wrapSafe (node:internal/modules/cjs/loader:1743:18)
+[31m0|jupiter- | [39m    at Module._compile (node:internal/modules/cjs/loader:1786:20)
+[31m0|jupiter- | [39m    at Object..js (node:internal/modules/cjs/loader:1943:10)
+[31m0|jupiter- | [39m    at Module.load (node:internal/modules/cjs/loader:1533:32)
+[31m0|jupiter- | [39m    at Module._load (node:internal/modules/cjs/loader:1335:12)
+[31m0|jupiter- | [39m    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+[31m0|jupiter- | [39m    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+[31m0|jupiter- | [39m    at node:internal/main/run_main_module:33:47
+[31m0|jupiter- | [39m
+[31m0|jupiter- | [39mNode.js v24.14.0
+[31m0|jupiter- | [39mC:\PROGRAM FILES\NODEJS\NPX.CMD:1
+[31m0|jupiter- | [39m:: Created by npm, please don't edit manually.
+[31m0|jupiter- | [39m^
+[31m0|jupiter- | [39m
+[31m0|jupiter- | [39mSyntaxError: Unexpected token ':'
+[31m0|jupiter- | [39m    at wrapSafe (node:internal/modules/cjs/loader:1743:18)
+[31m0|jupiter- | [39m    at Module._compile (node:internal/modules/cjs/loader:1786:20)
+[31m0|jupiter- | [39m    at Object..js (node:internal/modules/cjs/loader:1943:10)
+[31m0|jupiter- | [39m    at Module.load (node:internal/modules/cjs/loader:1533:32)
+[31m0|jupiter- | [39m    at Module._load (node:internal/modules/cjs/loader:1335:12)
+[31m0|jupiter- | [39m    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+[31m0|jupiter- | [39m    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+[31m0|jupiter- | [39m    at node:internal/main/run_main_module:33:47
+[31m0|jupiter- | [39m
+[31m0|jupiter- | [39mNode.js v24.14.0
+[31m0|jupiter- | [39mC:\PROGRAM FILES\NODEJS\NPX.CMD:1
+[31m0|jupiter- | [39m:: Created by npm, please don't edit manually.
+[31m0|jupiter- | [39m^
+[31m0|jupiter- | [39m
+[31m0|jupiter- | [39mSyntaxError: Unexpected token ':'
+[31m0|jupiter- | [39m    at wrapSafe (node:internal/modules/cjs/loader:1743:18)
+[31m0|jupiter- | [39m    at Module._compile (node:internal/modules/cjs/loader:1786:20)
+[31m0|jupiter- | [39m    at Object..js (node:internal/modules/cjs/loader:1943:10)
+[31m0|jupiter- | [39m    at Module.load (node:internal/modules/cjs/loader:1533:32)
+[31m0|jupiter- | [39m    at Module._load (node:internal/modules/cjs/loader:1335:12)
+[31m0|jupiter- | [39m    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+[31m0|jupiter- | [39m    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+[31m0|jupiter- | [39m    at node:internal/main/run_main_module:33:47
+[31m0|jupiter- | [39m
+[31m0|jupiter- | [39mNode.js v24.14.0
+
