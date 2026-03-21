@@ -1,34 +1,68 @@
 version: '3.8'
 
 services:
-  # The AI Strategy Agent (Telegram/X)
-  ai-agent:
-    build:
-      context: .
-      dockerfile: scripts/Dockerfile
-    container_name: pcp-ai-agent
-    restart: unless-stopped
-    env_file:
-      - .env
+  # -------------------------------------------------------------------
+  # 1. PostgreSQL DB for Engine Metrics & User Billing Mappings
+  # -------------------------------------------------------------------
+  db:
+    image: postgres:15-alpine
+    container_name: arbitrasaas_db
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-admin123}
+      POSTGRES_DB: ${POSTGRES_DB:-arbitrasaas}
+    ports:
+      - "5432:5432"
     volumes:
-      - ./engine-worker/telemetry.jsonl:/app/engine-worker/telemetry.jsonl
-    depends_on:
-      - engine
-    networks:
-      - pcp-network
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d arbitrasaas"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  # The High-Frequency Rust Arbitrage Engine
-  engine:
+  # -------------------------------------------------------------------
+  # 2. Rust Arbitrage Execution Engine (Core Worker)
+  # -------------------------------------------------------------------
+  engine-worker:
     build:
       context: ./engine-worker
       dockerfile: Dockerfile
-    container_name: pcp-rust-engine
-    network_mode: host
+    container_name: arbitrasaas_engine
     restart: unless-stopped
-    env_file:
-      - ./engine-worker/.env
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgres://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-admin123}@db:5432/${POSTGRES_DB:-arbitrasaas}
+      - SOLANA_RPC_URL=${SOLANA_RPC_URL:-https://api.devnet.solana.com}
+      - KMS_MASTER_KEY=${KMS_MASTER_KEY}
     volumes:
-      - ./engine-worker/telemetry.jsonl:/app/telemetry.jsonl
-networks:
-  pcp-network:
-    driver: bridge
+      # Mount the telemetry file so the Next.js frontend can parse the active JSONL loops
+      - shared_telemetry:/app/telemetry
+
+  # -------------------------------------------------------------------
+  # 3. Next.js SaaS Web Dashboard & API
+  # -------------------------------------------------------------------
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: arbitrasaas_web
+    restart: always
+    ports:
+      - "3000:3000"
+    depends_on:
+      - engine-worker
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_NETWORK=${NEXT_PUBLIC_NETWORK:-devnet}
+      - DATABASE_URL=postgres://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-admin123}@db:5432/${POSTGRES_DB:-arbitrasaas}
+    volumes:
+      # Access telemetry outputs written by the Rust engine
+      - shared_telemetry:/app/engine-worker
+
+volumes:
+  pgdata:
+  shared_telemetry:

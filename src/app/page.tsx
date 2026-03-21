@@ -1,307 +1,159 @@
 "use client";
 
-import { TrendingUp, AccountBalanceWallet, SwapCalls, Bolt, Public, AccountCircle, Memory } from "@mui/icons-material";
-import { useState, useEffect } from "react";
-import { useWallet } from "@solana/wallet-adapter-react";
-import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
-import Scanner from '../components/Scanner';
-import StrategyBuilder from '../components/Strategy';
-import Analytics from '../components/Analytics';
-import Tokenomics from '../components/Tokenomics';
-import Security from '../components/Security';
+import Link from "next/link";
+import { ArrowForward, LocalAtm, Security, Speed, TrendingUp, DeveloperMode, SyncAlt, AccountBalanceWallet } from "@mui/icons-material";
+import { useEffect, useState } from "react";
 
-function GlowingStatCard({ title, value, change, isPositive, icon, delay, accentColor }: any) {
+export default function LandingPage() {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  if (!mounted) return null;
+
   return (
-    <div className="glassmorphism fade-in" style={{
-      padding: "28px",
-      borderRadius: "20px",
-      display: "flex",
-      flexDirection: "column",
-      gap: "12px",
-      flex: 1,
-      minWidth: "260px",
-      position: "relative",
-      overflow: "hidden",
-      animationDelay: delay,
-      borderTop: `1px solid ${accentColor}40`
-    }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", zIndex: 1 }}>
-        <p style={{ color: "var(--text-secondary)", fontSize: "0.95rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "1px" }}>{title}</p>
-        <div style={{ color: accentColor, background: `${accentColor}1A`, padding: "10px", borderRadius: "14px", boxShadow: `0 0 15px ${accentColor}33`}}>
-          {icon}
-        </div>
-      </div>
-      <h2 style={{ fontSize: "2.5rem", fontWeight: 800, margin: "8px 0", letterSpacing: "-1px", zIndex: 1, textShadow: "0 2px 10px rgba(0,0,0,0.5)" }}>{value}</h2>
-      <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.9rem", zIndex: 1 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "4px", background: isPositive ? "rgba(0,255,170,0.1)" : "rgba(255,51,102,0.1)", padding: "4px 8px", borderRadius: "8px", color: isPositive ? "var(--success)" : "var(--error)" }}>
-           <TrendingUp style={{ fontSize: "1rem", transform: isPositive ? "none" : "scaleY(-1)" }} />
-           <span style={{ fontWeight: 700 }}>{change}</span>
-        </div>
-        <span style={{ color: "var(--text-secondary)", fontSize: "0.8rem", fontWeight: 500 }}>24h active</span>
-      </div>
+    <div style={{ minHeight: "100vh", position: "relative", overflowX: "hidden", color: "#fff" }}>
+      {/* Background Ambience */}
+      <div className="glow-orb glow-orb-primary" style={{ top: "-10%", left: "-10%", width: "600px", height: "600px", animationDuration: "20s" }} />
+      <div className="glow-orb glow-orb-secondary" style={{ top: "40%", right: "-20%", width: "800px", height: "800px", animationDuration: "25s", animationDirection: "reverse" }} />
       
-      {/* Dynamic Glow orb behind the card */}
-      <div style={{
-        position: "absolute",
-        top: "-50px",
-        right: "-50px",
-        width: "150px",
-        height: "150px",
-        background: accentColor,
-        filter: "blur(70px)",
-        opacity: 0.15,
-        borderRadius: "50%",
-        zIndex: 0
-      }} />
+      {/* Navbar */}
+      <nav style={{ padding: "24px 48px", display: "flex", justifyContent: "space-between", alignItems: "center", position: "absolute", top: 0, width: "100%", zIndex: 100, background: "linear-gradient(180deg, rgba(0,0,0,0.8), transparent)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+           <img src="https://cdn.helius-rpc.com/cdn-cgi/image//https://ipfs.io/ipfs/QmQwvUsgwBUa8PmKhTUgG6o1LL8PvUuo7XtkcVBNtQqry4" alt="Logo" style={{ width: "40px", height: "40px", borderRadius: "12px", boxShadow: "0 4px 20px rgba(255, 255, 255, 0.2)" }} />
+           <span style={{ fontSize: "1.4rem", fontWeight: 800, letterSpacing: "-0.5px" }} className="gradient-text">ArbitraSaaS</span>
+        </div>
+        <div style={{ display: "flex", gap: "32px", fontSize: "0.95rem", fontWeight: 600 }}>
+           <a href="#features" style={{ color: "var(--text-secondary)", textDecoration: "none" }}>Platform</a>
+           <a href="#security" style={{ color: "var(--text-secondary)", textDecoration: "none" }}>Security</a>
+           <a href="#docs" style={{ color: "var(--text-secondary)", textDecoration: "none" }}>Developers</a>
+        </div>
+        <div>
+           <Link href="/dashboard" style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.2), rgba(255,255,255,0.05))", border: "1px solid rgba(255,255,255,0.2)", padding: "12px 24px", borderRadius: "10px", color: "#fff", textDecoration: "none", fontWeight: 700, display: "flex", alignItems: "center", gap: "8px", boxShadow: "0 4px 15px rgba(255, 255, 255, 0.1)" }}>
+               Launch App <ArrowForward fontSize="small" />
+           </Link>
+        </div>
+      </nav>
+
+      <main style={{ maxWidth: "1200px", margin: "0 auto", padding: "160px 24px 80px 24px", zIndex: 10, position: "relative" }}>
+        
+        {/* Hero Section */}
+        <section style={{ textAlign: "center", marginBottom: "120px", display: "flex", flexDirection: "column", alignItems: "center" }}>
+           <div style={{ padding: "8px 16px", background: "rgba(0, 255, 170, 0.1)", color: "var(--success)", border: "1px solid var(--success)", borderRadius: "20px", fontSize: "0.85rem", fontWeight: 700, letterSpacing: "1px", marginBottom: "24px", animation: "fadeIn 1s ease" }}>
+               ⚡ JITO MEV PROTECTION ACTIVE
+           </div>
+           <h1 style={{ fontSize: "5rem", fontWeight: 900, lineHeight: 1.1, letterSpacing: "-2.5px", marginBottom: "24px", animation: "slideUp 1s cubic-bezier(0.16, 1, 0.3, 1)" }}>
+               Institutional-Grade <br/>
+               <span className="gradient-text" style={{ textShadow: "0 0 40px rgba(138,43,226,0.4)" }}>Arbitrage Yields.</span>
+           </h1>
+           <p style={{ fontSize: "1.25rem", color: "var(--text-secondary)", maxWidth: "700px", margin: "0 auto 48px auto", lineHeight: 1.6, animation: "slideUp 1.2s cubic-bezier(0.16, 1, 0.3, 1)" }}>
+               Deposit crypto capital and watch the Pocket Money Protocol deploy atomic flash loans targeting DEX inefficiencies simultaneously. Zero capital risk. Absolute delta-neutral mapping.
+           </p>
+
+           <div style={{ display: "flex", gap: "24px", animation: "slideUp 1.4s cubic-bezier(0.16, 1, 0.3, 1)" }}>
+               <Link href="/dashboard" className="neon-btn" style={{ background: "var(--primary)", color: "#000", padding: "20px 48px", borderRadius: "16px", textDecoration: "none", fontSize: "1.2rem", fontWeight: 800, border: "none" }}>
+                   Start Earning Today
+               </Link>
+               <a href="#architecture" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.2)", padding: "20px 48px", borderRadius: "16px", color: "#fff", textDecoration: "none", fontSize: "1.2rem", fontWeight: 700 }}>
+                   View Architecture
+               </a>
+           </div>
+
+           {/* Hero HUD Elements */}
+           <div className="glassmorphism fade-in" style={{ marginTop: "80px", width: "100%", padding: "24px", borderRadius: "24px", border: "1px solid rgba(255,255,255,0.1)", display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "24px", background: "linear-gradient(135deg, rgba(255,255,255,0.05), rgba(0,0,0,0.5))" }}>
+               <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                   <p style={{ color: "var(--text-secondary)", fontWeight: 600, textTransform: "uppercase", fontSize: "0.85rem", letterSpacing: "1px" }}>Global TVL</p>
+                   <p style={{ fontSize: "2.5rem", fontWeight: 800 }}>$1.42M</p>
+               </div>
+               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", borderLeft: "1px solid rgba(255,255,255,0.1)", borderRight: "1px solid rgba(255,255,255,0.1)" }}>
+                   <p style={{ color: "var(--text-secondary)", fontWeight: 600, textTransform: "uppercase", fontSize: "0.85rem", letterSpacing: "1px" }}>Execution Latency</p>
+                   <p style={{ fontSize: "2.5rem", fontWeight: 800, color: "var(--success)" }}>35ms</p>
+               </div>
+               <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                   <p style={{ color: "var(--text-secondary)", fontWeight: 600, textTransform: "uppercase", fontSize: "0.85rem", letterSpacing: "1px" }}>Total Volume (30D)</p>
+                   <p style={{ fontSize: "2.5rem", fontWeight: 800 }}>$840.2M</p>
+               </div>
+           </div>
+        </section>
+
+        {/* Features Split */}
+        <section id="features" style={{ marginBottom: "120px" }}>
+            <div style={{ display: "flex", gap: "64px", alignItems: "center", marginBottom: "64px" }}>
+                <div style={{ flex: 1, paddingRight: "32px" }}>
+                    <h2 style={{ fontSize: "2.8rem", fontWeight: 800, letterSpacing: "-1px", marginBottom: "24px", lineHeight: 1.1 }}>
+                        Unrivaled Atomic Execution
+                    </h2>
+                    <p style={{ color: "var(--text-secondary)", fontSize: "1.1rem", lineHeight: 1.7, marginBottom: "32px" }}>
+                        We leverage Solana's Programmable Transaction Blocks (PTB). Our Rust-based engine wraps DEX multi-hops inside a single signed instruction. If the yield slippage requirement fails, the transaction is rejected off-chain, costing 0 gas.
+                    </p>
+                    <ul style={{ listStyle: "none", padding: 0, display: "flex", flexDirection: "column", gap: "16px" }}>
+                        <li style={{ display: "flex", alignItems: "center", gap: "12px", fontSize: "1.05rem", fontWeight: 500 }}><CheckIcon color="var(--primary)" /> 45,000 TPS Maximum Bandwidth</li>
+                        <li style={{ display: "flex", alignItems: "center", gap: "12px", fontSize: "1.05rem", fontWeight: 500 }}><CheckIcon color="var(--primary)" /> Flash-loans deployed globally</li>
+                        <li style={{ display: "flex", alignItems: "center", gap: "12px", fontSize: "1.05rem", fontWeight: 500 }}><CheckIcon color="var(--primary)" /> Non-custodial Smart Contract Multi-signs</li>
+                    </ul>
+                </div>
+                <div style={{ flex: 1 }}>
+                    <div className="glassmorphism" style={{ padding: "40px", borderRadius: "24px", background: "linear-gradient(135deg, rgba(255,255,255,0.05), rgba(138,43,226,0.15))", 
+                          border: "1px solid rgba(138,43,226,0.4)", position: "relative" }}>
+                        <Speed style={{ fontSize: "4rem", color: "var(--primary)", marginBottom: "24px" }} />
+                        <h3 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "16px" }}>Rust Backend Execution</h3>
+                        <p style={{ color: "var(--text-secondary)", lineHeight: 1.6 }}>We built our core bot natively in Rust utilizing multithreaded Rayon constraints. This bypasses the standard Web3.js UI latency entirely.</p>
+                        
+                        <div style={{ marginTop: "24px", padding: "16px", background: "rgba(0,0,0,0.5)", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.1)", fontFamily: "monospace", color: "var(--success)" }}>
+                            <p>[Engine] Jupiter DEX Poller active.</p>
+                            <p>[Block 420993] +$1.02 USDC Profit Found!</p>
+                            <p>[Exec] Jito Bundle Signed.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        {/* Feature Grid */}
+        <section style={{ marginBottom: "120px" }}>
+             <h2 style={{ textAlign: "center", fontSize: "2.5rem", fontWeight: 800, marginBottom: "64px" }}>Engineered for Total Sovereignty</h2>
+             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "32px" }}>
+                 <FeatureCard icon={<Security style={{ color: "var(--success)", fontSize: "2.5rem" }}/>} title="KMS Payload Matrix" desc="Enterprise-grade Master Key decryption handled locally. Hackers accessing the remote node still fail to sign." />
+                 <FeatureCard icon={<LocalAtm style={{ color: "var(--secondary)", fontSize: "2.5rem" }}/>} title="Yield Splitting (80/20)" desc="Depositors keep 80% of generated gross yield. The protocol treasury claims a standard 20% maintenance cut." />
+                 <FeatureCard icon={<DeveloperMode style={{ color: "var(--primary)", fontSize: "2.5rem" }}/>} title="API Access Webhooks" desc="Deploy enterprise signals. React programmatically every time the system lands a multi-tier flash liquidation." />
+                 <FeatureCard icon={<SyncAlt style={{ color: "#29b6f6", fontSize: "2.5rem" }}/>} title="Auto-Compounding" desc="$PCP token values inflate directly alongside the growing USDC treasury base value, requiring zero interaction." />
+                 <FeatureCard icon={<TrendingUp style={{ color: "var(--primary)", fontSize: "2.5rem" }}/>} title="Jito Network Routing" desc="Transactions bypass public RPCs. MEV block-builders drop our routes simultaneously, eliminating sandwiching." />
+                 <FeatureCard icon={<AccountBalanceWallet style={{ color: "#ab47bc", fontSize: "2.5rem" }}/>} title="Native Integrations" desc="Phantom, Solflare, WalletConnect. Simply sign an Anchor BPF limit to lock your base capital natively." />
+             </div>
+        </section>
+
+        {/* CTA */}
+        <section style={{ textAlign: "center", padding: "80px", borderRadius: "32px", background: "linear-gradient(135deg, rgba(138,43,226,0.3), rgba(0,0,0,0.5))", border: "1px solid rgba(255,255,255,0.15)", position: "relative", overflow: "hidden" }}>
+             <div className="glow-orb glow-orb-primary" style={{ top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: "400px", height: "400px" }} />
+             <h2 style={{ fontSize: "3rem", fontWeight: 900, marginBottom: "24px", position: "relative", zIndex: 10 }}>Ready to capture the spreads?</h2>
+             <p style={{ fontSize: "1.2rem", color: "var(--text-secondary)", marginBottom: "40px", maxWidth: "600px", margin: "0 auto 40px auto", position: "relative", zIndex: 10 }}>Zero maintenance required. Deposit liquidity, wait, and burn your mapping tokens for pure profit withdrawals.</p>
+             <Link href="/dashboard" className="neon-btn" style={{ position: "relative", zIndex: 10, background: "var(--primary)", color: "#000", padding: "20px 48px", borderRadius: "16px", textDecoration: "none", fontSize: "1.2rem", fontWeight: 800, border: "none" }}>
+                   Access the Protocol Vault
+             </Link>
+        </section>
+      </main>
+      
+      {/* Footer */}
+      <footer style={{ padding: "48px 24px", textAlign: "center", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+          <p style={{ color: "var(--text-secondary)", fontWeight: 600 }}>&copy; 2026 ArbitraSaaS. Built by Antigravity for the Global Economy.</p>
+      </footer>
     </div>
   );
 }
 
-export default function DashboardPage() {
-  const { connected, publicKey } = useWallet();
-  const [data, setData] = useState<any>({
-      tvl: "$...", apy: "...", emitted: "...", totalUsers: "...", mode: "..."
-  });
-  const [tradesStream, setTradesStream] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<string>('Dashboard');
+function CheckIcon({ color }: { color: string }) {
+    return (
+        <svg fill={color} width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+        </svg>
+    )
+}
 
-  // Fetch Protocol Stats & Trades
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const statsRes = await fetch('/api/stats');
-        const tradesRes = await fetch('/api/trades');
-        const statsData = await statsRes.json();
-        const tradesData = await tradesRes.json();
-        setData(statsData);
-        setTradesStream(tradesData);
-      } catch (err) {
-        console.error("Failed to load metrics", err);
-      }
-    };
-    
-    fetchData();
-    const interval = setInterval(fetchData, 5000); // Polling every 5s
-    return () => clearInterval(interval);
-  }, []);
-
-  // --- STAKING STATE ---
-  const [stakedBalance, setStakedBalance] = useState<number>(0);
-  const [stakeInput, setStakeInput] = useState<string>("");
-  const [isProcessing, setIsProcessing] = useState<boolean>(false);
-  const [yieldEarned, setYieldEarned] = useState<number>(0);
-
-  // Simulate Yield generation
-  useEffect(() => {
-    if (stakedBalance > 0) {
-      const interval = setInterval(() => {
-        setYieldEarned(prev => prev + (stakedBalance * 0.00001)); // Mock yield
-      }, 3000);
-      return () => clearInterval(interval);
-    }
-  }, [stakedBalance]);
-
-  const handleStake = async () => {
-    if (!stakeInput || isNaN(Number(stakeInput))) return;
-    setIsProcessing(true);
-    // Simulate transaction delay
-    await new Promise(r => setTimeout(r, 1500));
-    setStakedBalance(prev => prev + Number(stakeInput));
-    setStakeInput("");
-    setIsProcessing(false);
-  };
-
-  const handleUnstake = async () => {
-    setIsProcessing(true);
-    await new Promise(r => setTimeout(r, 1500));
-    setStakedBalance(0);
-    setYieldEarned(0);
-    setIsProcessing(false);
-  };
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "40px", position: "relative" }}>
-      {/* Background Orbs */}
-      <div className="glow-orb glow-orb-primary" style={{ top: "0%", left: "10%", width: "400px", height: "400px" }} />
-      <div className="glow-orb glow-orb-secondary" style={{ top: "40%", right: "-10%", width: "500px", height: "500px" }} />
-
-      <header className="fade-in" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", animationDelay: "0.05s" }}>
-        <div>
-          <h1 style={{ fontSize: "2.8rem", fontWeight: 900, marginBottom: "8px", letterSpacing: "-1px" }}>
-            PocketChange <span className="gradient-text">Vault</span>
-          </h1>
-          <p style={{ color: "var(--text-secondary)", fontSize: "1.05rem", fontWeight: 500 }}>
-            Deposit crypto. Earn institutional-grade DeFi Arbitrage Yields natively.
-          </p>
+function FeatureCard({ icon, title, desc }: any) {
+    return (
+        <div className="glassmorphism" style={{ padding: "32px", borderRadius: "20px", border: "1px solid rgba(255,255,255,0.1)", display: "flex", flexDirection: "column", gap: "16px", transition: "transform 0.3s ease", cursor: "pointer" }} onMouseOver={e => e.currentTarget.style.transform = 'translateY(-5px)'} onMouseOut={e => e.currentTarget.style.transform = 'translateY(0)'}>
+            {icon}
+            <h3 style={{ fontSize: "1.3rem", fontWeight: 700 }}>{title}</h3>
+            <p style={{ color: "var(--text-secondary)", lineHeight: 1.6 }}>{desc}</p>
         </div>
-        <div style={{ zIndex: 10 }}>
-          <WalletMultiButton className="neon-btn" style={{ 
-            background: connected ? "rgba(255, 255, 255, 0.1)" : "rgba(255, 255, 255, 0.05)",
-            border: connected ? "1px solid rgba(255, 255, 255, 0.3)" : "1px solid rgba(255, 255, 255, 0.15)",
-            color: "#fff",
-            borderRadius: "12px",
-            fontFamily: "Inter",
-            fontWeight: 700,
-            boxShadow: connected ? "0 0 20px rgba(255, 255, 255, 0.15)" : "0 0 15px rgba(255, 255, 255, 0.05)"
-          }} />
-        </div>
-      </header>
-
-      {/* --- TAB NAVIGATION --- */}
-      <nav className="fade-in" style={{ display: "flex", gap: "12px", background: "rgba(255,255,255,0.02)", padding: "12px", borderRadius: "20px", border: "1px solid rgba(255,255,255,0.05)", overflowX: "auto", animationDelay: "0.08s", zIndex: 10 }}>
-        {['Dashboard', 'Scanner', 'Strategy', 'Analytics', 'Tokenomics', 'Security'].map(tab => (
-          <button 
-            key={tab}
-            onClick={() => setActiveTab(tab)} 
-            style={{
-              padding: "10px 24px", 
-              background: activeTab === tab ? "rgba(255,255,255,0.1)" : "transparent",
-              color: activeTab === tab ? "#fff" : "var(--text-secondary)",
-              borderRadius: "12px",
-              fontWeight: 700,
-              border: activeTab === tab ? "1px solid rgba(255,255,255,0.2)" : "1px solid transparent",
-              transition: "all 0.2s"
-            }}
-          >
-            {tab}
-          </button>
-        ))}
-      </nav>
-
-      {activeTab === 'Scanner' && <Scanner />}
-      {activeTab === 'Strategy' && <StrategyBuilder />}
-      {activeTab === 'Analytics' && <Analytics />}
-      {activeTab === 'Tokenomics' && <Tokenomics />}
-      {activeTab === 'Security' && <Security />}
-
-      {activeTab === 'Dashboard' && (
-        <>
-          {/* --- PERSONAL STAKING DASHBOARD (VISIBLE WHEN CONNECTED) --- */}
-          {connected && (
-            <section className="glassmorphism fade-in hover-glow" style={{ padding: "32px", borderRadius: "20px", display: "flex", flexDirection: "column", gap: "24px", zIndex: 10, animationDelay: "0.1s", border: "1px solid rgba(0, 255, 170, 0.2)", background: "rgba(15, 23, 42, 0.6)" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <h3 style={{ fontSize: "1.4rem", fontWeight: 700, display: "flex", alignItems: "center", gap: "8px" }}>
-              <AccountCircle style={{ color: "var(--success)" }} /> Your Staking Vault
-            </h3>
-            <div style={{ background: "rgba(0, 255, 170, 0.1)", padding: "6px 12px", borderRadius: "8px", color: "var(--success)", fontSize: "0.85rem", fontWeight: 700 }}>
-              Connected: {publicKey?.toBase58().substring(0, 4)}...{publicKey?.toBase58().substring(40)}
-            </div>
-          </div>
-          
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "20px" }}>
-             <div style={{ background: "rgba(255,255,255,0.03)", padding: "20px", borderRadius: "16px", border: "1px solid rgba(255,255,255,0.05)" }}>
-               <p style={{ color: "var(--text-secondary)", fontSize: "0.85rem", fontWeight: 600, textTransform: "uppercase" }}>Staked Balance</p>
-               <h4 style={{ fontSize: "2rem", fontWeight: 800 }}>{stakedBalance.toLocaleString()} <span style={{ fontSize: "1rem", color: "var(--text-secondary)" }}>USDC</span></h4>
-             </div>
-             <div style={{ background: "rgba(255,255,255,0.03)", padding: "20px", borderRadius: "16px", border: "1px solid rgba(255,255,255,0.05)" }}>
-               <p style={{ color: "var(--text-secondary)", fontSize: "0.85rem", fontWeight: 600, textTransform: "uppercase" }}>Yield Earned</p>
-               <h4 style={{ fontSize: "2rem", fontWeight: 800, color: "var(--success)" }}>+${yieldEarned.toFixed(6)}</h4>
-             </div>
-             <div style={{ background: "rgba(255,255,255,0.03)", padding: "20px", borderRadius: "16px", border: "1px solid rgba(255,255,255,0.05)" }}>
-               <p style={{ color: "var(--text-secondary)", fontSize: "0.85rem", fontWeight: 600, textTransform: "uppercase" }}>Size Multiplier</p>
-               <h4 style={{ fontSize: "2rem", fontWeight: 800, color: "var(--primary)" }}>{stakedBalance > 1000 ? "1.25x" : "1.00x"} <span style={{ fontSize: "0.9rem", color: "var(--text-secondary)", fontWeight: 500 }}>(Dynamic)</span></h4>
-             </div>
-          </div>
-
-          <div style={{ display: "flex", gap: "16px", marginTop: "8px" }}>
-            <input 
-              type="number" 
-              placeholder="Amount to Stake (USDC)" 
-              value={stakeInput}
-              onChange={(e) => setStakeInput(e.target.value)}
-              style={{ flex: 1, background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", padding: "12px 16px", color: "#fff", outline: "none", fontSize: "1rem" }}
-            />
-            <button 
-              onClick={handleStake}
-              disabled={isProcessing || !stakeInput}
-              style={{ background: isProcessing ? "#555" : "linear-gradient(90deg, #00FFaa, #00ccff)", padding: "0 32px", borderRadius: "12px", color: "#000", fontWeight: 800, fontSize: "1rem", border: "none", cursor: isProcessing ? "not-allowed" : "pointer" }}
-            >
-              {isProcessing ? "Processing..." : "Stake Funds"}
-            </button>
-            {stakedBalance > 0 && (
-              <button 
-                 onClick={handleUnstake}
-                 disabled={isProcessing}
-                 style={{ background: "rgba(255,51,102,0.1)", border: "1px solid rgba(255,51,102,0.3)", padding: "0 24px", borderRadius: "12px", color: "var(--error)", fontWeight: 700, fontSize: "1rem", cursor: isProcessing ? "not-allowed" : "pointer" }}
-              >
-                Unstake
-              </button>
-            )}
-          </div>
-        </section>
-      )}
-
-      {/* --- PUBLIC SECTIONS (Always Visible) --- */}
-      <section style={{ display: "flex", gap: "24px", flexWrap: "wrap", zIndex: 10 }}>
-        <GlowingStatCard title="Current Vault APY" value={data.apy} change="Variable" isPositive={true} icon={<TrendingUp />} accentColor="#ffffff" delay="0.1s" />
-        <GlowingStatCard title="Total Value Locked" value={data.tvl} change="+12.4% vs 30d" isPositive={true} icon={<AccountBalanceWallet />} accentColor="#b4b4c0" delay="0.2s" />
-        <GlowingStatCard title="xPKC Yield Emitted" value={data.emitted} change="Staking Rewards" isPositive={true} icon={<SwapCalls />} accentColor="#ffffff" delay="0.3s" />
-        <GlowingStatCard title="Active Depositors" value={data.totalUsers} change="+412 Today" isPositive={true} icon={<Public />} accentColor="#b4b4c0" delay="0.4s" />
-      </section>
-
-      <div style={{ display: "flex", gap: "24px", flexWrap: "wrap", zIndex: 10 }}>
-        {/* Main Chart Section */}
-        <section className="glassmorphism fade-in" style={{ flex: 2, minWidth: "500px", borderRadius: "20px", display: "flex", flexDirection: "column", animationDelay: "0.5s", overflow: "hidden" }}>
-          <div style={{ padding: "32px 32px 0 32px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div>
-               <h3 style={{ fontSize: "1.4rem", fontWeight: 700, letterSpacing: "-0.5px" }}>Cumulative Yield Trajectory</h3>
-               <p style={{ color: "var(--text-secondary)", fontSize: "0.9rem", marginTop: "4px" }}>Auto-compounding performance over the last 30 days.</p>
-            </div>
-            <select style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--border)", color: "#fff", padding: "10px 16px", borderRadius: "10px", outline: "none", fontWeight: 600, cursor: "pointer", backdropFilter: "blur(10px)" }}>
-              <option>Last 7 Days</option>
-              <option>Last 30 Days</option>
-              <option>Year to Date</option>
-            </select>
-          </div>
-          
-          <div style={{ width: "100%", height: "220px", marginTop: "auto", position: "relative" }}>
-             <div className="wave-graph" style={{ position: "absolute", bottom: 0, width: "100%" }}></div>
-             {/* Secondary subtle wave */}
-             <div className="wave-graph" style={{ position: "absolute", bottom: "-10px", width: "100%", opacity: 0.5, animationDuration: "15s", filter: "hue-rotate(60deg)" }}></div>
-          </div>
-        </section>
-
-        {/* Live Execution Stream */}
-        <section className="glassmorphism fade-in" style={{ flex: 1, minWidth: "350px", padding: "32px", borderRadius: "20px", animationDelay: "0.6s", position: "relative", borderTop: "1px solid rgba(255,255,255,0.15)" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "24px" }}>
-             <h3 style={{ fontSize: "1.3rem", fontWeight: 700 }}>Live Mempool Stream</h3>
-             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "var(--secondary)", boxShadow: "0 0 10px var(--secondary)", animation: "fadeIn 1s infinite alternate" }}></span>
-                <span style={{ fontSize: "0.85rem", color: "var(--secondary)", fontWeight: 600, letterSpacing: "1px" }}>SYNCED</span>
-             </div>
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-            {tradesStream.map((log) => (
-              <div key={log.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: "16px", borderBottom: "1px solid var(--border)" }}>
-                <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-                  <div style={{ background: log.ok ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.02)", padding: "8px", borderRadius: "10px", color: log.ok ? "var(--success)" : "var(--text-secondary)" }}>
-                    <Memory fontSize="small" />
-                  </div>
-                  <div>
-                    <p style={{ fontWeight: 700, fontSize: "0.95rem", color: log.ok ? "#fff" : "var(--text-secondary)" }}>{log.route}</p>
-                    <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", fontFamily: "monospace", marginTop: "2px" }}>{log.hash}</p>
-                  </div>
-                </div>
-                <div style={{ textAlign: "right" }}>
-                  <p style={{ color: log.ok ? "var(--success)" : "var(--text-secondary)", fontWeight: 800, fontSize: "1rem" }}>
-                      {log.profit}
-                  </p>
-                  <p style={{ fontSize: "0.7rem", color: log.ok ? "var(--secondary)" : "var(--error)", letterSpacing: "0.5px", fontWeight: 700 }}>
-                    {log.status}
-                  </p>
-                </div>
-              </div>
-            ))}
-            {tradesStream.length === 0 && (
-              <p style={{ color: "var(--text-secondary)", textAlign: "center", fontSize: "0.9rem" }}>Awaiting execution logs...</p>
-            )}
-          </div>
-        </section>
-      </div>
-
-        </>
-      )}
-    </div>
-  );
+    )
 }

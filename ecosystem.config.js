@@ -21,28 +21,6 @@ module.exports = {
       env: {
         NODE_ENV: 'production',
       }
-    },
-    {
-      name: 'data-backup-service',
-      script: 'node',
-      args: 'scripts/backup_service.js',
-      watch: true,
-      autorestart: true,
-      max_restarts: 10,
-      env: {
-        NODE_ENV: 'production',
-      }
-    },
-    {
-      name: 'pcp-ai-agent',
-      script: 'node',
-      args: 'scripts/ai_agent.js',
-      watch: true,
-      autorestart: true,
-      max_restarts: 10,
-      env: {
-        NODE_ENV: 'production',
-      }
     }
   ]
 };

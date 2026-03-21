@@ -4,16 +4,10 @@ import path from 'path';
 
 export async function POST(req: Request) {
     try {
-        const authHeader = req.headers.get('authorization');
-        // SECURITY FIX: In a real app this should validate against a proper DB or KMS secret block
-        if (authHeader !== `Bearer ${process.env.INTERNAL_API_KEY}`) {
-             return NextResponse.json({ error: "Unauthorized endpoint execution" }, { status: 401 });
-        }
-
         const body = await req.json();
         
         const dbPath = path.join(process.cwd(), 'trades.json');
-        let logs: any[] = [];
+        let logs = [];
         try {
             logs = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
         } catch(e) {}

@@ -4,35 +4,33 @@ import path from 'path';
 
 export async function GET() {
     try {
-        const dbPath = path.join(process.cwd(), 'trades.json');
+        const dbPath = path.join(process.cwd(), 'engine-worker', 'telemetry.jsonl');
         let logs: any[] = [];
         try {
-            logs = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
+            const fileContent = fs.readFileSync(dbPath, 'utf8');
+            logs = fileContent.trim().split('\n').filter(line => line.length > 5).map(line => JSON.parse(line));
         } catch(e) {}
-        
-        // Reverse array to put newest first
-        logs.reverse();
         
         let wins = 0;
         let sumProfit = 0;
         
         for (const log of logs) {
-            if (log.status && log.status.includes("SUCCESS")) {
+            if (log.success) {
                 wins++;
-                sumProfit += (log.profitAmt || 0);
+                sumProfit += (log.profit_sol || 0);
             }
         }
 
         const totalTrades = logs.length;
         const winRate = totalTrades > 0 ? ((wins / totalTrades) * 100).toFixed(1) : "0.0";
-        const totalPnL = sumProfit.toFixed(4);
+        const formattedPnL = sumProfit >= 0 ? `+$${sumProfit.toFixed(4)} USDC` : `-$${Math.abs(sumProfit).toFixed(4)} USDC`;
         
         return NextResponse.json({
-            recentLogs: logs.slice(0, 20),
+            recentLogs: logs.slice(-20).reverse(),
             totalTrades,
             winRate: `${winRate}%`,
-            totalPnL: `${totalPnL} SOL`,
-            volume: `${(totalTrades * 0.05).toFixed(2)} SOL`
+            totalPnL: formattedPnL,
+            volume: `$${(totalTrades * 100).toFixed(2)} USDC`
         });
     } catch(e: any) {
         return NextResponse.json({ error: e.message }, { status: 500 });

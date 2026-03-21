@@ -1,20 +1,6 @@
 # Global Bot Settings
-data_sources:
-  price_feed:
-    mode: "live"   # or "simulated"
-    simulated:
-      strategy: "random_walk"   # or "historical_replay", "constant"
-      seed: 42
-    live:
-      raydium_rpc: "https://api.mainnet-beta.solana.com"
-      bitget_api_key: "..."
-  market_cap:
-    mode: "simulated"
-    simulated:
-      value: 10000000   # fixed for testing
-
 bot:
-  rpc_url: "https://mainnet.helius-rpc.com/?api-key=df082a16-aebf-4ec4-8ad6-86abfa06c8fc"
+  rpc_url: "https://mainnet.helius-rpc.com/?api-key=YOUR_API_KEY_HERE"
   dry_run: false
   max_loss_per_hour_percent: 5.0 # Circuit breaker
 

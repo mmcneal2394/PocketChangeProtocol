@@ -2,14 +2,10 @@ import { Connection, Keypair, VersionedTransaction, PublicKey, SystemProgram, Tr
 import bs58 from "bs58";
 import fetch from "cross-fetch";
 
-import dotenv from "dotenv";
-dotenv.config();
-
 const RPC_ENDPOINT = "https://beta.helius-rpc.com/?api-key=df082a16-aebf-4ec4-8ad6-86abfa06c8fc";
 
-// Using the 2nd tenant wallet from the previous validation
-const LIVE_PRV_KEY = process.env.PRIVATE_KEY;
-if (!LIVE_PRV_KEY) throw new Error("Missing PRIVATE_KEY in .env");
+// Using the 2nd tenant wallet from the previous validation: 0.0329 SOL
+const LIVE_PRV_KEY = "3S9RdpPiLEKkdfPh2ZUbtqiEVqwzaj36MpkERYJTSwcpFSusJaGPa2v2g77UPpBn3SaivnZeKCUNBoq17yJXovC5";
 
 const JITO_TIP_ACCOUNTS = [
     "HFqU5x63VTQVPeG1B6XQxK5y9pYpYnU1HnK9Yy9H34J4",

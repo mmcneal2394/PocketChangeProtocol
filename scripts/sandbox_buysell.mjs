@@ -1,4 +1,5 @@
-// Native global.fetch integration
+import fetch from 'node-fetch';
+
 const TARGETS = [
     { mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", sym: "USDC" },
     { mint: "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R", sym: "RAY" },
@@ -16,9 +17,9 @@ async function testBuySellLogic() {
         console.log(`\nTesting Buy/Sell Spread for ${target.sym}...`);
         try {
             // Leg 1: SOL -> Target (with 0% max slippage = 0 bps)
-            const url1 = `https://api.jup.ag/swap/v1/quote?inputMint=So11111111111111111111111111111111111111112&outputMint=${target.mint}&amount=${startingLamports}&slippageBps=0${routingParam}`;
+            const url1 = `https://public.jupiterapi.com/quote?inputMint=So11111111111111111111111111111111111111112&outputMint=${target.mint}&amount=${startingLamports}&slippageBps=0${routingParam}`;
             const quoteRes = await fetch(url1, {
-                headers: { 'x-api-key': '05aa94b2-05d5-4993-acfe-30e18dc35ff1' }
+                headers: { 'x-api-key': 'bb328d29-b99e-4d05-98f9-a610ce470001' }
             });
             const quoteData = await quoteRes.json();
             
@@ -33,9 +34,9 @@ async function testBuySellLogic() {
             console.log(`           Leg 1 Price Impact: ${quoteData.priceImpactPct}%`);
             
             // Leg 2: Target -> SOL (with 0% max slippage = 0 bps)
-            const url2 = `https://api.jup.ag/swap/v1/quote?inputMint=${target.mint}&outputMint=So11111111111111111111111111111111111111112&amount=${receivedTokens}&slippageBps=0${routingParam}`;
+            const url2 = `https://public.jupiterapi.com/quote?inputMint=${target.mint}&outputMint=So11111111111111111111111111111111111111112&amount=${receivedTokens}&slippageBps=0${routingParam}`;
             const q2Res = await fetch(url2, {
-                headers: { 'x-api-key': '05aa94b2-05d5-4993-acfe-30e18dc35ff1' }
+                headers: { 'x-api-key': 'bb328d29-b99e-4d05-98f9-a610ce470001' }
             });
             const q2Data = await q2Res.json();
             

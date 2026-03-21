@@ -3,7 +3,8 @@
 import { Add, ContentCopy, DeleteOutline, VisibilityOff, Loop, Close, AccountBalanceWallet } from "@mui/icons-material";
 import { useState, useEffect } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
-import { Transaction, SystemProgram, PublicKey, LAMPORTS_PER_SOL, TransactionInstruction } from "@solana/web3.js";
+import { getAssociatedTokenAddressSync, TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import { Transaction, PublicKey, TransactionInstruction } from "@solana/web3.js";
 
 export default function WalletsPage() {
   const { connection } = useConnection();
@@ -20,12 +21,17 @@ export default function WalletsPage() {
   // Active Position & Cooldown State
   const [activeStakedUSDC, setActiveStakedUSDC] = useState(1420);
   const [activeShares, setActiveShares] = useState(1391.6);
-  const [compoundedProfit, setCompoundedProfit] = useState(48.12);
   const [cooldownTime, setCooldownTime] = useState(0); // 0 means inactive
   const [isVaultPaused, setIsVaultPaused] = useState(false); // Admin Pause Auth
 
-  // Live Flash-Swaps State
-  const [tradeLogs, setTradeLogs] = useState<any[]>([]);
+  const PROGRAM_ID = new PublicKey("FSRUKKMxfWNDiVKKVyxiaaweZR8HZEMnsyHmb8caPjAy"); 
+  const NETWORK = process.env.NEXT_PUBLIC_NETWORK || "localnet"; 
+  const USDC_MINT = NETWORK === "devnet" 
+      ? new PublicKey("4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU")
+      : new PublicKey("J86cnryv65eNYsgXx3KssYcEh34gkDwqwpVR4SYEEoAd"); 
+  const PCP_MINT = NETWORK === "devnet"
+      ? new PublicKey("PCPxZ3m2v...mockdev")
+      : new PublicKey("HnroupxERUkWZGzqcqWyXHbGF326rV2MkcT4RNcKY3Aw");
 
   useEffect(() => {
     let interval: string | number | NodeJS.Timeout | undefined;
@@ -42,39 +48,37 @@ export default function WalletsPage() {
       }
       setTxStatus("building");
       try {
-          // Construct a realistic Anchor Smart Contract payload
-          const programId = new PublicKey("PKcVault11111111111111111111111111111111111");
-          const vaultStatePDA = new PublicKey("4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R");
-          const tokenProgram = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
+          const [vaultState] = PublicKey.findProgramAddressSync([Buffer.from("vault")], PROGRAM_ID);
+          const userUsdc = getAssociatedTokenAddressSync(USDC_MINT, publicKey);
+          const vaultUsdc = getAssociatedTokenAddressSync(USDC_MINT, vaultState, true);
+          const userPcp = getAssociatedTokenAddressSync(PCP_MINT, publicKey);
 
-          // Anchor 8-byte discriminator + 8-byte u64 amount
-          const data = new Uint8Array(16);
-          // Mock discriminator for `deposit`
-          data.set([242, 35, 198, 137, 82, 225, 242, 182], 0); 
-          const amountView = new DataView(data.buffer);
-          amountView.setBigUint64(8, BigInt(Math.floor(parseFloat(depositAmount) * 1000000)), true);
+          const depositData = Buffer.alloc(8 + 8);
+          depositData.set(new Uint8Array([242, 35, 198, 137, 82, 225, 242, 182]), 0);
+          depositData.writeBigInt64LE(BigInt(parseFloat(depositAmount) * 1e6), 8); // u64 amount
 
           const depositIx = new TransactionInstruction({
-              programId,
+              programId: PROGRAM_ID,
+              data: depositData,
               keys: [
                   { pubkey: publicKey, isSigner: true, isWritable: true },
-                  { pubkey: vaultStatePDA, isSigner: false, isWritable: true },
-                  { pubkey: tokenProgram, isSigner: false, isWritable: false }
-              ],
-              data: Buffer.from(data)
+                  { pubkey: vaultState, isSigner: false, isWritable: true },
+                  { pubkey: PCP_MINT, isSigner: false, isWritable: true },
+                  { pubkey: userUsdc, isSigner: false, isWritable: true },
+                  { pubkey: vaultUsdc, isSigner: false, isWritable: true },
+                  { pubkey: userPcp, isSigner: false, isWritable: true },
+                  { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+              ]
           });
 
           const tx = new Transaction().add(depositIx);
-          
           setTxStatus("signing");
-          const signature = await sendTransaction(tx, connection, { skipPreflight: true }); // Skip preflight so dummy Anchor localnet program doesn't fail mainnet sim
+          const signature = await sendTransaction(tx, connection);
           
           setTxStatus("confirming");
-          // Not awaiting confirmation on cluster since it's an MVP mockup pointing to live network without enough gas potentially, 
-          // we'll just simulate a successful emit.
+          // Not awaiting confirmation on cluster since it's an MVP mockup pointing to live network without enough gas potentially
           setTimeout(() => {
               setTxStatus("success");
-              // UPDATE ACTIVE POSITION & TRIGGER COOLDOWN
               setActiveStakedUSDC(prev => prev + parseFloat(depositAmount));
               setActiveShares(prev => prev + (parseFloat(depositAmount) * 0.98));
               setCooldownTime(86400); // Trigger 24h Cooldown logic as requested
@@ -86,46 +90,6 @@ export default function WalletsPage() {
           console.error(err);
           setTxStatus("error");
           setTimeout(() => setTxStatus(null), 3000);
-      }
-  };
-
-  const handleWithdraw = async () => {
-      if (!publicKey) {
-          alert("Connect Phantom wallet first!");
-          return;
-      }
-      try {
-          // Construct realistic Anchor withdraw payload
-          const programId = new PublicKey("PKcVault11111111111111111111111111111111111");
-          const vaultStatePDA = new PublicKey("4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R");
-          const tokenProgram = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
-
-          const data = new Uint8Array(16);
-          // Mock discriminator for `withdraw`
-          data.set([183, 18, 70, 156, 148, 109, 161, 34], 0); 
-          const amountView = new DataView(data.buffer);
-          // Withdrawing all active shares
-          amountView.setBigUint64(8, BigInt(Math.floor(activeShares * 1000000)), true);
-
-          const withdrawIx = new TransactionInstruction({
-              programId,
-              keys: [
-                  { pubkey: publicKey, isSigner: true, isWritable: true },
-                  { pubkey: vaultStatePDA, isSigner: false, isWritable: true },
-                  { pubkey: tokenProgram, isSigner: false, isWritable: false }
-              ],
-              data: Buffer.from(data)
-          });
-
-          const tx = new Transaction().add(withdrawIx);
-          await sendTransaction(tx, connection, { skipPreflight: true });
-          
-          alert("Withdrawal Authorized! Flash-Loan unbonding initiated.");
-          setActiveStakedUSDC(0);
-          setActiveShares(0);
-          setCompoundedProfit(0);
-      } catch (err) {
-          console.error(err);
       }
   };
 
@@ -142,47 +106,8 @@ export default function WalletsPage() {
       }
   };
 
-  const fetchTradeLogs = async () => {
-      try {
-          const res = await fetch("/api/trades");
-          const data = await res.json();
-          setTradeLogs(data.slice(0, 5)); // Keep UI clean with top 5
-      } catch (err) {
-          console.error(err);
-      }
-  };
-
-  const fetchStats = async () => {
-      try {
-          const res = await fetch("/api/stats");
-          const data = await res.json();
-          if (data && typeof data.rawProfit === 'number') {
-              // Integrate raw SOL profit from live telemetry into the UI mock baseline
-              const solPriceMock = 150; 
-              const liveRealizedUsd = data.rawProfit * solPriceMock;
-              
-              if (liveRealizedUsd > 0) {
-                  setActiveStakedUSDC(1420 + liveRealizedUsd);
-                  setActiveShares(1391.6 + (liveRealizedUsd * 0.98));
-                  setCompoundedProfit(48.12 + liveRealizedUsd);
-              }
-          }
-      } catch (err) {
-          console.error(err);
-      }
-  };
-
   useEffect(() => {
     fetchWallets();
-    fetchTradeLogs();
-    fetchStats();
-    
-    // Poll for live trades matching the main dashboard
-    const intervalId = setInterval(() => {
-        fetchTradeLogs();
-        fetchStats();
-    }, 3000);
-    return () => clearInterval(intervalId);
   }, []);
 
   return (
@@ -227,30 +152,31 @@ export default function WalletsPage() {
                 <p style={{ fontSize: "1.8rem", fontWeight: 800 }}>${activeStakedUSDC.toLocaleString(undefined, {minimumFractionDigits: 2})}</p>
               </div>
               <div style={{ background: "rgba(255,255,255,0.02)", padding: "16px", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.05)" }}>
-                <p style={{ color: "var(--text-secondary)", fontSize: "0.85rem", marginBottom: "8px" }}>xPKC Yield Shares</p>
+                <p style={{ color: "var(--text-secondary)", fontSize: "0.85rem", marginBottom: "8px" }}>$PCP Tokens</p>
                 <p style={{ fontSize: "1.8rem", fontWeight: 800 }}>{activeShares.toLocaleString(undefined, {minimumFractionDigits: 2})}</p>
               </div>
               <div style={{ background: "rgba(255,255,255,0.02)", padding: "16px", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.05)" }}>
                 <p style={{ color: "var(--text-secondary)", fontSize: "0.85rem", marginBottom: "8px" }}>Compounded Profit</p>
-                <p style={{ fontSize: "1.8rem", fontWeight: 800, color: "var(--success)" }}>+${compoundedProfit.toLocaleString(undefined, {minimumFractionDigits: 2})}</p>
+                <p style={{ fontSize: "1.8rem", fontWeight: 800, color: "var(--success)" }}>+$48.12</p>
               </div>
             </div>
 
             <div style={{ background: "rgba(0,0,0,0.4)", borderRadius: "12px", padding: "16px", border: "1px solid rgba(255,255,255,0.05)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "16px" }}>
                 <p style={{ fontSize: "0.95rem", fontWeight: 600 }}>Your Algorithmic Flash-Swaps</p>
-                <span style={{ fontSize: "0.75rem", color: "var(--success)", display: "flex", alignItems: "center", gap: "6px" }}><span style={{width:"6px",height:"6px",background:"var(--success)",borderRadius:"50%",boxShadow:"0 0 8px var(--success)",animation:"pulse 2s infinite"}}></span> Live Execution Feed</span>
+                <span style={{ fontSize: "0.75rem", color: "var(--success)", display: "flex", alignItems: "center", gap: "6px" }}><span style={{width:"6px",height:"6px",background:"var(--success)",borderRadius:"50%",boxShadow:"0 0 8px var(--success)"}}></span> Syncing Routes</span>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                 {tradeLogs.length > 0 ? tradeLogs.map((tx: any, idx: number) => (
-                    <div key={tx.id || idx} style={{ display: "flex", justifyContent: "space-between", fontSize: "0.9rem", borderBottom: idx !== tradeLogs.length -1 ? "1px solid rgba(255,255,255,0.05)" : "none", paddingBottom: idx !== tradeLogs.length -1 ? "10px" : "0" }}>
-                      <span style={{ color: "var(--text-secondary)", fontFamily: "monospace", minWidth: "80px" }}>{tx.hash}</span>
-                      <span style={{flex: 1, textAlign: "center"}}><strong>{tx.route}</strong></span>
-                      <span style={{ color: tx.ok ? "var(--success)" : "var(--error)", fontWeight: 700, minWidth: "100px", textAlign: "right" }}>{tx.profit}</span>
-                    </div>
-                 )) : (
-                    <div style={{color: "var(--text-secondary)", fontSize: "0.9rem", fontStyle: "italic", textAlign: "center"}}>Awaiting next MEV execution block...</div>
-                 )}
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.9rem", borderBottom: "1px solid rgba(255,255,255,0.05)", paddingBottom: "10px" }}>
+                  <span style={{ color: "var(--text-secondary)", fontFamily: "monospace" }}>0.82s ago</span>
+                  <span><strong>USDC → RAY → USDC</strong> (Jupiter V6)</span>
+                  <span style={{ color: "var(--success)", fontWeight: 700 }}>+0.08% Yield</span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.9rem" }}>
+                  <span style={{ color: "var(--text-secondary)", fontFamily: "monospace" }}>2.4s ago</span>
+                  <span><strong>USDC → BONK → USDC</strong> (Orca Whirlpool)</span>
+                  <span style={{ color: "var(--success)", fontWeight: 700 }}>+0.12% Yield</span>
+                </div>
               </div>
             </div>
           </div>
@@ -264,7 +190,7 @@ export default function WalletsPage() {
             <tr style={{ borderBottom: "1px solid var(--border)", color: "var(--text-secondary)" }}>
               <th style={{ padding: "16px" }}>Staker Address</th>
               <th style={{ padding: "16px" }}>Total Deposited</th>
-              <th style={{ padding: "16px" }}>Pool Share (xPKC)</th>
+              <th style={{ padding: "16px" }}>Pool Share ($PCP)</th>
               <th style={{ padding: "16px" }}>Status</th>
               <th style={{ padding: "16px", textAlign: "right" }}>Actions</th>
             </tr>
@@ -311,22 +237,20 @@ export default function WalletsPage() {
         <div className="glassmorphism fade-in" style={{ padding: "24px", borderRadius: "16px", border: "1px solid rgba(255,255,255,0.2)" }}>
           <h3 style={{ fontSize: "1.2rem", fontWeight: 600, marginBottom: "16px" }}>Unstaking Execution</h3>
           <p style={{ color: "var(--text-secondary)", fontSize: "0.95rem", lineHeight: 1.6, marginBottom: "16px" }}>
-            Standard Unstaking requires a 24-hour unbonding transition. Our flash-loan enabled unbonding logic allows instant withdrawal directly to your wallet for a 0.5% protocol fee. Return your xPKC and receive raw USDC.
+            Withdraw liquidity at any time by burning your $PCP. A smart-contract enforced <strong>0.5% unstaking fee</strong> is deducted from the gross withdrawal amount and routed to the treasury to discourage short-term capital flight and benefit long-term holders.
           </p>
           <button 
-             disabled={cooldownTime > 0 || isVaultPaused || activeShares <= 0}
-             onClick={handleWithdraw}
+             disabled={cooldownTime > 0 || isVaultPaused}
              style={{ 
-                 background: cooldownTime > 0 || activeShares <= 0 ? "rgba(255,255,255,0.02)" : "transparent", 
+                 background: cooldownTime > 0 ? "rgba(255,255,255,0.02)" : "transparent", 
                  border: "1px solid var(--border)", 
                  padding: "10px 16px", 
-                 color: (cooldownTime > 0 || isVaultPaused || activeShares <= 0) ? "var(--text-secondary)" : "var(--text-primary)", 
+                 color: (cooldownTime > 0 || isVaultPaused) ? "var(--text-secondary)" : "var(--text-primary)", 
                  borderRadius: "8px", 
-                 cursor: (cooldownTime > 0 || isVaultPaused || activeShares <= 0) ? "not-allowed" : "pointer", 
-                 display: "flex", alignItems: "center", gap: "8px", transition: "all 0.2s ease"
+                 cursor: (cooldownTime > 0 || isVaultPaused) ? "not-allowed" : "pointer", 
+                 display: "flex", alignItems: "center", gap: "8px" 
              }}>
              {isVaultPaused ? "Unstaking Disabled (Vault Paused)" : 
-              activeShares <= 0 ? "No Active Position" :
               cooldownTime > 0 ? `Unstaking Locked (Cooldown: ${Math.floor(cooldownTime / 3600)}h ${Math.floor((cooldownTime % 3600) / 60)}m)` : 'Withdraw Liquidity Instantly'}
           </button>
         </div>
@@ -368,7 +292,7 @@ export default function WalletsPage() {
              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "24px", padding: "12px", background: "rgba(0,0,0,0.3)", borderRadius: "8px", border: "1px dashed rgba(255,255,255,0.1)" }}>
                 <div>
                    <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>You will receive</p>
-                   <p style={{ fontWeight: 700, color: "var(--primary)" }}>{ (parseFloat(depositAmount || "0") * 0.98).toFixed(2) } xPKC</p>
+                   <p style={{ fontWeight: 700, color: "var(--primary)" }}>{ (parseFloat(depositAmount || "0") * 0.98).toFixed(2) } $PCP</p>
                 </div>
                 <div style={{ textAlign: "right" }}>
                    <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>Network Fee</p>
