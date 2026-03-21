@@ -28,7 +28,7 @@ setTimeout(async () => {
         console.log(`🔍 Contacting Jupiter Verification Pipelines API for strict Route Compilation...`);
         const quoteResponse = await (
             await fetch(`https://api.jup.ag/swap/v1/quote?inputMint=So11111111111111111111111111111111111111112&outputMint=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&amount=1000000&slippageBps=50`, {
-                headers: { 'x-api-key': '05aa94b2-05d5-4993-acfe-30e18dc35ff1' }
+                headers: { 'x-api-key': 'YOUR_JUPITER_API_KEY' }
             })
         ).json();
 
@@ -45,7 +45,7 @@ setTimeout(async () => {
             method: 'POST',
             headers: { 
                 'Content-Type': 'application/json',
-                'x-api-key': '05aa94b2-05d5-4993-acfe-30e18dc35ff1' 
+                'x-api-key': 'YOUR_JUPITER_API_KEY' 
             },
             body: JSON.stringify({
                 quoteResponse,

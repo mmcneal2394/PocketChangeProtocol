@@ -25,7 +25,7 @@ setTimeout(async () => {
         process.exit(1);
     }
     console.log("💳 Target Trading Wallet:", wallet.publicKey.toString());
-    const API_KEY = '05aa94b2-05d5-4993-acfe-30e18dc35ff1';
+    const API_KEY = 'YOUR_JUPITER_API_KEY';
     const connection = new Connection("https://api.mainnet-beta.solana.com");
 
     try {

@@ -276,7 +276,7 @@ export class ArbEngine {
         try {
             logger.info(`[COMPILATION] Constructing payload for ${opp.type} with tip: ${opp.tipAmount} SOL`);
             
-            const API_KEY = config.JUPITER_API_KEY || '05aa94b2-05d5-4993-acfe-30e18dc35ff1';
+            const API_KEY = config.JUPITER_API_KEY || 'YOUR_JUPITER_API_KEY';
 
             const fetchWithTimeout = async (url: string, options: any, retries = 3) => {
                 for (let i = 0; i < retries; i++) {

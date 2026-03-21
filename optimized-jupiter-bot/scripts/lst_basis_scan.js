@@ -18,8 +18,8 @@ require('dotenv').config();
 const nodeFetch  = require('node-fetch');
 const { Connection, PublicKey } = require('@solana/web3.js');
 
-const HELIUS_RPC = process.env.RPC_ENDPOINT || 'https://mainnet.helius-rpc.com/?api-key=df082a16-aebf-4ec4-8ad6-86abfa06c8fc';
-const JUP_KEY   = process.env.JUPITER_API_KEY || '05aa94b2-05d5-4993-acfe-30e18dc35ff1';
+const HELIUS_RPC = process.env.RPC_ENDPOINT || 'https://rpc.helius.xyz/?api-key=YOUR_HELIUS_API_KEY';
+const JUP_KEY   = process.env.JUPITER_API_KEY || 'YOUR_JUPITER_API_KEY';
 const JUP_H_GET  = { 'x-api-key': JUP_KEY };  // GET requests — no Content-Type
 const JUP_H      = { 'Content-Type': 'application/json', 'x-api-key': JUP_KEY };  // POST
 const JUP_PRICE = 'https://api.jup.ag/price/v3';  // ?ids=MINT&vsToken=MINT
