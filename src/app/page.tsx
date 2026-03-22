@@ -22,14 +22,15 @@ export default function LandingPage() {
            <img src="https://cdn.helius-rpc.com/cdn-cgi/image//https://ipfs.io/ipfs/QmQwvUsgwBUa8PmKhTUgG6o1LL8PvUuo7XtkcVBNtQqry4" alt="Logo" style={{ width: "40px", height: "40px", borderRadius: "12px", boxShadow: "0 4px 20px rgba(255, 255, 255, 0.2)" }} />
            <span style={{ fontSize: "1.4rem", fontWeight: 800, letterSpacing: "-0.5px" }} className="gradient-text">PocketChange Protocol</span>
         </div>
-        <div style={{ display: "flex", gap: "32px", fontSize: "0.95rem", fontWeight: 600 }}>
+        <div style={{ display: "flex", gap: "24px", fontSize: "0.9rem", fontWeight: 600 }}>
            <a href="#features" style={{ color: "var(--text-secondary)", textDecoration: "none" }}>Platform</a>
            <a href="#security" style={{ color: "var(--text-secondary)", textDecoration: "none" }}>Security</a>
-           <a href="#docs" style={{ color: "var(--text-secondary)", textDecoration: "none" }}>Developers</a>
+           <Link href="/vault" style={{ color: "var(--text-secondary)", textDecoration: "none" }}>Vault Portal</Link>
+           <Link href="/admin" style={{ color: "#9b59b6", textDecoration: "none", fontWeight: 700 }}>⚙ Admin</Link>
         </div>
         <div>
-           <Link href="/dashboard" style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.2), rgba(255,255,255,0.05))", border: "1px solid rgba(255,255,255,0.2)", padding: "12px 24px", borderRadius: "10px", color: "#fff", textDecoration: "none", fontWeight: 700, display: "flex", alignItems: "center", gap: "8px", boxShadow: "0 4px 15px rgba(255, 255, 255, 0.1)" }}>
-               Launch App <ArrowForward fontSize="small" />
+           <Link href="/vault" style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.2), rgba(255,255,255,0.05))", border: "1px solid rgba(255,255,255,0.2)", padding: "12px 24px", borderRadius: "10px", color: "#fff", textDecoration: "none", fontWeight: 700, display: "flex", alignItems: "center", gap: "8px", boxShadow: "0 4px 15px rgba(255, 255, 255, 0.1)" }}>
+               Enter Vault <ArrowForward fontSize="small" />
            </Link>
         </div>
       </nav>
