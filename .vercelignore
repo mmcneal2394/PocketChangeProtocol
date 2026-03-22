@@ -1,0 +1,14 @@
+optimized-jupiter-bot
+gsd-2
+engine-worker
+*.log
+*.tar.gz
+*.zip
+*.gz
+*.webm
+*.mp4
+node_modules
+.next_build
+.next_build2
+backups
+docs

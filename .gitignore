@@ -38,3 +38,10 @@ target/
 anchor/node_modules/
 anchor/target/
 anchor/.anchor/
+  
+# !! WALLET KEYPAIRS - NEVER COMMIT !!  
+**/real_wallet.json  
+**/wallet.json  
+**/new_wallet.json  
+**/*keypair*.json  
+optimized-jupiter-bot/*.json  
