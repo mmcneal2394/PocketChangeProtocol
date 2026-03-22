@@ -14,6 +14,9 @@ export interface ArbitrageMetrics {
     expectedProfitBps: number;
     signature?: string | null;
     success: boolean;
+    // [8] Telemetry
+    quoteAgeMs?: number;        // ms to fetch both legs
+    signalToExecMs?: number;    // ms from quote start to on-chain landing
 }
 
 export function cacheTradeMetrics(metrics: ArbitrageMetrics) {

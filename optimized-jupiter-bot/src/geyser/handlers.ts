@@ -25,11 +25,18 @@ import { config }                            from '../utils/config';
 import { Connection, PublicKey }             from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID }                  from '@solana/spl-token';
 import { cacheTradeMetrics }                 from '../utils/trade_logger';
-import { globalRouteManager }                from '../discovery/route_manager';
+import { globalRouteManager,
+         getGasCost, markAtaCreated }        from '../discovery/route_manager';
 import { startLaunchpadScanner,
          handleNewPoolEvent,
          LAUNCHPAD_PROGRAMS }                from '../discovery/launchpad_scanner';
 import { loadStrategyParams }                from '../strategy_tuner';
+
+// [7] Minimum trade size for LST/defi routes (to clear gas+ATA floor)
+const LST_MIN_TRADE_SOL = parseFloat(process.env.LST_MIN_TRADE_SOL || '1.0');
+// [1] Parallel batch size per Geyser tick
+const BATCH_SIZE = parseInt(process.env.SCAN_BATCH_SIZE || '5');
+
 
 // ── Wallet state (cached, refreshed every 30s) ────────────────────────────────
 const connection  = new Connection(config.RPC_ENDPOINT, { commitment: 'processed' });
@@ -58,77 +65,82 @@ function detectProgram(filters: string[]): string | null {
 // ── Main account update handler ───────────────────────────────────────────────
 export async function handleAccountUpdate(data: any) {
   const startMs = Date.now();
-  const params   = loadStrategyParams(); // Live calibrated params
+  const params   = loadStrategyParams();
 
   // ── New pool event? Route to launchpad scanner ───────────────────────────
   const program = detectProgram(data.filters || []);
   if (program && data.account) {
-    handleNewPoolEvent(program, data.account).catch(() => {}); // non-blocking
+    handleNewPoolEvent(program, data.account).catch(() => {});
   }
 
   // ── MEV temporal jitter (5–25ms anti-sandwich) ───────────────────────────
   const jitterMs = Math.floor(Math.random() * 20) + 5;
   await new Promise(r => setTimeout(r, jitterMs));
 
-  // ── Get the top 3 priority routes from route_manager ─────────────────────
-  // (already respects per-route cooldowns internally)
-  const routes = globalRouteManager.getNextBatch(3);
+  // [1] Get top BATCH_SIZE (5) priority routes, scan all concurrently
+  const routes = globalRouteManager.getNextBatch(BATCH_SIZE);
   if (routes.length === 0) return;
 
-  // ── Quote all 3 routes concurrently ──────────────────────────────────────
-  await Promise.all(routes.map(route => scanRoute(route.outputMint, params, startMs)));
+  await Promise.allSettled(routes.map(route =>
+    scanRoute(route.outputMint, route.entry.category, params, startMs)
+  ));
 }
 
 // ── Scan a single route ───────────────────────────────────────────────────────
-async function scanRoute(outputMint: string, params: ReturnType<typeof loadStrategyParams>, startMs: number) {
+async function scanRoute(outputMint: string, category: string, params: ReturnType<typeof loadStrategyParams>, startMs: number) {
   const WSOL = 'So11111111111111111111111111111111111111112';
 
-  // Kelly-sized trade (from slow loop calibration), quantise to lamports
-  const tradeSOL      = params.MAX_TRADE_SIZE_SOL;
+  // [7] LST/defi routes always trade at least LST_MIN_TRADE_SOL (1 SOL)
+  // to clear the gas floor. Meme/launch use Kelly calibrated size.
+  const isLst      = category === 'defi';
+  const tradeSOL   = isLst
+    ? Math.max(params.MAX_TRADE_SIZE_SOL, LST_MIN_TRADE_SOL)
+    : params.MAX_TRADE_SIZE_SOL;
   const tradeLamports = Math.floor(tradeSOL * 1e9);
 
-  // ATA rent check (avoid 2 SOL bleed on new tokens)
-  const ataRent = existingAtas.has(outputMint) ? 0 : 2_039_280;
+  // [5] ATA gas cost — reads ata_cache.json, returns 5000 if pre-created
+  const gasLamports = getGasCost(outputMint);
 
   // Balance guard
-  if (cachedLamports < tradeLamports + ataRent + 50_000) {
+  if (cachedLamports < tradeLamports + gasLamports + 50_000) {
     logger.debug(`[SCAN] Skipping ${outputMint.slice(0, 8)}… insufficient balance`);
     return;
   }
 
+  // [8] Quote with timestamp for telemetry
+  const quoteStartMs = Date.now();
   const quote1 = await fetchJupiterQuote(WSOL, outputMint, tradeLamports);
   if (!quote1) return;
 
   const intermediateAmt = Number(quote1.otherAmountThreshold);
   const quote2          = await fetchJupiterQuote(outputMint, WSOL, intermediateAmt);
   if (!quote2) return;
+  const quoteAgeMs = Date.now() - quoteStartMs;
 
-  const expectedOut        = Number(quote2.outAmount);
+  const expectedOut         = Number(quote2.outAmount);
   const grossProfitLamports = expectedOut - tradeLamports;
+  const netProfitLam        = grossProfitLamports - gasLamports;
+  const netProfitBps        = (netProfitLam / tradeLamports) * 10_000;
+  const netProfitSOL        = netProfitLam / 1e9;
 
-  // Network costs: gas + ATA rent
-  const gasLamports   = 15_000;
-  const netProfitLam  = grossProfitLamports - gasLamports - ataRent;
-  const netProfitBps  = (netProfitLam / tradeLamports) * 10_000;
-  const netProfitSOL  = netProfitLam / 1e9;
-
-  // Record outcome in route_manager for EMA scoring (always, win or lose)
+  // Record EMA outcome
   globalRouteManager.recordOutcome(outputMint, netProfitBps, netProfitSOL > params.MIN_PROFIT_SOL);
 
-  const elapsed = Date.now() - startMs;
+  const totalElapsed = Date.now() - startMs;
 
   if (netProfitBps > 0) {
-    logger.info(`✅ [ARB] SOL→${outputMint.slice(0, 6)}… | ${tradeSOL} SOL | +${netProfitBps.toFixed(2)} bps (+${netProfitSOL.toFixed(5)} SOL) [${elapsed}ms]`);
+    logger.info(`✅ [ARB] SOL→${outputMint.slice(0, 6)}… | ${tradeSOL}SOL | +${netProfitBps.toFixed(2)}bps (+${netProfitSOL.toFixed(5)}SOL) | quote:${quoteAgeMs}ms total:${totalElapsed}ms`);
   } else {
-    logger.debug(`❌ [SCAN] SOL→${outputMint.slice(0, 6)}… | ${netProfitBps.toFixed(2)} bps [${elapsed}ms]`);
+    logger.debug(`❌ [SCAN] SOL→${outputMint.slice(0, 6)}… | ${netProfitBps.toFixed(2)}bps | quote:${quoteAgeMs}ms`);
   }
 
   // ── Execute if profitable ────────────────────────────────────────────────
   if (netProfitSOL >= params.MIN_PROFIT_SOL) {
-    logger.warn(`🔥 EXECUTING: ${tradeSOL} SOL → ${outputMint.slice(0, 8)}… | Est. net +${netProfitSOL.toFixed(5)} SOL`);
+    logger.warn(`🔥 EXECUTING: ${tradeSOL}SOL→${outputMint.slice(0,8)}… | Est. net +${netProfitSOL.toFixed(5)}SOL | signal-age:${quoteAgeMs}ms`);
 
     let signatureStr: string | null = null;
     let success = false;
+    const execStartMs = Date.now();
 
     try {
       const instructions = await getParallelSwapInstructions(quote1, quote2);
@@ -139,7 +151,12 @@ async function scanRoute(outputMint: string, params: ReturnType<typeof loadStrat
           if (rpcResult?.success) {
             signatureStr = (rpcResult as any).signature as string;
             success      = true;
-            logger.info(`✅ EXECUTED: ${signatureStr?.slice(0, 12)}…`);
+            // [5] Mark ATA as created so future trades don't pay rent again
+            markAtaCreated(outputMint);
+            // [8] Execution telemetry
+            const execMs  = Date.now() - execStartMs;
+            const signalAge = Date.now() - quoteStartMs;
+            logger.info(`✅ EXECUTED | sig:${signatureStr?.slice(0,12)}… | exec:${execMs}ms | signal-age:${signalAge}ms`);
           }
         }
       }
@@ -157,6 +174,9 @@ async function scanRoute(outputMint: string, params: ReturnType<typeof loadStrat
       expectedProfitBps: netProfitBps,
       signature:         signatureStr,
       success,
+      // [8] Telemetry fields
+      quoteAgeMs,
+      signalToExecMs: success ? Date.now() - quoteStartMs : undefined,
     });
   }
 }

@@ -209,53 +209,70 @@ async function screenTokenLight(mint: string): Promise<{ safe: boolean; score: n
   return result;
 }
 
-// ── Simulate one arb scan on a route ─────────────────────────────────────────
+// ── ATA gas cost model (proposal 5) ─────────────────────────────────────────
+const ATA_PRE_CREATED_MINTS = new Set([
+  'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', // USDC
+  'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB',  // USDT
+  'mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So',  // MSOL
+  'J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn',  // jitoSOL
+  'bSo13r4TkiE4KumL71LsHTPpL2euBYLFx6h9HP3piy1',   // bSOL
+  'orcaEKTdK7LKz57vaAYr9QeNsVEPfiu6QeMU1kektZE',   // ORCA
+  '4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R',  // RAY
+  'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263',  // BONK
+  'EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYtM2wYSzRo',  // WIF
+  'JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbPwdrsxGBK',    // JUP
+]);
+const GAS_FLOOR_LAM   = 5_000;          // priority fee only (ATA pre-created)
+const ATA_RENT_LAM    = 2_039_280;      // full rent if ATA doesn't exist
+const LST_MIN_TRADE   = 1.0;            // [7] 1 SOL floor for defi routes
+
+// Per-category slippage [2]
+const CAT_SLIP: Record<string, number> = { bluechip: 30, defi: 50, meme: 100, launch: 200, native: 150, default: 50 };
+
+// ── Simulate one arb scan on a route (ATA-aware) ─────────────────────────
 async function simArbRoute(
   mint: string,
-  tradeSol: number
-): Promise<{ profitSol: number; profitBps: number; found: boolean } | null> {
-  const lamports = Math.floor(tradeSol * 1e9);
-  const slipBps  = parseInt(process.env.SLIPPAGE_BPS || '50');
+  tradeSol: number,
+  cat: string
+): Promise<{ profitSol: number; profitBps: number; found: boolean; gasSol: number } | null> {
+  const slip    = CAT_SLIP[cat] ?? CAT_SLIP.default;
+  // [7] LST minimum trade size
+  const actualTrade = cat === 'defi' ? Math.max(tradeSol, LST_MIN_TRADE) : tradeSol;
+  const lamports = Math.floor(actualTrade * 1e9);
 
   // Use authenticated Jupiter endpoint + API key from .env
-  const JBASE   = (process.env.JUPITER_ENDPOINT || 'https://quote-api.jup.ag').replace(/\/$/, '');
   const API_KEY = process.env.JUPITER_API_KEY || '';
   const headers: any = API_KEY ? { 'x-api-key': API_KEY } : {};
 
-  // Quote leg 1: SOL → Token
-  const q1Url = `${JBASE}/v6/quote?inputMint=${WSOL}&outputMint=${mint}&amount=${lamports}&slippageBps=${slipBps}`;
+  // Quote leg 1: SOL → Token (use lite-api)
+  const LITE   = 'https://lite-api.jup.ag/swap/v1';
+  const q1Url  = `${LITE}/quote?inputMint=${WSOL}&outputMint=${mint}&amount=${lamports}&slippageBps=${slip}`;
   const { data: q1, status: q1Status } = await rateLimitedFetch('jupiter', q1Url, { headers });
   if (q1Status === 429) { session.rateLimitWarnings.push(`Jupiter 429 leg1 ${mint.slice(0,8)}`); return null; }
   if (!q1?.outAmount) {
-    if (q1Status !== 0) session.inputParseErrors.push(`q1 null outAmount for ${mint.slice(0,8)} (status:${q1Status})`);
+    if (q1Status !== 0) session.inputParseErrors.push(`q1 null outAmount ${mint.slice(0,8)} (${q1Status})`);
     return null;
   }
 
   const interAmt = Number(q1.outAmount);
-  if (isNaN(interAmt) || interAmt <= 0) {
-    session.inputParseErrors.push(`q1 invalid outAmount: "${q1.outAmount}" for ${mint.slice(0,8)}`);
-    return null;
-  }
+  if (isNaN(interAmt) || interAmt <= 0) { session.inputParseErrors.push(`q1 invalid: "${q1.outAmount}" ${mint.slice(0,8)}`); return null; }
 
   // Quote leg 2: Token → SOL
-  const q2Url = `${JBASE}/v6/quote?inputMint=${mint}&outputMint=${WSOL}&amount=${interAmt}&slippageBps=${slipBps}`;
+  const q2Url = `${LITE}/quote?inputMint=${mint}&outputMint=${WSOL}&amount=${interAmt}&slippageBps=${slip}`;
   const { data: q2, status: q2Status } = await rateLimitedFetch('jupiter', q2Url, { headers });
   if (q2Status === 429) { session.rateLimitWarnings.push(`Jupiter 429 leg2 ${mint.slice(0,8)}`); return null; }
   if (!q2?.outAmount) return null;
 
   const outAmt = Number(q2.outAmount);
-  if (isNaN(outAmt)) {
-    session.inputParseErrors.push(`q2 invalid outAmount: "${q2.outAmount}" for ${mint.slice(0,8)}`);
-    return null;
-  }
+  if (isNaN(outAmt)) { session.inputParseErrors.push(`q2 invalid: "${q2.outAmount}" ${mint.slice(0,8)}`); return null; }
 
   const grossLam  = outAmt - lamports;
-  const gasLam    = 15_000 + 2_039_280; // worst-case gas + ATA rent
+  const gasLam    = ATA_PRE_CREATED_MINTS.has(mint) ? GAS_FLOOR_LAM : ATA_RENT_LAM + GAS_FLOOR_LAM;
   const netLam    = grossLam - gasLam;
   const profitSol = netLam / 1e9;
   const profitBps = (netLam / lamports) * 10_000;
 
-  return { profitSol, profitBps, found: profitSol > 0 };
+  return { profitSol, profitBps, found: profitSol > 0, gasSol: gasLam / 1e9 };
 }
 
 // ── Checkpoint reporter ───────────────────────────────────────────────────────
@@ -372,79 +389,92 @@ async function main() {
 
   // 4. Pre-screen all candidates once (parallel, cached for 10min)
   console.log(`\n🛡  Pre-screening ${candidates.length} tokens (parallel)...`);
-  let approvedTokens: string[] = [];
+  let approvedTokens: Array<{ mint: string; cat: string }> = [];
   await Promise.all(candidates.map(async mint => {
     const screen = await screenTokenLight(mint);
+    const cat    = ['mSoLz','J1tos','bSo13','orcaE'].some(p => mint.startsWith(p)) ? 'defi'
+                 : ['EPjFW','Es9vM'].some(p => mint.startsWith(p)) ? 'bluechip' : 'meme';
     if (screen.safe) {
-      approvedTokens.push(mint);
+      approvedTokens.push({ mint, cat });
     } else {
       session.tokensBlocked.push(`${mint.slice(0,8)}…: ${screen.flags.join(',')}`);
-      console.log(`   ⛔ ${mint.slice(0,8)}… blocked (score:${screen.score}) — ${screen.flags.join(', ')}`);
+      console.log(`   ⛔ ${mint.slice(0,8)}… blocked — ${screen.flags.join(', ')}`);
     }
   }));
   session.tokensDiscovered = candidates.length;
   session.tokensApproved   = approvedTokens.length;
   console.log(`   ✅ ${approvedTokens.length}/${candidates.length} tokens passed screening`);
 
-  // 5. Hot quote loop — only approved tokens, just 200ms delay
-  let candidateIdx  = 0;
-  let nextReport    = startTime + REPORT_EVERY * 60 * 1000;
-  let nextDiscover  = startTime + 5  * 60 * 1000;
-  let nextRescreen  = startTime + 10 * 60 * 1000; // re-screen every 10 min
+  // Theoretical P&L comparison (ATA rent saved)
+  const ataSavedPerTrade = (ATA_RENT_LAM - GAS_FLOOR_LAM) / 1e9 * session.solPriceUsd;
+  console.log(`   💰 ATA pre-created = $${ataSavedPerTrade.toFixed(3)} saved per trade on seeded mints`);
 
-  console.log(`\n▶  Hot scan loop starting — ${approvedTokens.length} approved routes\n`);
+  // 5. [1] Parallel quote loop — batch 5 at a time
+  const CONCURRENCY  = 5;
+  let candidateIdx   = 0;
+  let nextReport     = startTime + REPORT_EVERY * 60 * 1000;
+  let nextDiscover   = startTime + 5  * 60 * 1000;
+  let nextRescreen   = startTime + 10 * 60 * 1000;
+
+  console.log(`\n▶  Hot scan loop — ${approvedTokens.length} approved routes | batch:${CONCURRENCY} | per-cat slippage\n`);
 
   while (Date.now() < endTime) {
-    // Refresh candidate list every 5 min
     if (Date.now() > nextDiscover) {
       const fresh   = await fetchCandidates();
-      const newOnes = fresh.filter(m => !candidates.includes(m) && !approvedTokens.includes(m));
-      if (newOnes.length) {
-        console.log(`   🆕 +${newOnes.length} new tokens — screening...`);
-        await Promise.all(newOnes.map(async mint => {
+      const newMints = fresh.filter(m => !candidates.includes(m));
+      if (newMints.length) {
+        console.log(`   🆕 +${newMints.length} new tokens — screening...`);
+        await Promise.all(newMints.map(async mint => {
           const screen = await screenTokenLight(mint);
-          if (screen.safe) { approvedTokens.push(mint); session.tokensApproved++; }
+          if (screen.safe) { approvedTokens.push({ mint, cat: 'meme' }); session.tokensApproved++; }
           else session.tokensBlocked.push(`${mint.slice(0,8)}…: ${screen.flags.join(',')}`);
         }));
-        candidates.push(...newOnes);
+        candidates.push(...newMints);
         session.tokensDiscovered = candidates.length;
       }
       nextDiscover = Date.now() + 5 * 60 * 1000;
     }
-
-    // Re-screen approved tokens every 10 min (conditions can change)
-    if (Date.now() > nextRescreen) {
-      screenCache.clear(); // invalidate cache to force fresh checks
-      nextRescreen = Date.now() + 10 * 60 * 1000;
-    }
-
+    if (Date.now() > nextRescreen) { screenCache.clear(); nextRescreen = Date.now() + 10 * 60 * 1000; }
     if (approvedTokens.length === 0) { await new Promise(r => setTimeout(r, 2000)); continue; }
 
-    const mint = approvedTokens[candidateIdx % approvedTokens.length];
-    candidateIdx++;
+    // [1] Batch CONCURRENCY routes at once
+    const batch = [];
+    for (let i = 0; i < CONCURRENCY; i++) {
+      batch.push(approvedTokens[candidateIdx % approvedTokens.length]);
+      candidateIdx++;
+    }
 
-    const result = await simArbRoute(mint, TRADE_SIZE_SOL);
-    session.routesScanned++;
+    // Run batch in parallel
+    const results = await Promise.allSettled(
+      batch.map(({ mint, cat }) => simArbRoute(mint, TRADE_SIZE_SOL, cat))
+    );
 
-    if (result !== null) {
+    for (let i = 0; i < results.length; i++) {
+      session.routesScanned++;
+      const r = results[i];
+      if (r.status !== 'fulfilled' || r.value === null) continue;
+      const result = r.value;
+      const { mint, cat } = batch[i];
+
       if (result.found && result.profitBps >= MIN_PROFIT_BPS) {
         session.opportunitiesFound++;
         session.simulatedTradesExecuted++;
         session.simulatedPnlSol += result.profitSol;
         if (!session.bestOpportunity || result.profitBps > parseFloat(session.bestOpportunity.profitBps)) {
           session.bestOpportunity = {
-            mint: mint.slice(0, 8) + '…', profitSol: result.profitSol.toFixed(6),
+            mint: mint.slice(0,8)+'…', cat, profitSol: result.profitSol.toFixed(6),
             profitBps: result.profitBps.toFixed(2), tradeSOL: TRADE_SIZE_SOL,
+            gasModel: ATA_PRE_CREATED_MINTS.has(mint) ? 'ATA-prebuilt' : 'ATA-rent',
             capturedAt: new Date().toISOString(),
           };
         }
-        console.log(`✅ [SIM] ${mint.slice(0,8)}… | +${result.profitBps.toFixed(2)} bps (+${result.profitSol.toFixed(6)} SOL) [DRY RUN]`);
+        console.log(`✅ [SIM] ${mint.slice(0,8)}… [${cat}] slip:${CAT_SLIP[cat]||50}bps | +${result.profitBps.toFixed(2)}bps +${result.profitSol.toFixed(6)}SOL | gas:${result.gasSol.toFixed(6)}SOL [DRY RUN]`);
       } else if (Math.random() < 0.05) {
-        console.log(`   [SCAN] ${mint.slice(0,8)}… | ${result.profitBps.toFixed(2)} bps`);
+        console.log(`   [SCAN] ${mint.slice(0,8)}… [${cat}] | ${result.profitBps.toFixed(2)}bps | gas:${result.gasSol.toFixed(6)}SOL`);
       }
     }
 
-    await new Promise(r => setTimeout(r, 2000)); // 2s between quotes — respects Jupiter API key limit (~30 req/min)
+    await new Promise(r => setTimeout(r, 2000)); // 2s between batches
 
     if (Date.now() > nextReport) {
       checkpoint(`${REPORT_EVERY}min checkpoint`);

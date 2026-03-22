@@ -18,6 +18,9 @@
  */
 
 import { logger } from '../utils/logger';
+import { Connection } from '@solana/web3.js';
+import fs from 'fs';
+import path from 'path';
 
 const WSOL = 'So11111111111111111111111111111111111111112';
 const USDC = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
@@ -37,17 +40,66 @@ const SOURCE_WEIGHT: Record<string, number> = {
   'Jupiter':           50,
 };
 
-// Per-route cooldown (ms) — prevents hammering one route repeatedly
-const ROUTE_COOLDOWN_MS = parseInt(process.env.ROUTE_COOLDOWN_MS || '15000'); // 15s default
+// [2] Per-category cooldown (ms)
+const CATEGORY_COOLDOWN_MS: Record<string, number> = {
+  defi:     parseInt(process.env.COOLDOWN_DEFI    || '5000'),   // LST arb windows are short
+  bluechip: parseInt(process.env.COOLDOWN_BLUE    || '10000'),
+  meme:     parseInt(process.env.COOLDOWN_MEME    || '15000'),
+  launch:   parseInt(process.env.COOLDOWN_LAUNCH  || '30000'),
+  native:   parseInt(process.env.COOLDOWN_NATIVE  || '20000'),
+  default:  parseInt(process.env.ROUTE_COOLDOWN_MS || '15000'),
+};
+
+// [3] LST epoch boost state
+let epochBoost = 0;          // 0-25 extra priority points, set by fetchEpochBoost()
+let lastEpochFetch = 0;
+
+async function fetchEpochBoost(): Promise<void> {
+  if (Date.now() - lastEpochFetch < 60_000) return; // refresh every 60s
+  lastEpochFetch = Date.now();
+  try {
+    const rpc  = process.env.RPC_ENDPOINT || '';
+    const conn = new Connection(rpc, 'confirmed');
+    const ei   = await conn.getEpochInfo();
+    const pct  = ei.slotIndex / ei.slotsInEpoch; // 0.0 → 1.0
+    // Boost in the last 10% of epoch (yield accrual window)
+    epochBoost = pct >= 0.90 ? Math.round((pct - 0.90) / 0.10 * 25) : 0;
+    if (epochBoost > 0) logger.info(`[ROUTE-MGR] Epoch ${ei.epoch} at ${(pct*100).toFixed(1)}% — LST boost: +${epochBoost}`);
+  } catch { epochBoost = 0; }
+}
+
+// [5] ATA existence cache — loaded from disk
+const ATA_CACHE_FILE = path.join(__dirname, '..', '..', 'ata_cache.json');
+function loadAtaCache(): Set<string> {
+  try {
+    if (fs.existsSync(ATA_CACHE_FILE)) {
+      const raw = JSON.parse(fs.readFileSync(ATA_CACHE_FILE, 'utf-8'));
+      return new Set(Object.keys(raw).filter(k => raw[k] === true));
+    }
+  } catch {}
+  return new Set();
+}
+const ataCacheSet: Set<string> = loadAtaCache();
+export function markAtaCreated(mint: string) { ataCacheSet.add(mint); }
+export const ATA_RENT_LAMPORTS   = 2_039_280;
+export const GAS_FLOOR_LAMPORTS  = 5_000; // priority fee only when ATA exists
+export function getGasCost(mint: string): number {
+  return ataCacheSet.has(mint) ? GAS_FLOOR_LAMPORTS : ATA_RENT_LAMPORTS + GAS_FLOOR_LAMPORTS;
+}
+
+// [4] Profitable tier threshold (bps)
+const PROFITABLE_TIER_BPS = parseFloat(process.env.PROFITABLE_TIER_BPS || '3');
+
 
 export interface TokenEntry {
   mint:         string;
   source:       string;
+  category:     string;  // bluechip | defi | meme | launch | native
   liquidityUsd: number;
   trustScore:   number;
   addedAt:      number;
   // runtime stats
-  emaProfitBps: number;    // EMA of observed profit bps (-ve if consistently losing)
+  emaProfitBps: number;
   scanCount:    number;
   lastScannedAt: number;
   lastProfitBps: number;
@@ -68,16 +120,17 @@ class RouteManager {
   private routeCooldowns = new Map<string, number>(); // routeKey → lastScanTs
 
   // ── Add a new token (from any launchpad scanner) ────────────────────────────
-  addToken(opts: { mint: string; source: string; liquidityUsd: number; trustScore: number; addedAt: number }) {
+  addToken(opts: { mint: string; source: string; category?: string; liquidityUsd: number; trustScore: number; addedAt: number }) {
     if (this.tokens.has(opts.mint)) {
-      // Update liquidity + trust if already known
       const existing = this.tokens.get(opts.mint)!;
       existing.liquidityUsd = Math.max(existing.liquidityUsd, opts.liquidityUsd);
       existing.trustScore   = Math.max(existing.trustScore, opts.trustScore);
+      if (opts.category) existing.category = opts.category;
       return;
     }
     this.tokens.set(opts.mint, {
       ...opts,
+      category:      opts.category || 'meme',
       emaProfitBps:  0,
       scanCount:     0,
       lastScannedAt: 0,
@@ -99,27 +152,42 @@ class RouteManager {
     e.lastScannedAt = Date.now();
   }
 
-  // ── Compute priority score for a token ────────────────────────────────────
+  // ── [4] Compute priority score for a token ───────────────────────────────
   private score(e: TokenEntry): number {
-    const sourceW     = SOURCE_WEIGHT[e.source] ?? 50;
-    const trustW      = e.trustScore;                           // 0–100
-    const liquidityW  = Math.min(40, Math.log10(Math.max(1, e.liquidityUsd)) * 5); // 0–40
-    const profitW     = Math.min(30, Math.max(-10, e.emaProfitBps / 10));          // –10 to +30
-    const stalenessW  = e.lastScannedAt === 0 ? 20 :           // never scanned = boost
-      Math.min(20, (Date.now() - e.lastScannedAt) / 60_000);   // +1 per minute idle
+    const sourceW    = SOURCE_WEIGHT[e.source] ?? 50;
+    const trustW     = e.trustScore;
+    const liquidityW = Math.min(40, Math.log10(Math.max(1, e.liquidityUsd)) * 5);
+    const profitW    = Math.min(30, Math.max(-10, e.emaProfitBps / 10));
 
-    return sourceW + trustW + liquidityW + profitW + stalenessW;
+    // [4] Confirmed-profitable tier: bypass staleness penalty, score floors at 200
+    if (e.emaProfitBps >= PROFITABLE_TIER_BPS) {
+      const lstBoost = (e.category === 'defi') ? epochBoost : 0; // [3] epoch boost
+      return 200 + profitW + lstBoost;
+    }
+
+    // [3] Epoch boost for LST category even if not yet confirmed profitable
+    const lstBoost = (e.category === 'defi') ? epochBoost * 0.5 : 0;
+
+    const stalenessW = e.lastScannedAt === 0 ? 20
+      : Math.min(20, (Date.now() - e.lastScannedAt) / 60_000);
+
+    return sourceW + trustW + liquidityW + profitW + stalenessW + lstBoost;
   }
 
-  // ── Get top N routes to scan this tick ────────────────────────────────────
+  // ── [2] Get top N routes — per-category cooldowns ────────────────────────
   getNextBatch(n: number): Route[] {
+    // Async epoch refresh (fire-and-forget — result used next tick)
+    fetchEpochBoost().catch(() => {});
+
     const now = Date.now();
     const routes: Route[] = [];
 
     for (const [mint, entry] of this.tokens) {
       const routeKey = `WSOL-${mint}`;
       const lastScan = this.routeCooldowns.get(routeKey) || 0;
-      if (now - lastScan < ROUTE_COOLDOWN_MS) continue; // still cooling
+      // [2] Per-category cooldown
+      const cooldown = CATEGORY_COOLDOWN_MS[entry.category] ?? CATEGORY_COOLDOWN_MS.default;
+      if (now - lastScan < cooldown) continue;
 
       routes.push({
         inputMint:     WSOL,
@@ -130,15 +198,12 @@ class RouteManager {
       });
     }
 
-    // Sort descending by priority, take top N
     routes.sort((a, b) => b.priority - a.priority);
     const batch = routes.slice(0, n);
 
-    // Mark all batch routes as scanned NOW to enforce cooldowns
     for (const r of batch) {
       this.routeCooldowns.set(`WSOL-${r.outputMint}`, now);
     }
-
     return batch;
   }
 
