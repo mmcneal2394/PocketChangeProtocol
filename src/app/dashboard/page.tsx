@@ -7,7 +7,7 @@ import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 
 function GlowingStatCard({ title, value, change, isPositive, icon, delay, accentColor }: any) {
   return (
-    <div className="glassmorphism fade-in" style={{
+    <div className="glassmorphism fade-in stat-card" style={{
       padding: "28px",
       borderRadius: "20px",
       display: "flex",
@@ -198,7 +198,7 @@ export default function DashboardPage() {
           </div>
       )}
 
-      <header className="fade-in" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", animationDelay: "0.05s" }}>
+      <header className="fade-in page-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", animationDelay: "0.05s" }}>
         <div>
           <h1 style={{ fontSize: "2.8rem", fontWeight: 900, marginBottom: "8px", letterSpacing: "-1px" }}>
             PocketChange <span className="gradient-text">Vault</span>
@@ -228,7 +228,7 @@ export default function DashboardPage() {
       </section>
 
       {/* Vault Interactions */}
-      <section className="glassmorphism fade-in" style={{ padding: "32px", borderRadius: "20px", display: "flex", gap: "32px", animationDelay: "0.45s", zIndex: 10 }}>
+      <section className="glassmorphism fade-in vault-actions" style={{ padding: "32px", borderRadius: "20px", display: "flex", gap: "32px", animationDelay: "0.45s", zIndex: 10 }}>
         {/* Deposit Block */}
         <div style={{ flex: 1, padding: "24px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "16px" }}>
             <h3 style={{ fontSize: "1.2rem", fontWeight: 700, marginBottom: "16px" }}>Deposit USDC</h3>
@@ -282,7 +282,7 @@ export default function DashboardPage() {
 
       <div style={{ display: "flex", gap: "24px", flexWrap: "wrap", zIndex: 10 }}>
         {/* Main Chart Section */}
-        <section className="glassmorphism fade-in" style={{ flex: 2, minWidth: "500px", borderRadius: "20px", display: "flex", flexDirection: "column", animationDelay: "0.5s", overflow: "hidden" }}>
+        <section className="glassmorphism fade-in flex-min-500" style={{ flex: 2, minWidth: "500px", borderRadius: "20px", display: "flex", flexDirection: "column", animationDelay: "0.5s", overflow: "hidden" }}>
           <div style={{ padding: "32px 32px 0 32px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div>
                <h3 style={{ fontSize: "1.4rem", fontWeight: 700, letterSpacing: "-0.5px" }}>Cumulative Yield Trajectory</h3>
@@ -303,7 +303,7 @@ export default function DashboardPage() {
         </section>
 
         {/* Live Execution Stream */}
-        <section className="glassmorphism fade-in" style={{ flex: 1, minWidth: "350px", padding: "32px", borderRadius: "20px", animationDelay: "0.6s", position: "relative", borderTop: "1px solid rgba(255,255,255,0.15)" }}>
+        <section className="glassmorphism fade-in flex-min-350" style={{ flex: 1, minWidth: "350px", padding: "32px", borderRadius: "20px", animationDelay: "0.6s", position: "relative", borderTop: "1px solid rgba(255,255,255,0.15)" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "24px" }}>
              <h3 style={{ fontSize: "1.3rem", fontWeight: 700 }}>Live Mempool Stream</h3>
              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>

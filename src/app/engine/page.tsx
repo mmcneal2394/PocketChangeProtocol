@@ -100,7 +100,7 @@ export default function YieldStrategies() {
         </p>
       </header>
 
-      <section style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: "32px" }}>
+      <section className="grid-1fr-2fr" style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: "32px" }}>
         {/* Controls */}
         <div className="glassmorphism fade-in" style={{ padding: "32px", borderRadius: "16px", border: "1px solid rgba(255,255,255,0.15)" }}>
             <h3 style={{ fontSize: "1.2rem", fontWeight: 600, marginBottom: "24px", color: "white" }}>Strategy Deployment</h3>
@@ -156,7 +156,7 @@ export default function YieldStrategies() {
 
         {/* Live Metrics */}
         <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
+            <div className="grid-metrics" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
                 <div className="glassmorphism" style={{ padding: "24px", borderRadius: "16px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.1)" }}>
                     <div style={{ color: "var(--primary)", display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}><Speed /> Average Block Yield</div>
                     <div style={{ fontSize: "2.5rem", fontWeight: 800 }}>{metrics.avgYield.toFixed(2)} <span style={{ fontSize: "1.2rem", color: "var(--text-secondary)" }}>%</span></div>
