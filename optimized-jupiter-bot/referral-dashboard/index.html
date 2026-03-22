@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>pcprotocol — Referral Program</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #080b14; --card: #0e1420; --card2: #131928;
+    --border: rgba(99,179,237,0.12); --accent: #5b8dee;
+    --green: #34d399; --yellow: #fbbf24; --red: #f87171;
+    --text: #e2e8f0; --muted: #64748b;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--text); font-family:'Inter',sans-serif; min-height:100vh; }
+
+  /* Hero */
+  .hero { text-align:center; padding:80px 24px 60px; position:relative; overflow:hidden; }
+  .hero::before { content:''; position:absolute; inset:0;
+    background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(91,141,238,.18) 0%, transparent 70%); pointer-events:none; }
+  .hero h1 { font-size:clamp(2rem,5vw,3.5rem); font-weight:800; letter-spacing:-0.03em;
+    background:linear-gradient(135deg,#fff 30%,var(--accent)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+  .hero p { margin-top:16px; color:var(--muted); font-size:1.1rem; max-width:560px; margin-inline:auto; }
+  .pill { display:inline-block; background:rgba(91,141,238,.15); border:1px solid rgba(91,141,238,.3);
+    color:var(--accent); padding:6px 16px; border-radius:99px; font-size:.85rem; font-weight:600; margin-bottom:24px; }
+
+  /* Stats row */
+  .stats-row { display:flex; gap:16px; justify-content:center; flex-wrap:wrap; padding:0 24px 48px; }
+  .stat-card { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:20px 28px;
+    min-width:160px; text-align:center; transition:transform .2s; }
+  .stat-card:hover { transform:translateY(-3px); }
+  .stat-card .val { font-size:1.6rem; font-weight:700; color:#fff; }
+  .stat-card .lbl { font-size:.78rem; color:var(--muted); margin-top:4px; text-transform:uppercase; letter-spacing:.08em; }
+
+  /* Main content */
+  .container { max-width:900px; margin:0 auto; padding:0 24px 80px; display:grid; gap:24px; }
+
+  .card { background:var(--card); border:1px solid var(--border); border-radius:20px; padding:28px 32px; }
+  .card h2 { font-size:1.1rem; font-weight:700; margin-bottom:20px; color:#fff; }
+
+  /* Input row */
+  .input-row { display:flex; gap:12px; }
+  input[type=text] { flex:1; background:var(--card2); border:1px solid var(--border); border-radius:12px;
+    padding:14px 18px; color:#fff; font-size:.95rem; font-family:inherit; outline:none; transition:border-color .2s; }
+  input[type=text]:focus { border-color:var(--accent); }
+  input[type=text]::placeholder { color:var(--muted); }
+  button { background:var(--accent); color:#fff; border:none; border-radius:12px; padding:14px 24px;
+    font-size:.95rem; font-weight:600; cursor:pointer; transition:opacity .2s, transform .15s; white-space:nowrap; }
+  button:hover { opacity:.88; transform:translateY(-1px); }
+  button:active { transform:translateY(0); }
+  button.secondary { background:var(--card2); border:1px solid var(--border); color:var(--text); }
+
+  /* Referral link box */
+  .link-box { display:none; margin-top:16px; background:var(--card2); border:1px solid var(--border);
+    border-radius:12px; padding:16px 20px; }
+  .link-box.show { display:block; }
+  .link-box .url { font-family:'SF Mono',monospace; font-size:.88rem; color:var(--green); word-break:break-all; }
+  .copy-btn { margin-top:12px; font-size:.82rem; padding:8px 16px; }
+
+  /* Stats panel */
+  .stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; }
+  .mini-stat { background:var(--card2); border-radius:12px; padding:16px; text-align:center; }
+  .mini-stat .v { font-size:1.3rem; font-weight:700; }
+  .mini-stat .l { font-size:.75rem; color:var(--muted); margin-top:4px; }
+  .green { color:var(--green); }
+  .yellow { color:var(--yellow); }
+  .blue { color:var(--accent); }
+
+  /* Leaderboard */
+  .lb-table { width:100%; border-collapse:collapse; }
+  .lb-table th { text-align:left; font-size:.75rem; color:var(--muted); text-transform:uppercase;
+    letter-spacing:.08em; padding:0 12px 10px; }
+  .lb-table td { padding:10px 12px; border-top:1px solid var(--border); font-size:.9rem; }
+  .lb-table tr:hover td { background:rgba(255,255,255,.02); }
+  .rank { color:var(--muted); width:36px; }
+  .rank.gold { color:#fbbf24; font-weight:700; }
+  .addr { font-family:'SF Mono',monospace; font-size:.82rem; color:var(--muted); }
+
+  /* How it works */
+  .steps { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px; margin-top:4px; }
+  .step { background:var(--card2); border-radius:14px; padding:20px; }
+  .step .num { font-size:1.8rem; font-weight:800; color:var(--accent); opacity:.6; }
+  .step .title { font-weight:700; margin:8px 0 6px; }
+  .step .desc { font-size:.85rem; color:var(--muted); line-height:1.5; }
+
+  .badge { display:inline-block; font-size:.72rem; padding:2px 8px; border-radius:6px; font-weight:600; margin-left:8px; vertical-align:middle; }
+  .badge.green { background:rgba(52,211,153,.15); color:var(--green); }
+
+  @media(max-width:600px) { .input-row { flex-direction:column; } .card { padding:20px; } }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="pill">🔗 Referral Program — Live</div>
+  <h1>Earn on Every Swap You Refer</h1>
+  <p>Share your unique link. Earn <strong>0.1% of every trade</strong> routed through it — paid in SOL, no minimums.</p>
+</div>
+
+<!-- Global platform stats -->
+<div class="stats-row" id="globalStats">
+  <div class="stat-card"><div class="val" id="gReferrers">—</div><div class="lbl">Referrers</div></div>
+  <div class="stat-card"><div class="val" id="gSwaps">—</div><div class="lbl">Total Swaps</div></div>
+  <div class="stat-card"><div class="val" id="gVolume">—</div><div class="lbl">Volume (SOL)</div></div>
+  <div class="stat-card"><div class="val green" id="gFees">—</div><div class="lbl">Fees Collected</div></div>
+  <div class="stat-card"><div class="val yellow" id="gPaid">—</div><div class="lbl">Paid Out</div></div>
+</div>
+
+<div class="container">
+
+  <!-- Generate link -->
+  <div class="card">
+    <h2>🔗 Generate Your Referral Link</h2>
+    <div class="input-row">
+      <input type="text" id="walletInput" placeholder="Your Solana wallet address (e.g. DnQh...)" maxlength="44"/>
+      <button onclick="register()">Get Link</button>
+    </div>
+    <div class="link-box" id="linkBox">
+      <div style="font-size:.8rem;color:var(--muted);margin-bottom:6px;">Your referral link:</div>
+      <div class="url" id="refLink"></div>
+      <button class="copy-btn secondary" onclick="copyLink()">📋 Copy Link</button>
+      <span id="copied" style="display:none;color:var(--green);font-size:.82rem;margin-left:12px;">Copied!</span>
+    </div>
+  </div>
+
+  <!-- Check stats -->
+  <div class="card">
+    <h2>📊 Your Earnings
+      <span class="badge green" id="rankBadge" style="display:none"></span>
+    </h2>
+    <div class="input-row">
+      <input type="text" id="statsWallet" placeholder="Enter wallet to check earnings"/>
+      <button onclick="checkStats()">Check</button>
+    </div>
+    <div id="statsPanel" style="display:none;margin-top:20px;">
+      <div class="stats-grid">
+        <div class="mini-stat"><div class="v blue" id="sReferrals">0</div><div class="l">Referrals</div></div>
+        <div class="mini-stat"><div class="v" id="sSwaps">0</div><div class="l">Swaps</div></div>
+        <div class="mini-stat"><div class="v yellow" id="sVolume">0</div><div class="l">Volume (SOL)</div></div>
+        <div class="mini-stat"><div class="v green" id="sEarned">0.000000</div><div class="l">Earned (SOL)</div></div>
+      </div>
+    </div>
+    <div id="statsError" style="display:none;margin-top:16px;color:var(--red);font-size:.9rem;"></div>
+  </div>
+
+  <!-- Leaderboard -->
+  <div class="card">
+    <h2>🏆 Top Referrers</h2>
+    <table class="lb-table">
+      <thead><tr><th class="rank">#</th><th>Wallet</th><th>Swaps</th><th>Volume</th><th>Earned</th></tr></thead>
+      <tbody id="leaderboard"><tr><td colspan="5" style="color:var(--muted);padding:20px 12px;text-align:center;">Loading...</td></tr></tbody>
+    </table>
+  </div>
+
+  <!-- How it works -->
+  <div class="card">
+    <h2>⚡ How It Works</h2>
+    <div class="steps">
+      <div class="step"><div class="num">01</div><div class="title">Get Your Link</div><div class="desc">Enter your wallet above and copy your unique referral URL.</div></div>
+      <div class="step"><div class="num">02</div><div class="title">Share It</div><div class="desc">Post your link on Twitter, Discord, or send directly to traders.</div></div>
+      <div class="step"><div class="num">03</div><div class="title">Earn 0.1% SOL</div><div class="desc">Every swap made through your link earns you 0.1% of the trade volume — automatically.</div></div>
+      <div class="step"><div class="num">04</div><div class="title">Track Earnings</div><div class="desc">Check your earnings live on this dashboard any time.</div></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const API = 'http://localhost:3001/api';
+
+  // Auto-detect ref from URL
+  const params = new URLSearchParams(location.search);
+  const refWallet = params.get('ref');
+  if (refWallet) {
+    document.getElementById('statsWallet').value = refWallet;
+    setTimeout(checkStats, 400);
+    // Track the referral (could POST to API)
+    fetch(`${API}/register`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({wallet:refWallet}) }).catch(()=>{});
+  }
+
+  async function safeJson(r) { try { return await r.json(); } catch(_) { return {}; } }
+
+  async function loadGlobal() {
+    try {
+      const d = await safeJson(await fetch(`${API}/total`));
+      document.getElementById('gReferrers').textContent = d.referrers ?? '—';
+      document.getElementById('gSwaps').textContent = d.swaps ?? '—';
+      document.getElementById('gVolume').textContent = d.total_volume_sol?.toFixed(2) ?? '—';
+      document.getElementById('gFees').textContent = d.total_fees_sol?.toFixed(4) ?? '—';
+      document.getElementById('gPaid').textContent = d.total_paid_sol?.toFixed(4) ?? '—';
+    } catch(_){}
+  }
+
+  async function loadLeaderboard() {
+    try {
+      const lb = await safeJson(await fetch(`${API}/leaderboard`));
+      const medals = ['🥇','🥈','🥉'];
+      const body = document.getElementById('leaderboard');
+      if (!lb.length) { body.innerHTML = '<tr><td colspan="5" style="color:var(--muted);padding:20px 12px;text-align:center;">No referrers yet — be the first!</td></tr>'; return; }
+      body.innerHTML = lb.map((r,i) => `
+        <tr>
+          <td class="rank ${i<3?'gold':''}">${medals[i]||i+1}</td>
+          <td class="addr">${r.wallet}</td>
+          <td>${r.swaps}</td>
+          <td>${r.volume_sol?.toFixed(2)||'0'} SOL</td>
+          <td style="color:var(--green);font-weight:600">+${r.earned_sol?.toFixed(5)||'0'} SOL</td>
+        </tr>`).join('');
+    } catch(_){}
+  }
+
+  async function register() {
+    const w = document.getElementById('walletInput').value.trim();
+    if (!w || w.length < 32) { alert('Enter a valid Solana wallet address'); return; }
+    try {
+      const d = await safeJson(await fetch(`${API}/register`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({wallet:w}) }));
+      if (d.link) {
+        document.getElementById('refLink').textContent = d.link;
+        document.getElementById('linkBox').classList.add('show');
+        loadGlobal(); loadLeaderboard();
+      }
+    } catch(_) { alert('API error — make sure referral API is running'); }
+  }
+
+  function copyLink() {
+    navigator.clipboard.writeText(document.getElementById('refLink').textContent);
+    const c = document.getElementById('copied');
+    c.style.display = 'inline';
+    setTimeout(() => { c.style.display = 'none'; }, 2000);
+  }
+
+  async function checkStats() {
+    const w = (document.getElementById('statsWallet').value || '').trim();
+    if (!w || w.length < 32) { document.getElementById('statsError').style.display='block'; document.getElementById('statsError').textContent='Enter a valid wallet address.'; return; }
+    try {
+      const d = await safeJson(await fetch(`${API}/stats/${w}`));
+      if (d.error) { document.getElementById('statsError').style.display='block'; document.getElementById('statsError').textContent=d.error; document.getElementById('statsPanel').style.display='none'; return; }
+      document.getElementById('statsError').style.display='none';
+      document.getElementById('statsPanel').style.display='block';
+      document.getElementById('sReferrals').textContent = d.referrals;
+      document.getElementById('sSwaps').textContent = d.swaps;
+      document.getElementById('sVolume').textContent = d.volume_sol?.toFixed(3)||'0';
+      document.getElementById('sEarned').textContent = '+' + (d.earned_sol?.toFixed(6)||'0');
+      if (d.rank) { const b = document.getElementById('rankBadge'); b.textContent = `Rank #${d.rank}`; b.style.display='inline-block'; }
+    } catch(_) { document.getElementById('statsError').style.display='block'; document.getElementById('statsError').textContent='Could not load stats.'; }
+  }
+
+  // Init
+  loadGlobal();
+  loadLeaderboard();
+  setInterval(() => { loadGlobal(); loadLeaderboard(); }, 30_000);
+</script>
+</body>
+</html>

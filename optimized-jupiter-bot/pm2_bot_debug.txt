@@ -1,0 +1,1 @@
+[1m[90m[TAILING] Tailing last 300 lines for [jupiter-ultra-bot] process (change the value with --lines option)[39m[22m
