@@ -4,6 +4,7 @@ import { config } from '../utils/config';
 import { globalVerifier } from '../execution/verificationEngine';
 import { submitTransactionWithRacing } from '../execution/racing';
 import { buildVersionedTransaction } from '../execution/transaction';
+import { loadStrategyParams, DEFAULT_PARAMS, StrategyParams } from '../strategy_tuner';
 
 class AdaptiveMemory {
     private routePerformance = new Map<string, { avgProfitBps: number, count: number }>();
@@ -35,8 +36,8 @@ export interface Opportunity {
 
 export class ArbEngine {
     
-    // Calculates Net Profit utilizing dynamic JITO scaling preventing static overpayments natively
-    private calculateDynamicNetProfit(grossProfitSol: number, amountInSol: number): { netProfit: number, jitoTip: number } {
+    // Calculates Net Profit utilizing dynamic JITO scaling — reads live calibrated params
+    private calculateDynamicNetProfit(grossProfitSol: number, amountInSol: number, params: StrategyParams): { netProfit: number, jitoTip: number } {
         const expectedProfitLamports = grossProfitSol * 1e9;
         const computeUnits = 1400000;
         
@@ -45,46 +46,46 @@ export class ArbEngine {
         const priorityFeeLamports = (priorityFeeMicroLamports * computeUnits) / 1000000;
         const priorityFeeSol = priorityFeeLamports / 1e9;
         
-        // Dynamic Tip calculation (Bounded actively)
-        let jitoTipLamports = expectedProfitLamports * (config.TIP_PERCENTAGE || 0.5);
-        const maxTipLamports = 10000000; // 0.01 SOL maximum boundary limits
+        // Dynamic Tip — from strategy_params.json (calibrated every 72h via Kelly Criterion)
+        let jitoTipLamports = expectedProfitLamports * params.TIP_PERCENTAGE;
+        const maxTipLamports = 10000000; // 0.01 SOL max
         jitoTipLamports = Math.min(jitoTipLamports, maxTipLamports);
-        jitoTipLamports = Math.max(jitoTipLamports, 2000000); // 0.002 SOL guaranteed inclusion
+        jitoTipLamports = Math.max(jitoTipLamports, 2000000); // 0.002 SOL minimum
         
         const jitoTipSol = jitoTipLamports / 1e9;
         
-        const slippageTolerance = (config.MAX_SLIPPAGE_BPS || 50) / 10000;
+        // Slippage — from strategy_params.json (adjusted by volatility every 72h)
+        const slippageTolerance = params.MAX_SLIPPAGE_BPS / 10000;
         const slippageCost = amountInSol * slippageTolerance;
         
         const netProfit = grossProfitSol - jitoTipSol - priorityFeeSol - slippageCost;
         return { netProfit, jitoTip: jitoTipSol };
     }
 
-    private detectTriangularArb(pools: PoolState[]): Opportunity[] {
+    private detectTriangularArb(pools: PoolState[], params: StrategyParams): Opportunity[] {
         const opportunities: Opportunity[] = [];
-        const startingSol = 0.001; 
+        const startingSol = params.MAX_TRADE_SIZE_SOL;
         
-        // Native 3-hop Scanner (SOL -> Token A -> Token B -> SOL) organically mapping routes natively
+        // Native 3-hop Scanner (SOL -> Token A -> Token B -> SOL)
         for (let i = 0; i < pools.length; i++) {
             for (let j = 0; j < pools.length; j++) {
                 if (i === j) continue;
                 for (let k = 0; k < pools.length; k++) {
                     if (k === i || k === j) continue;
                     
-                    const poolA = pools[i]; // SOL -> Token A
-                    const poolB = pools[j]; // Token A -> Token B
-                    const poolC = pools[k]; // Token B -> SOL
+                    const poolA = pools[i];
+                    const poolB = pools[j];
+                    const poolC = pools[k];
                     
-                    // Simple path validation (Wait, real AMMs require strict Mint checking. Mock validates simply by ensuring three sequential unique paths)
                     if (poolA.tokenA === "SOL" && poolC.tokenB === "USDC") {
                         let inter1 = globalPriceBook.calculateOutput(poolA, startingSol, true);
-                        let inter2 = globalPriceBook.calculateOutput(poolB, inter1, true); // Assuming Token A -> Token B natively maps
+                        let inter2 = globalPriceBook.calculateOutput(poolB, inter1, true);
                         let finalOut = globalPriceBook.calculateOutput(poolC, inter2, false);
                         
                         let gross = finalOut - startingSol;
                         if (gross > -0.01) {
-                            const { netProfit, jitoTip } = this.calculateDynamicNetProfit(gross, startingSol);
-                            if (netProfit > -0.005) {
+                            const { netProfit, jitoTip } = this.calculateDynamicNetProfit(gross, startingSol, params);
+                            if (netProfit > params.MIN_PROFIT_SOL) {
                                 opportunities.push({
                                     type: 'Triangular-3-Hop',
                                     description: `SOL -> ${poolA.dex} -> ${poolB.dex} -> ${poolC.dex} -> SOL`,
@@ -104,33 +105,34 @@ export class ArbEngine {
         return opportunities;
     }
 
-    private detectSplitArb(pools: PoolState[]): Opportunity[] {
+    private detectSplitArb(pools: PoolState[], params: StrategyParams): Opportunity[] {
         const opportunities: Opportunity[] = [];
-        const startingSol = 0.001; 
+        const startingSol = params.MAX_TRADE_SIZE_SOL;
+        const split = params.SPLIT_RATIO; // calibrated every 72h
         
-        // Multi-DEX splitting: Buy on one exchange, dump linearly across TWO entirely distinct exchanges mitigating deep price impact heavily.
+        // Multi-DEX splitting: Buy 1 DEX, distribute sell across 2 to reduce price impact
         for (let i = 0; i < pools.length; i++) {
             for (let j = i + 1; j < pools.length; j++) {
                 for (let k = j + 1; k < pools.length; k++) {
-                    const poolA = pools[i]; // Buy Raydium natively
-                    const poolB = pools[j]; // Sell Orca (Split 50%)
-                    const poolC = pools[k]; // Sell Meteora (Split 50%)
+                    const poolA = pools[i];
+                    const poolB = pools[j];
+                    const poolC = pools[k];
                     
                     if (poolA.tokenA === poolB.tokenA && poolB.tokenA === poolC.tokenA) {
                          let intermediateTokens = globalPriceBook.calculateOutput(poolA, startingSol, true);
                          
-                         let splitOut1 = globalPriceBook.calculateOutput(poolB, intermediateTokens * 0.5, false);
-                         let splitOut2 = globalPriceBook.calculateOutput(poolC, intermediateTokens * 0.5, false);
+                         let splitOut1 = globalPriceBook.calculateOutput(poolB, intermediateTokens * split, false);
+                         let splitOut2 = globalPriceBook.calculateOutput(poolC, intermediateTokens * (1 - split), false);
                          
                          let totalOut = splitOut1 + splitOut2;
                          let gross = totalOut - startingSol;
                          
-                         if (gross > config.MIN_PROFIT_SOL) {
-                              const { netProfit, jitoTip } = this.calculateDynamicNetProfit(gross, startingSol);
-                              if (netProfit > config.MIN_PROFIT_SOL) {
+                         if (gross > params.MIN_PROFIT_SOL) {
+                              const { netProfit, jitoTip } = this.calculateDynamicNetProfit(gross, startingSol, params);
+                              if (netProfit > params.MIN_PROFIT_SOL) {
                                   opportunities.push({
                                       type: 'Split-Routing',
-                                      description: `Buy ${poolA.dex} -> Split Sell [${poolB.dex} + ${poolC.dex}]`,
+                                      description: `Buy ${poolA.dex} -> Split [${Math.round(split*100)}%:${poolB.dex} / ${Math.round((1-split)*100)}%:${poolC.dex}]`,
                                       expectedInSol: startingSol,
                                       expectedOutSol: totalOut,
                                       grossProfitSol: gross,
@@ -147,17 +149,15 @@ export class ArbEngine {
         return opportunities;
     }
 
-    private detectSimpleArb(pools: PoolState[]): Opportunity[] {
+    private detectSimpleArb(pools: PoolState[], params: StrategyParams): Opportunity[] {
         const opportunities: Opportunity[] = [];
-        const startingSol = 0.001; // Base scanning threshold
+        const startingSol = params.MAX_TRADE_SIZE_SOL;
 
-        // Native 2-hop Scanner across cached arrays
         for (let i = 0; i < pools.length; i++) {
             for (let j = i + 1; j < pools.length; j++) {
                 const poolA = pools[i];
                 const poolB = pools[j];
 
-                // Ensure same token pairing
                 if (poolA.tokenA === poolB.tokenA && poolA.tokenB === poolB.tokenB) {
                     
                     // Route 1: Pool A -> Pool B
@@ -165,9 +165,9 @@ export class ArbEngine {
                     let finalOut1 = globalPriceBook.calculateOutput(poolB, intermediate, false);
                     let gross1 = finalOut1 - startingSol;
                     
-                    if (gross1 > config.MIN_PROFIT_SOL) {
-                        const { netProfit, jitoTip } = this.calculateDynamicNetProfit(gross1, startingSol);
-                        if (netProfit > config.MIN_PROFIT_SOL) {
+                    if (gross1 > params.MIN_PROFIT_SOL) {
+                        const { netProfit, jitoTip } = this.calculateDynamicNetProfit(gross1, startingSol, params);
+                        if (netProfit > params.MIN_PROFIT_SOL) {
                             opportunities.push({
                                 type: 'Simple-2-Hop',
                                 description: `SOL -> ${poolA.tokenB} (${poolA.dex}) -> SOL (${poolB.dex})`,
@@ -186,9 +186,9 @@ export class ArbEngine {
                     let finalOut2 = globalPriceBook.calculateOutput(poolA, intermediate2, false);
                     let gross2 = finalOut2 - startingSol;
                     
-                    if (gross2 > config.MIN_PROFIT_SOL) {
-                        const { netProfit, jitoTip } = this.calculateDynamicNetProfit(gross2, startingSol);
-                        if (netProfit > config.MIN_PROFIT_SOL) {
+                    if (gross2 > params.MIN_PROFIT_SOL) {
+                        const { netProfit, jitoTip } = this.calculateDynamicNetProfit(gross2, startingSol, params);
+                        if (netProfit > params.MIN_PROFIT_SOL) {
                             opportunities.push({
                                 type: 'Simple-2-Hop',
                                 description: `SOL -> ${poolB.tokenB} (${poolB.dex}) -> SOL (${poolA.dex})`,
@@ -213,13 +213,16 @@ export class ArbEngine {
         const startMs = performance.now();
         const pools = globalPriceBook.getAllPools();
         
-        if (pools.length < 2) return; // Need at least two pools for arb
+        if (pools.length < 2) return;
+
+        // Load latest calibrated params (reads strategy_params.json if updated by tuner)
+        const params = loadStrategyParams();
         
-        // Parallel execution of distinctly mapped mathematical detection algorithms continuously evaluating completely separate edge cases simultaneously
+        // Parallel execution of all three strategy detectors
         const allOpps = await Promise.all([
-            this.detectSimpleArb(pools),
-            this.detectTriangularArb(pools),
-            this.detectSplitArb(pools)
+            this.detectSimpleArb(pools, params),
+            this.detectTriangularArb(pools, params),
+            this.detectSplitArb(pools, params)
         ]);
 
         const validOpps = allOpps.flat().sort((a, b) => b.netProfit - a.netProfit);
