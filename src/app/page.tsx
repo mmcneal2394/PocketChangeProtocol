@@ -20,7 +20,7 @@ export default function LandingPage() {
       <nav style={{ padding: "24px 48px", display: "flex", justifyContent: "space-between", alignItems: "center", position: "absolute", top: 0, width: "100%", zIndex: 100, background: "linear-gradient(180deg, rgba(0,0,0,0.8), transparent)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
            <img src="https://cdn.helius-rpc.com/cdn-cgi/image//https://ipfs.io/ipfs/QmQwvUsgwBUa8PmKhTUgG6o1LL8PvUuo7XtkcVBNtQqry4" alt="Logo" style={{ width: "40px", height: "40px", borderRadius: "12px", boxShadow: "0 4px 20px rgba(255, 255, 255, 0.2)" }} />
-           <span style={{ fontSize: "1.4rem", fontWeight: 800, letterSpacing: "-0.5px" }} className="gradient-text">ArbitraSaaS</span>
+           <span style={{ fontSize: "1.4rem", fontWeight: 800, letterSpacing: "-0.5px" }} className="gradient-text">PocketChange Protocol</span>
         </div>
         <div style={{ display: "flex", gap: "32px", fontSize: "0.95rem", fontWeight: 600 }}>
            <a href="#features" style={{ color: "var(--text-secondary)", textDecoration: "none" }}>Platform</a>
@@ -49,13 +49,13 @@ export default function LandingPage() {
                Deposit crypto capital and watch the Pocket Money Protocol deploy atomic flash loans targeting DEX inefficiencies simultaneously. Zero capital risk. Absolute delta-neutral mapping.
            </p>
 
-           <div style={{ display: "flex", gap: "24px", animation: "slideUp 1.4s cubic-bezier(0.16, 1, 0.3, 1)" }}>
-               <Link href="/dashboard" className="neon-btn" style={{ background: "var(--primary)", color: "#000", padding: "20px 48px", borderRadius: "16px", textDecoration: "none", fontSize: "1.2rem", fontWeight: 800, border: "none" }}>
-                   Start Earning Today
-               </Link>
-               <a href="#architecture" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.2)", padding: "20px 48px", borderRadius: "16px", color: "#fff", textDecoration: "none", fontSize: "1.2rem", fontWeight: 700 }}>
-                   View Architecture
+           <div style={{ display: "flex", gap: "24px", flexWrap: "wrap", justifyContent: "center", animation: "slideUp 1.4s cubic-bezier(0.16, 1, 0.3, 1)" }}>
+               <a href="https://bags.fm/t/PCP" target="_blank" rel="noopener noreferrer" className="neon-btn" style={{ background: "linear-gradient(135deg, #9b59b6, #6c3483)", color: "#fff", padding: "20px 48px", borderRadius: "16px", textDecoration: "none", fontSize: "1.2rem", fontWeight: 800, border: "1px solid rgba(138,43,226,0.5)", boxShadow: "0 8px 32px rgba(138,43,226,0.4)" }}>
+                   🛍 Buy $PCP on Bags.fm
                </a>
+               <Link href="/wallets" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.2)", padding: "20px 48px", borderRadius: "16px", color: "#fff", textDecoration: "none", fontSize: "1.2rem", fontWeight: 700 }}>
+                   Enter Vault →
+               </Link>
            </div>
 
            {/* Hero HUD Elements */}
@@ -126,15 +126,15 @@ export default function LandingPage() {
              <div className="glow-orb glow-orb-primary" style={{ top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: "400px", height: "400px" }} />
              <h2 style={{ fontSize: "3rem", fontWeight: 900, marginBottom: "24px", position: "relative", zIndex: 10 }}>Ready to capture the spreads?</h2>
              <p style={{ fontSize: "1.2rem", color: "var(--text-secondary)", marginBottom: "40px", maxWidth: "600px", margin: "0 auto 40px auto", position: "relative", zIndex: 10 }}>Zero maintenance required. Deposit liquidity, wait, and burn your mapping tokens for pure profit withdrawals.</p>
-             <Link href="/dashboard" className="neon-btn" style={{ position: "relative", zIndex: 10, background: "var(--primary)", color: "#000", padding: "20px 48px", borderRadius: "16px", textDecoration: "none", fontSize: "1.2rem", fontWeight: 800, border: "none" }}>
-                   Access the Protocol Vault
-             </Link>
+             <a href="https://bags.fm/t/PCP" target="_blank" rel="noopener noreferrer" className="neon-btn" style={{ position: "relative", zIndex: 10, background: "linear-gradient(135deg, #9b59b6, #6c3483)", color: "#fff", padding: "20px 48px", borderRadius: "16px", textDecoration: "none", fontSize: "1.2rem", fontWeight: 800, border: "1px solid rgba(138,43,226,0.5)", boxShadow: "0 8px 32px rgba(138,43,226,0.4)" }}>
+                   🛍 Buy $PCP on Bags.fm
+             </a>
         </section>
       </main>
       
       {/* Footer */}
       <footer style={{ padding: "48px 24px", textAlign: "center", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
-          <p style={{ color: "var(--text-secondary)", fontWeight: 600 }}>&copy; 2026 ArbitraSaaS. Built by Antigravity for the Global Economy.</p>
+          <p style={{ color: "var(--text-secondary)", fontWeight: 600 }}>&copy; 2026 PocketChange Protocol. Powered by Solana &amp; Jito MEV.</p>
       </footer>
     </div>
   );
