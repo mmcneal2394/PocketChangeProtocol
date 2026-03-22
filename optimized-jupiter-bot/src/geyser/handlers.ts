@@ -1,234 +1,182 @@
-import { logger } from '../utils/logger';
-import { fetchJupiterQuote, getParallelSwapInstructions } from '../jupiter/quotes';
-import { buildVersionedTransaction } from '../execution/transaction';
-import { submitTransactionWithRacing } from '../execution/racing';
-import { config } from '../utils/config';
-import { Connection, PublicKey } from '@solana/web3.js';
-import { cacheTradeMetrics } from '../utils/trade_logger';
+/**
+ * handlers.ts  —  Geyser stream handler (v2)
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Wired to:
+ *   • globalRouteManager  — priority-scored token queue (route_manager.ts)
+ *   • launchpad_scanner   — multi-source token discovery
+ *   • strategy_tuner      — live calibrated params (MIN_PROFIT, trade size…)
+ *
+ * Key improvements over v1:
+ *   ✅ Per-route cooldowns (not a single 10s global lock)
+ *   ✅ Kelly-calibrated trade sizes from strategy_params.json
+ *   ✅ Scans top-priority routes from route_manager (not random)
+ *   ✅ Records outcome back to route_manager for EMA learning
+ *   ✅ Security-screened routes only (screened on discovery, not here)
+ *   ✅ Geyser new-pool events routed to launchpad_scanner
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
 
-const TOKENS = {
-  WSOL: "So11111111111111111111111111111111111111112",
-  USDC: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-  WIF: "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYtM2wYSzRo",
-  BONK: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
-  RAY: "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
-  JUP: "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbPwdrsxGBK",
-  PYTH: "HZ1JovNiVvGrGNiiYvEozEVgZ58xaU3AkTftx2K2aFCh",
-  JTO: "jtojtomepa8beP8AuQc6eXt5FriJwfFMwQx2v2f9mCL",
-  POPCAT: "7GCihgDB8fe6KNjn2gN7ZDB2h2n2i2Z7pW2r2YjN1e8p",
-  BOME: "ukHH6c7mMyiWCf1b9pnWe25TSpkDDt3H5pQZgM2W8qT"
-};
+import { logger }                           from '../utils/logger';
+import { fetchJupiterQuote,
+         getParallelSwapInstructions }       from '../jupiter/quotes';
+import { buildVersionedTransaction }         from '../execution/transaction';
+import { submitTransactionWithRacing }       from '../execution/racing';
+import { config }                            from '../utils/config';
+import { Connection, PublicKey }             from '@solana/web3.js';
+import { TOKEN_PROGRAM_ID }                  from '@solana/spl-token';
+import { cacheTradeMetrics }                 from '../utils/trade_logger';
+import { globalRouteManager }                from '../discovery/route_manager';
+import { startLaunchpadScanner,
+         handleNewPoolEvent,
+         LAUNCHPAD_PROGRAMS }                from '../discovery/launchpad_scanner';
+import { loadStrategyParams }                from '../strategy_tuner';
 
-const TRADE_ROUTES = [
-  [TOKENS.WSOL, TOKENS.USDC],
-  [TOKENS.WSOL, TOKENS.WIF],
-  [TOKENS.WSOL, TOKENS.BONK],
-  [TOKENS.WSOL, TOKENS.RAY],
-  [TOKENS.WSOL, TOKENS.JUP],
-  [TOKENS.WSOL, TOKENS.PYTH],
-  [TOKENS.WSOL, TOKENS.JTO],
-  [TOKENS.WSOL, TOKENS.POPCAT],
-  [TOKENS.WSOL, TOKENS.BOME]
-];
-
-// Dynamic Routing Array (Updated via multi-DEX fetch)
-let DYNAMIC_ROUTES = [...TRADE_ROUTES];
-
-async function refreshDynamicTokens() {
-  try {
-    const jupRes = await fetch("https://token.jup.ag/strict");
-    const jupData = await jupRes.json();
-    
-    if (jupData && jupData.length > 0) {
-      const newRoutes: string[][] = [];
-      const shuffled = jupData.sort(() => 0.5 - Math.random()).slice(0, 50);
-      
-      shuffled.forEach((token: any) => {
-        if (token.address !== TOKENS.WSOL) {
-            newRoutes.push([TOKENS.WSOL, token.address]);
-        }
-      });
-      
-      DYNAMIC_ROUTES = [...TRADE_ROUTES, ...newRoutes];
-      logger.info(`✅ Multi-DEX Token Rotator pulled ${newRoutes.length} trending items! Current Hunting Scope: ${DYNAMIC_ROUTES.length} routes.`);
-    }
-
-    if (config.BAGS_API_KEY) {
-      const bagsRes = await fetch("https://public-api-v2.bags.fm/api/v1/tokens", {
-         headers: { 'Authorization': `Bearer ${config.BAGS_API_KEY}` }
-      });
-      if (bagsRes.ok) {
-         logger.debug("Bags API authenticated securely.");
-      }
-    }
-  } catch (err) {
-    logger.warn("Failed to fetch dynamic tokens:", err);
-  }
-}
-
-refreshDynamicTokens();
-// Refresh every 60 seconds (1 minute) for absolute maximum trending pool tracking
-setInterval(refreshDynamicTokens, 60 * 1000);
-
-import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
-
-// Connection for wallet balance checking
-const connection = new Connection(config.RPC_ENDPOINT, { commitment: 'processed' });
+// ── Wallet state (cached, refreshed every 30s) ────────────────────────────────
+const connection  = new Connection(config.RPC_ENDPOINT, { commitment: 'processed' });
 const walletPubkey = new PublicKey(config.WALLET_PUBLIC_KEY);
-let cachedLamportsBalance = 0.5 * 10 ** 9; // Fallback
-let existingAtas = new Set<string>();
+let cachedLamports = 0.05 * 1e9; // safe fallback
+let existingAtas   = new Set<string>();
 
-// Update balance and known ATAs every 30 seconds
 setInterval(async () => {
   try {
-    cachedLamportsBalance = await connection.getBalance(walletPubkey);
-    
-    // Fetch all token accounts to cache existing ATAs
-    const accounts = await connection.getParsedTokenAccountsByOwner(walletPubkey, {
-      programId: TOKEN_PROGRAM_ID
-    });
-    
-    const tokenMints = accounts.value.map(acc => acc.account.data.parsed.info.mint);
-    existingAtas = new Set(tokenMints);
-  } catch (err) {
-    logger.warn("Failed to fetch wallet balance and ATAs:", err);
+    cachedLamports = await connection.getBalance(walletPubkey);
+    const accounts  = await connection.getParsedTokenAccountsByOwner(walletPubkey, { programId: TOKEN_PROGRAM_ID });
+    existingAtas    = new Set(accounts.value.map(a => a.account.data.parsed.info.mint));
+  } catch (e: any) {
+    logger.warn(`[WALLET] Balance refresh failed: ${e.message}`);
   }
-}, 30000);
+}, 30_000);
 
-let hasForcedInitialTrade = false;
+// ── Identify launchpad program from Geyser filter ─────────────────────────────
+function detectProgram(filters: string[]): string | null {
+  for (const prog of Object.values(LAUNCHPAD_PROGRAMS)) {
+    if (filters.some(f => f.includes(prog))) return prog;
+  }
+  return null;
+}
 
-let lastTradeTime = 0;
-
+// ── Main account update handler ───────────────────────────────────────────────
 export async function handleAccountUpdate(data: any) {
   const startMs = Date.now();
-  
-  // Guard-rail removal cooldown: prevent >10ms Geyser stream from physically draining all Solana via gas inside 1 second
-  if (startMs - lastTradeTime < 10000) return;
+  const params   = loadStrategyParams(); // Live calibrated params
 
-  if (process.env.DEBUG) {
-    logger.debug(`[GEYSER] Stream triggered account update event.`);
+  // ── New pool event? Route to launchpad scanner ───────────────────────────
+  const program = detectProgram(data.filters || []);
+  if (program && data.account) {
+    handleNewPoolEvent(program, data.account).catch(() => {}); // non-blocking
   }
 
-  const route = DYNAMIC_ROUTES[Math.floor(Math.random() * DYNAMIC_ROUTES.length)];
-  const inputMint = route[0];
-  const intermediateMint = route[1];
-  
-  // Phase 16a: Temporal Jitter (Anti-Trust / MEV Obfuscation)
-  // Suspends execution for 5-25ms to spoof synthetic robotic tick-rates, destroying Validator Sandwich predictions
-  const temporalJitterMs = Math.floor(Math.random() * 20) + 5;
-  await new Promise(resolve => setTimeout(resolve, temporalJitterMs));
-  
-  // Phase 16b: Quantitative Parameter Jitter
-  // Randomizes flat block sizing to generate organic, human-like byte lengths natively bypassing RPC WAF blocks
-  const generateJitter = () => Number((Math.random() * 0.009).toFixed(4));
-  const tradeSizes = [
-    0.05 + generateJitter(), 
-    0.10 + generateJitter(), 
-    0.25 + generateJitter(), 
-    0.50 + generateJitter()
-  ];
-  
-  logger.info(`🔍 [JITTER: +${temporalJitterMs}ms] Hunting synthetic volumes for Route: WSOL -> ${intermediateMint.substring(0, 4)}...`);
+  // ── MEV temporal jitter (5–25ms anti-sandwich) ───────────────────────────
+  const jitterMs = Math.floor(Math.random() * 20) + 5;
+  await new Promise(r => setTimeout(r, jitterMs));
 
-  const sweepResults = await Promise.all(tradeSizes.map(async (size) => {
-    const tradeSizeLamports = Math.floor(size * 10**9);
-    // Ensure the wallet can actually afford this leg (plus gas padding)
-    if (cachedLamportsBalance < tradeSizeLamports + 50000) return null; 
+  // ── Get the top 3 priority routes from route_manager ─────────────────────
+  // (already respects per-route cooldowns internally)
+  const routes = globalRouteManager.getNextBatch(3);
+  if (routes.length === 0) return;
 
-    const quote1 = await fetchJupiterQuote(inputMint, intermediateMint, tradeSizeLamports);
-    if (!quote1) return null;
+  // ── Quote all 3 routes concurrently ──────────────────────────────────────
+  await Promise.all(routes.map(route => scanRoute(route.outputMint, params, startMs)));
+}
 
-    const intermediateAmount = Number(quote1.otherAmountThreshold);
-    const quote2 = await fetchJupiterQuote(intermediateMint, inputMint, intermediateAmount);
-    if (!quote2) return null;
+// ── Scan a single route ───────────────────────────────────────────────────────
+async function scanRoute(outputMint: string, params: ReturnType<typeof loadStrategyParams>, startMs: number) {
+  const WSOL = 'So11111111111111111111111111111111111111112';
 
-    const expectedOut = Number(quote2.outAmount);
-    const grossProfitLamports = expectedOut - tradeSizeLamports;
-    
-    // Subtract standard physical network fees natively (Bypassing MEV Tips constraints)
-    // Freed up ~200,000 lamports of margin previously wasted on Artificial buffers!
-    const ESTIMATED_GAS_AND_TIP_LAMPORTS = 15000; 
+  // Kelly-sized trade (from slow loop calibration), quantise to lamports
+  const tradeSOL      = params.MAX_TRADE_SIZE_SOL;
+  const tradeLamports = Math.floor(tradeSOL * 1e9);
 
-    // CRITICAL FIX: Account for ~0.002 SOL Rent Exemption if this is a new dynamically routed token!
-    // Without this, the bot bleeds 2,000,000 lamports per new token, far exceeding typical 5bps arbitrage profit!
-    const ATA_RENT_LAMPORTS = existingAtas.has(intermediateMint) ? 0 : 2039280;
+  // ATA rent check (avoid 2 SOL bleed on new tokens)
+  const ataRent = existingAtas.has(outputMint) ? 0 : 2_039_280;
 
-    const netProfitLamports = grossProfitLamports - ESTIMATED_GAS_AND_TIP_LAMPORTS - ATA_RENT_LAMPORTS;
-    const netProfitBps = (netProfitLamports / tradeSizeLamports) * 10000;
+  // Balance guard
+  if (cachedLamports < tradeLamports + ataRent + 50_000) {
+    logger.debug(`[SCAN] Skipping ${outputMint.slice(0, 8)}… insufficient balance`);
+    return;
+  }
 
-    return { size, quote1, quote2, netProfitLamports, netProfitBps };
-  }));
+  const quote1 = await fetchJupiterQuote(WSOL, outputMint, tradeLamports);
+  if (!quote1) return;
 
-  // Filter valid completed sweeps
-  const validResults = sweepResults.filter(r => r !== null);
-  if (validResults.length === 0) return;
+  const intermediateAmt = Number(quote1.otherAmountThreshold);
+  const quote2          = await fetchJupiterQuote(outputMint, WSOL, intermediateAmt);
+  if (!quote2) return;
 
-  // Select the trade size that yielded the highest absolute SOL profit
-  const bestResult = validResults.sort((a, b) => b!.netProfitLamports - a!.netProfitLamports)[0]!;
+  const expectedOut        = Number(quote2.outAmount);
+  const grossProfitLamports = expectedOut - tradeLamports;
 
-  const processMs = Date.now() - startMs;
+  // Network costs: gas + ATA rent
+  const gasLamports   = 15_000;
+  const netProfitLam  = grossProfitLamports - gasLamports - ataRent;
+  const netProfitBps  = (netProfitLam / tradeLamports) * 10_000;
+  const netProfitSOL  = netProfitLam / 1e9;
 
-  if (bestResult.netProfitBps > 0) {
-    logger.info(`✅ [ARBITRAGE FOUND] Size: ${bestResult.size} SOL | Net Profit: ${bestResult.netProfitBps.toFixed(2)} bps (${(bestResult.netProfitLamports / 10**9).toFixed(5)} SOL) [Sweep Ms: ${processMs}ms]`);
+  // Record outcome in route_manager for EMA scoring (always, win or lose)
+  globalRouteManager.recordOutcome(outputMint, netProfitBps, netProfitSOL > params.MIN_PROFIT_SOL);
+
+  const elapsed = Date.now() - startMs;
+
+  if (netProfitBps > 0) {
+    logger.info(`✅ [ARB] SOL→${outputMint.slice(0, 6)}… | ${tradeSOL} SOL | +${netProfitBps.toFixed(2)} bps (+${netProfitSOL.toFixed(5)} SOL) [${elapsed}ms]`);
   } else {
-    logger.info(`❌ [NO ARBITRAGE] Route: SOL -> ${intermediateMint.substring(0, 4)}... | Best Size: ${bestResult.size} SOL yielded Net Loss: ${bestResult.netProfitBps.toFixed(2)} bps. [Sweep Ms: ${processMs}ms]`);
+    logger.debug(`❌ [SCAN] SOL→${outputMint.slice(0, 6)}… | ${netProfitBps.toFixed(2)} bps [${elapsed}ms]`);
   }
 
-  // Final confirmation to execute
-  if (bestResult.netProfitBps >= config.MIN_PROFIT_BPS) {
-    lastTradeTime = Date.now(); // Instantly lock out the concurrent Geyser streams
-    logger.warn(`🔥 PROFITABLE OPPORTUNITY DETECTED on Size ${bestResult.size} SOL! Proceeding to bundle extraction...`);
-    
+  // ── Execute if profitable ────────────────────────────────────────────────
+  if (netProfitSOL >= params.MIN_PROFIT_SOL) {
+    logger.warn(`🔥 EXECUTING: ${tradeSOL} SOL → ${outputMint.slice(0, 8)}… | Est. net +${netProfitSOL.toFixed(5)} SOL`);
+
     let signatureStr: string | null = null;
     let success = false;
-    
-    const instructions = await getParallelSwapInstructions(bestResult.quote1, bestResult.quote2);
-    if (instructions) {
-      const transaction = await buildVersionedTransaction(instructions.ix1, instructions.ix2);
-      if (transaction) {
-        const rpcResult = await submitTransactionWithRacing(transaction);
-        if (rpcResult && rpcResult.success) {
+
+    try {
+      const instructions = await getParallelSwapInstructions(quote1, quote2);
+      if (instructions) {
+        const transaction = await buildVersionedTransaction(instructions.ix1, instructions.ix2);
+        if (transaction) {
+          const rpcResult = await submitTransactionWithRacing(transaction);
+          if (rpcResult?.success) {
             signatureStr = (rpcResult as any).signature as string;
+            success      = true;
+            logger.info(`✅ EXECUTED: ${signatureStr?.slice(0, 12)}…`);
+          }
         }
-      } else {
-        logger.error('Failed to build versioned transaction.');
       }
-    } else {
-      logger.error('Failed to get routing instructions.');
+    } catch (e: any) {
+      logger.error(`[EXEC] Failed: ${e.message}`);
     }
 
-    // Persist evaluation metrics for analytics & refining rolling period strategies
     cacheTradeMetrics({
-        timestamp: Date.now(),
-        date: new Date().toISOString(),
-        inputMint: bestResult.quote1.inputMint,
-        outputMint: bestResult.quote1.outputMint,
-        tradeSizeSOL: bestResult.size,
-        expectedProfitSOL: bestResult.netProfitLamports / 10**9,
-        expectedProfitBps: bestResult.netProfitBps,
-        signature: signatureStr,
-        success: success
+      timestamp:         Date.now(),
+      date:              new Date().toISOString(),
+      inputMint:         WSOL,
+      outputMint,
+      tradeSizeSOL:      tradeSOL,
+      expectedProfitSOL: netProfitSOL,
+      expectedProfitBps: netProfitBps,
+      signature:         signatureStr,
+      success,
     });
   }
 }
 
+// ── Geyser stream bootstrap ───────────────────────────────────────────────────
 export function startGeyserListeners(stream: any) {
+  // Boot multi-launchpad scanner alongside the Geyser stream
+  startLaunchpadScanner();
+
   stream.on('data', (data: any) => {
     try {
-      if (data.filters && data.filters.includes('jupiter')) {
-        handleAccountUpdate(data);
+      // Accept ANY program update — route to handler which will classify it
+      if (data.filters && data.filters.length > 0) {
+        handleAccountUpdate(data).catch(e => logger.error('[GEYSER] handler error:', e));
       }
     } catch (err) {
       logger.error('Error handling geyser message', err);
     }
   });
 
-  stream.on('error', (err: any) => {
-    logger.error('Geyser stream error', err);
-  });
-
-  stream.on('end', () => {
-    logger.warn('Geyser stream ended. Consider reconnecting.');
-  });
+  stream.on('error', (err: any) => logger.error('Geyser stream error', err));
+  stream.on('end',   ()         => logger.warn('Geyser stream ended. Consider reconnecting.'));
 }
-
