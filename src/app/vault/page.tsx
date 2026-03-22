@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
-import { AccountBalanceWallet, TrendingUp, Logout, ContentCopy, CheckCircle, Loop } from "@mui/icons-material";
+import { AccountBalanceWallet, TrendingUp, Logout, ContentCopy, CheckCircle, Loop, Bolt } from "@mui/icons-material";
 import Link from "next/link";
 
 // ── Simulated position data (replace with on-chain reads when funded) ─────────
@@ -14,12 +14,15 @@ export default function VaultPortalPage() {
   const { publicKey, disconnect, connected } = useWallet();
   const { connection } = useConnection();
 
-  const [balance, setBalance]       = useState<number | null>(null);
-  const [pcpPrice, setPcpPrice]     = useState<number | null>(null);
-  const [copied, setCopied]         = useState(false);
+  const [balance, setBalance]         = useState<number | null>(null);
+  const [pcpPrice, setPcpPrice]       = useState<number | null>(null);
+  const [copied, setCopied]           = useState(false);
   const [withdrawing, setWithdrawing] = useState(false);
   const [withdrawStatus, setWithdrawStatus] = useState<string | null>(null);
-  const [mounted, setMounted]       = useState(false);
+  const [mounted, setMounted]         = useState(false);
+  const [tradeLogs, setTradeLogs]     = useState<any[]>([]);
+  const [logsLoading, setLogsLoading] = useState(true);
+  const logsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -38,6 +41,27 @@ export default function VaultPortalPage() {
       .then(d => { const p = d?.data?.[PCP_MINT]?.price; if (p) setPcpPrice(parseFloat(p)); })
       .catch(() => {});
   }, []);
+
+  // Live trade log stream — poll /api/logs every 5s
+  useEffect(() => {
+    const fetchLogs = () => {
+      fetch('/api/logs')
+        .then(r => r.json())
+        .then(data => {
+          if (Array.isArray(data)) setTradeLogs(data.slice(0, 25));
+          setLogsLoading(false);
+        })
+        .catch(() => setLogsLoading(false));
+    };
+    fetchLogs();
+    const id = setInterval(fetchLogs, 5000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Auto-scroll logs to top when updated (newest first)
+  useEffect(() => {
+    if (logsRef.current) logsRef.current.scrollTop = 0;
+  }, [tradeLogs]);
 
   const copy = () => {
     if (!publicKey) return;
@@ -182,15 +206,56 @@ export default function VaultPortalPage() {
             )}
           </div>
 
-          {/* Recent Activity */}
-          <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "24px" }}>
-            <h3 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "20px", display: "flex", alignItems: "center", gap: "8px" }}>
-              <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#9b59b6", display: "inline-block" }}></span>
-              Your Transaction History
-            </h3>
-            <div style={{ textAlign: "center", padding: "32px 0", color: "#555" }}>
-              <p>No transactions yet for this wallet.</p>
-              <p style={{ fontSize: "0.85rem", marginTop: "8px" }}>Deposit USDC to start earning.</p>
+          {/* ── Live Vault Trade Stream ──────────────────────────────── */}
+          <div style={{ background: "rgba(0,0,0,0.6)", border: "1px solid rgba(0,255,136,0.12)", borderRadius: "16px", overflow: "hidden" }}>
+            <div style={{ padding: "16px 20px", borderBottom: "1px solid rgba(255,255,255,0.06)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: tradeLogs.length > 0 ? "#00ff88" : "#444", boxShadow: tradeLogs.length > 0 ? "0 0 8px #00ff88" : "none", display: "inline-block", animation: tradeLogs.length > 0 ? "pulse 2s infinite" : "none" }} />
+                <h3 style={{ fontSize: "0.95rem", fontWeight: 700, color: "#fff", margin: 0 }}>Vault Trade Stream</h3>
+                <span style={{ fontSize: "0.75rem", color: "#555", fontFamily: "monospace" }}>· live · refreshes every 5s</span>
+              </div>
+              <Bolt style={{ color: "#00ff88", fontSize: "1rem" }} />
+            </div>
+            <div
+              ref={logsRef}
+              style={{ height: "300px", overflowY: "auto", padding: "0" }}
+            >
+              {logsLoading ? (
+                <div style={{ textAlign: "center", padding: "48px 0", color: "#444", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" }}>
+                  <Loop style={{ animation: "spin 1s linear infinite", fontSize: "1.2rem" }} />
+                  <span>Connecting to vault engine...</span>
+                </div>
+              ) : tradeLogs.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "48px 0", color: "#444" }}>
+                  <p style={{ marginBottom: "4px" }}>No trades executed yet.</p>
+                  <p style={{ fontSize: "0.8rem", color: "#333" }}>The vault engine will begin trading when funded.</p>
+                </div>
+              ) : (
+                tradeLogs.map((log, i) => {
+                  const isSuccess = log.ok === true || String(log.status).includes("SUCCESS");
+                  return (
+                    <div
+                      key={log.id ?? i}
+                      style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 20px", borderBottom: "1px solid rgba(255,255,255,0.04)", transition: "background 0.2s" }}
+                      onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.02)")}
+                      onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                        <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: isSuccess ? "#00ff88" : "#ff4444", flexShrink: 0, boxShadow: `0 0 6px ${isSuccess ? "#00ff88" : "#ff4444"}` }} />
+                        <span style={{ fontFamily: "monospace", fontSize: "0.85rem", color: "#bbb" }}>{log.route || "—"}</span>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
+                        <span style={{ fontSize: "0.85rem", fontWeight: 700, color: isSuccess ? "#00ff88" : "#ff6666" }}>
+                          {log.profit || (isSuccess ? "+0.000 SOL" : "REJECTED")}
+                        </span>
+                        <span style={{ fontSize: "0.75rem", color: "#444", fontFamily: "monospace" }}>
+                          {log.hash ? `${String(log.hash).slice(0, 6)}…` : "—"}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
 
