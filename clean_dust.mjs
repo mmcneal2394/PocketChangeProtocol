@@ -4,7 +4,7 @@ import fs from 'fs';
 
 const JUPITER_API = 'https://public.jupiterapi.com';
 
-const READ_RPC = 'https://solana-mainnet.core.chainstack.com/95d603f3d634acfbf2ac5a57a32baf97';
+const READ_RPC = 'https://solana-mainnet.core.chainstack.com/YOUR_CHAINSTACK_KEY';
 const WRITE_RPC = 'https://nd-622-626-774.p2pify.com/89d5bb214e0ab0b5b25397cd9ca79d95';
 
 async function buildAndSend(readConn, writeConn, wallet, inputMint, outputMint, amount, side) {
@@ -81,7 +81,7 @@ async function runDustCleanup() {
     const secretKeyStr = fs.readFileSync('./new_wallet.json', 'utf8');
     const wallet = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(secretKeyStr)));
     
-    const READ_WSS = 'wss://solana-mainnet.core.chainstack.com/95d603f3d634acfbf2ac5a57a32baf97';
+    const READ_WSS = 'wss://solana-mainnet.core.chainstack.com/YOUR_CHAINSTACK_KEY';
     const readConn = new Connection(READ_RPC, { wsEndpoint: READ_WSS, commitment: 'confirmed' });
     const writeConn = new Connection(WRITE_RPC, 'confirmed');
 

@@ -14,7 +14,7 @@ async function testBuy() {
     const wallet = Keypair.fromSecretKey(secretKeyArr);
     const connection = new Connection(config.RPC_ENDPOINT, 'confirmed');
 
-    const API_KEY = config.JUPITER_API_KEY || '05aa94b2-05d5-4993-acfe-30e18dc35ff1';
+    const API_KEY = config.JUPITER_API_KEY || 'YOUR_JUPITER_API_KEY';
 
     // 2. Quote & Swap Ix via Ultra API
     const orderRes = await fetch(`${JUPITER_API}/ultra/v1/order?inputMint=So11111111111111111111111111111111111111112&outputMint=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&amount=1000000&slippageBps=50&taker=${wallet.publicKey.toString()}`);

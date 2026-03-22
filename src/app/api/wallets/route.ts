@@ -4,7 +4,7 @@ import bs58 from 'bs58';
 import crypto from 'crypto';
 
 const MASTER_KEY = process.env.KMS_MASTER_KEY || "00000000000000000000000000000000";
-const RPC_ENDPOINT = "https://beta.helius-rpc.com/?api-key=df082a16-aebf-4ec4-8ad6-86abfa06c8fc";
+const RPC_ENDPOINT = "https://beta.helius-rpc.com/?api-key=YOUR_HELIUS_API_KEY";
 
 // Simplified AES-256-GCM encryption for SaaS 
 function encryptWalletKey(plainTextKey: string, salt: string) {

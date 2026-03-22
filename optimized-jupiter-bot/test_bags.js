@@ -1,4 +1,4 @@
-const key = "bags_prod_bhNWKWR4_HAseNYlrmgpJX4NklFdCzAbDdYpx9UIIgg";
+const key = "process.env.BAGS_API_KEY";
 
 async function testBags() {
   try {

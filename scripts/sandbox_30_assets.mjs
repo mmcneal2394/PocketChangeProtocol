@@ -1,5 +1,5 @@
 // Native global.fetch integration
-const JUP_API_KEY = '05aa94b2-05d5-4993-acfe-30e18dc35ff1';
+const JUP_API_KEY = 'YOUR_JUPITER_API_KEY';
 
 async function fetchTop30Assets() {
     return [

@@ -2,7 +2,7 @@ import { Connection, Keypair, VersionedTransaction } from '@solana/web3.js';
 import fs from 'fs';
 
 const JUPITER_API = 'https://api.jup.ag/swap/v1';
-const RPC_ENDPOINT = 'https://solana-mainnet.core.chainstack.com/95d603f3d634acfbf2ac5a57a32baf97';
+const RPC_ENDPOINT = 'https://solana-mainnet.core.chainstack.com/YOUR_CHAINSTACK_KEY';
 
 const TOKENS = [
     { sym: 'USDC', mint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v' },
@@ -32,7 +32,7 @@ async function forceBuyFive() {
         
         try {
             const quoteRes = await fetch(`${JUPITER_API}/quote?inputMint=So11111111111111111111111111111111111111112&outputMint=${token.mint}&amount=1000000&slippageBps=50&strict=false&restrictIntermediateTokens=false`, {
-                headers: { "x-api-key": "05aa94b2-05d5-4993-acfe-30e18dc35ff1" }
+                headers: { "x-api-key": "YOUR_JUPITER_API_KEY" }
             });
             const quoteData = await quoteRes.json();
             
@@ -45,7 +45,7 @@ async function forceBuyFive() {
 
             const swapRes = await fetch(`${JUPITER_API}/swap-instructions`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-api-key': '05aa94b2-05d5-4993-acfe-30e18dc35ff1' },
+                headers: { 'Content-Type': 'application/json', 'x-api-key': 'YOUR_JUPITER_API_KEY' },
                 body: JSON.stringify({
                     quoteResponse: quoteData,
                     userPublicKey: wallet.publicKey.toString(),
@@ -61,7 +61,7 @@ async function forceBuyFive() {
 
             const swapFullRes = await fetch(`${JUPITER_API}/swap`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-api-key': '05aa94b2-05d5-4993-acfe-30e18dc35ff1' },
+                headers: { 'Content-Type': 'application/json', 'x-api-key': 'YOUR_JUPITER_API_KEY' },
                 body: JSON.stringify({
                     quoteResponse: quoteData,
                     userPublicKey: wallet.publicKey.toString(),

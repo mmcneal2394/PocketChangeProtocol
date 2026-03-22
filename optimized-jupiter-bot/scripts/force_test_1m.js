@@ -23,14 +23,14 @@ const HELIUS_WS   = (process.env.RPC_WEBSOCKET || 'wss://rpc.helius.xyz/?api-key
 const CHAIN_RPC   = 'https://rpc.YOUR_CHAINSTACK_ENDPOINT';
 const WALLET_PATH = process.env.WALLET_KEYPAIR_PATH || './real_wallet.json';
 const BAGS_KEYS = [
-  process.env.BAGS_API_KEY   || 'bags_prod_bhNWKWR4_HAseNYlrmgpJX4NklFdCzAbDdYpx9UIIgg',
-  process.env.BAGS_API_KEY_2 || 'bags_prod_kfsnkMqQ4NJW16_BknWl1ox31Ysr1kZL1MA2mGSlt5c',
-  process.env.BAGS_API_KEY_3 || 'bags_prod_QJ3a_QsV3R8FEg9kbxWZ7yMOqVD7OnAu2mxLHNfkia8',
-  process.env.BAGS_API_KEY_4 || 'bags_prod_a64DNgP7fs2O9DcqT0JIIva4Qsy_XEPmdgLtP67jbSU',
-  process.env.BAGS_API_KEY_5 || 'bags_prod_pIHo6k8F6k7W_5q0N4kVCzodVgPqMBQ_tj0G0S2Mn9o',
-  process.env.BAGS_API_KEY_6 || 'bags_prod_b5Aeygaqa1vb5JGdwm5hsRoBCyVKMBCK12p-DCIodlU',
+  process.env.BAGS_API_KEY   || 'process.env.BAGS_API_KEY',
+  process.env.BAGS_API_KEY_2 || 'process.env.BAGS_API_KEY_2',
+  process.env.BAGS_API_KEY_3 || 'process.env.BAGS_API_KEY_3',
+  process.env.BAGS_API_KEY_4 || 'process.env.BAGS_API_KEY_4',
+  process.env.BAGS_API_KEY_5 || 'process.env.BAGS_API_KEY_5',
+  process.env.BAGS_API_KEY_6 || 'process.env.BAGS_API_KEY_6',
 ];
-const COINAPI_KEY = process.env.COINAPI_KEY || '9320e9e4-9048-4e41-a7fc-7811674e7249';
+const COINAPI_KEY = process.env.COINAPI_KEY || 'process.env.COINAPI_KEY';
 const BAGS_API    = 'https://public-api-v2.bags.fm/api/v1';
 const SOL_MINT    = 'So11111111111111111111111111111111111111112';
 const USDC_MINT   = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';

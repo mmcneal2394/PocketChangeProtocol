@@ -8,7 +8,7 @@ export async function GET() {
     const envConfig = fs.existsSync(envPath) ? require('dotenv').parse(fs.readFileSync(envPath)) : {};
     
     const privateKeyB58 = envConfig.SOLANA_PRIVATE_KEY || process.env.SOLANA_PRIVATE_KEY;
-    const rpcUrl = envConfig.RPC_URL || process.env.RPC_URL || "https://beta.helius-rpc.com/?api-key=df082a16-aebf-4ec4-8ad6-86abfa06c8fc";
+    const rpcUrl = envConfig.RPC_URL || process.env.RPC_URL || "https://beta.helius-rpc.com/?api-key=YOUR_HELIUS_API_KEY";
     let balance = 0.5; // fallback
 
     if (privateKeyB58 && privateKeyB58 !== "YOUR_NEW_PRIVATE_KEY_HERE" && privateKeyB58.length > 30) {

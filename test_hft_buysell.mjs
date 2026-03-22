@@ -9,7 +9,7 @@ dotenv.config();
 const JUPITER_API = 'https://public.jupiterapi.com';
 
 // 1. Standard Node for Reading Chain State (Balances, Blockhashes, Priorities)
-const READ_RPC = 'https://solana-mainnet.core.chainstack.com/95d603f3d634acfbf2ac5a57a32baf97';
+const READ_RPC = 'https://solana-mainnet.core.chainstack.com/YOUR_CHAINSTACK_KEY';
 
 // 2. BloXroute Trader Node strictly for Writing (Submit/Warp constraints limit read commands yielding 405 errors)
 const WRITE_RPC = 'https://nd-622-626-774.p2pify.com/89d5bb214e0ab0b5b25397cd9ca79d95';
@@ -102,7 +102,7 @@ async function runHftPing() {
     const wallet = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(secretKeyStr)));
     
     // Explicit read/write node bifurcation
-    const READ_WSS = 'wss://solana-mainnet.core.chainstack.com/95d603f3d634acfbf2ac5a57a32baf97';
+    const READ_WSS = 'wss://solana-mainnet.core.chainstack.com/YOUR_CHAINSTACK_KEY';
     const readConn = new Connection(READ_RPC, { wsEndpoint: READ_WSS, commitment: 'confirmed' });
     const writeConn = new Connection(WRITE_RPC, 'confirmed');
 

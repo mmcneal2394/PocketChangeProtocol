@@ -2,7 +2,7 @@ import { Connection, Keypair, VersionedTransaction } from '@solana/web3.js';
 import fs from 'fs';
 
 const JUPITER_API = 'https://lite-api.jup.ag';
-const RPC_ENDPOINT = 'https://solana-mainnet.core.chainstack.com/95d603f3d634acfbf2ac5a57a32baf97';
+const RPC_ENDPOINT = 'https://solana-mainnet.core.chainstack.com/YOUR_CHAINSTACK_KEY';
 
 async function testBuy() {
     console.log('⚡ Constructing physical test transaction via Droplet (0.001 SOL -> RAY)...');
