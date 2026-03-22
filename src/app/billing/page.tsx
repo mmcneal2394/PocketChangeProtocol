@@ -43,7 +43,7 @@ function BillingContent() {
       </header>
 
       {/* Current Plan Overview */}
-      <section className="glassmorphism fade-in" style={{ padding: "32px", borderRadius: "16px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "32px", borderTop: "2px solid var(--primary)" }}>
+      <section className="glassmorphism fade-in billing-overview" style={{ padding: "32px", borderRadius: "16px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "32px", borderTop: "2px solid var(--primary)" }}>
           <div>
               <p style={{ fontSize: "0.9rem", color: "var(--text-secondary)", textTransform: "uppercase", fontWeight: 600, letterSpacing: "1px", marginBottom: "8px" }}>
                   Ecosystem Governance
@@ -64,7 +64,7 @@ function BillingContent() {
               </div>
           </div>
 
-          <div style={{ borderLeft: "1px solid rgba(255,255,255,0.1)", paddingLeft: "32px", display: "flex", flexDirection: "column", justifyContent: "center" }}>
+          <div className="billing-divider" style={{ borderLeft: "1px solid rgba(255,255,255,0.1)", paddingLeft: "32px", display: "flex", flexDirection: "column", justifyContent: "center" }}>
               <h3 style={{ fontSize: "1.2rem", color: "#fff", marginBottom: "16px" }}>Protocol Value Distribution</h3>
               
               <div style={{ marginBottom: "24px" }}>
