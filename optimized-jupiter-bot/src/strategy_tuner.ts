@@ -1,71 +1,80 @@
 /**
- * strategy_tuner.ts
+ * strategy_tuner.ts  —  Two-Speed Auto-Calibration
  * ─────────────────────────────────────────────────────────────────────────────
- * 72-Hour Auto-Calibration Engine
  *
- * Every 3 days (configurable via TUNE_INTERVAL_HOURS), this module reads the
- * last N trade outcomes from trades.db / telemetry logs, then recalculates
- * optimal values for the core strategy parameters using:
+ *  FAST LOOP  (default: 15 min, override FAST_TUNE_INTERVAL_MINUTES)
+ *    · Reads last 50 trades only (cheap I/O)
+ *    · Recalibrates: MIN_PROFIT_SOL, MIN_SPREAD_BPS
+ *    · Safe to run frequently — these are threshold-only, no execution risk
+ *    · Adapts to intraday volatility spikes, route crowding, fee changes
  *
- *   1. Kelly Criterion  — optimal fraction of capital to risk per trade
- *   2. EMA Win-Rate     — exponential moving average of recent win rate
- *   3. Sharpe Ratio     — risk-adjusted return signal for tip %, slippage
- *   4. Percentile BPS   — 25th/50th/75th profit spread for threshold setting
- *   5. Volatility Band  — rolling std-dev on profit used to gate trade size
+ *  SLOW LOOP  (default: 72 h,  override TUNE_INTERVAL_HOURS)
+ *    · Reads last 500 trades
+ *    · Recalibrates: TIP_PERCENTAGE, MAX_SLIPPAGE_BPS, MAX_TRADE_SIZE_SOL,
+ *                    SPLIT_RATIO  (full Kelly / Sharpe / percentile rebuild)
+ *    · Needs statistical depth — never run on sparse data
  *
- * Output is written to strategy_params.json which config.ts reads on restart,
- * AND emitted as a log event visible in the admin panel's live log stream.
+ *  Both loops write to strategy_params.json.  The slow loop merges over the
+ *  fast loop's latest thresholds so nothing is ever overwritten blindly.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import fs from 'fs';
+import fs   from 'fs';
 import path from 'path';
 import { logger } from './utils/logger';
 
-// ── Tuning interval ──────────────────────────────────────────────────────────
-const TUNE_INTERVAL_MS  = (parseInt(process.env.TUNE_INTERVAL_HOURS || '72')) * 60 * 60 * 1000;
-const PARAMS_PATH       = path.join(__dirname, '..', 'strategy_params.json');
-const TELEMETRY_PATHS   = [
-  path.join(__dirname, '..', 'engine-worker', 'telemetry.jsonl'),
+// ── Intervals ─────────────────────────────────────────────────────────────────
+const FAST_INTERVAL_MS = (parseInt(process.env.FAST_TUNE_INTERVAL_MINUTES || '15')) * 60 * 1000;
+const SLOW_INTERVAL_MS = (parseInt(process.env.TUNE_INTERVAL_HOURS        || '72')) * 60 * 60 * 1000;
+
+const FAST_WINDOW = 50;   // trade rows for fast loop
+const SLOW_WINDOW = 500;  // trade rows for slow loop
+
+const PARAMS_PATH     = path.join(process.cwd(), 'strategy_params.json');
+const TELEMETRY_PATHS = [
   path.join(process.cwd(), 'engine-worker', 'telemetry.jsonl'),
   path.join(process.cwd(), 'telemetry.jsonl'),
 ];
 
-// ── Default safe parameters (used when no history available) ─────────────────
+// ── Default parameters ────────────────────────────────────────────────────────
 export const DEFAULT_PARAMS = {
-  MIN_PROFIT_SOL:   0.0001,   // Minimum net profit to execute a trade
-  TIP_PERCENTAGE:   0.50,     // Fraction of gross profit paid as Jito tip
-  MAX_SLIPPAGE_BPS: 50,       // Max tolerable slippage in basis points
-  MAX_TRADE_SIZE_SOL: 0.02,   // Capital committed per swap
-  SPLIT_RATIO:      0.50,     // Fraction of tokens routed to first sell DEX
-  MIN_SPREAD_BPS:   8,        // Minimum spread in BPS to even consider a route
-  updatedAt:        0,
+  // --- Fast-loop owned ---
+  MIN_PROFIT_SOL:   0.0001,
+  MIN_SPREAD_BPS:   8,
+  // --- Slow-loop owned ---
+  TIP_PERCENTAGE:   0.50,
+  MAX_SLIPPAGE_BPS: 50,
+  MAX_TRADE_SIZE_SOL: 0.02,
+  SPLIT_RATIO:      0.50,
+  // --- Metadata ---
+  fastUpdatedAt: 0,
+  slowUpdatedAt: 0,
 };
 
 export type StrategyParams = typeof DEFAULT_PARAMS;
 
-// ── Load current params from disk (or defaults) ───────────────────────────────
+// ── Persist / load ─────────────────────────────────────────────────────────────
 export function loadStrategyParams(): StrategyParams {
   try {
     if (fs.existsSync(PARAMS_PATH)) {
-      const raw = JSON.parse(fs.readFileSync(PARAMS_PATH, 'utf-8'));
-      return { ...DEFAULT_PARAMS, ...raw };
+      return { ...DEFAULT_PARAMS, ...JSON.parse(fs.readFileSync(PARAMS_PATH, 'utf-8')) };
     }
-  } catch (e: any) {
-    logger.warn(`[TUNER] Could not read strategy_params.json: ${e.message}`);
-  }
+  } catch {}
   return { ...DEFAULT_PARAMS };
 }
 
-// ── Read latest N trade outcomes from telemetry ───────────────────────────────
-interface TradeRecord {
-  success: boolean;
-  profit_sol: number;
-  spread_bps?: number;
-  route?: string;
+function saveParams(params: StrategyParams): void {
+  try {
+    fs.writeFileSync(PARAMS_PATH, JSON.stringify(params, null, 2), 'utf-8');
+  } catch (e: any) {
+    logger.error(`[TUNER] Failed to save params: ${e.message}`);
+  }
 }
 
-function readTelemetry(maxRows = 500): TradeRecord[] {
+// ── Telemetry reader ──────────────────────────────────────────────────────────
+interface TradeRow { success: boolean; profit_sol: number; spread_bps?: number; }
+
+function readTelemetry(maxRows: number): TradeRow[] {
   for (const p of TELEMETRY_PATHS) {
     if (!fs.existsSync(p)) continue;
     try {
@@ -74,189 +83,178 @@ function readTelemetry(maxRows = 500): TradeRecord[] {
         .filter(l => l.length > 5)
         .map(l => { try { return JSON.parse(l); } catch { return null; } })
         .filter(Boolean)
-        .slice(-maxRows) as TradeRecord[];
+        .slice(-maxRows) as TradeRow[];
     } catch { continue; }
   }
   return [];
 }
 
 // ── Math helpers ──────────────────────────────────────────────────────────────
-
-/** Exponential Moving Average (α = 2/(N+1)) */
 function ema(values: number[], period: number): number {
-  if (values.length === 0) return 0;
+  if (!values.length) return 0;
   const alpha = 2 / (period + 1);
-  let result = values[0];
-  for (let i = 1; i < values.length; i++) {
-    result = alpha * values[i] + (1 - alpha) * result;
-  }
-  return result;
+  return values.reduce((acc, v, i) => i === 0 ? v : alpha * v + (1 - alpha) * acc, values[0]);
 }
 
-/** Population standard deviation */
 function stdDev(values: number[]): number {
   if (values.length <= 1) return 0;
   const mean = values.reduce((a, b) => a + b, 0) / values.length;
-  const variance = values.reduce((a, b) => a + (b - mean) ** 2, 0) / values.length;
-  return Math.sqrt(variance);
+  return Math.sqrt(values.reduce((a, b) => a + (b - mean) ** 2, 0) / values.length);
 }
 
-/** Percentile (linear interpolation) */
 function percentile(sorted: number[], p: number): number {
-  if (sorted.length === 0) return 0;
+  if (!sorted.length) return 0;
   const idx = (p / 100) * (sorted.length - 1);
-  const low = Math.floor(idx);
-  const high = Math.ceil(idx);
-  if (low === high) return sorted[low];
-  return sorted[low] + (sorted[high] - sorted[low]) * (idx - low);
+  const lo  = Math.floor(idx), hi = Math.ceil(idx);
+  return lo === hi ? sorted[lo] : sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
 }
 
-/**
- * Kelly Criterion for binary outcomes:
- *   f* = (p * b - q) / b
- *   where p = win probability, q = 1 - p, b = avg_win / avg_loss
- *   Returns a fraction in [0, 0.25] (quarter-Kelly for safety)
- */
 function kellyFraction(winRate: number, avgWin: number, avgLoss: number): number {
   if (avgLoss <= 0 || avgWin <= 0) return 0.05;
   const b = avgWin / avgLoss;
-  const q = 1 - winRate;
-  const kelly = (winRate * b - q) / b;
-  // Apply quarter-Kelly and clamp to sane range [0.01, 0.25]
-  return Math.max(0.01, Math.min(0.25, kelly * 0.25));
+  const kelly = (winRate * b - (1 - winRate)) / b;
+  return Math.max(0.01, Math.min(0.25, kelly * 0.25)); // quarter-Kelly, clamped
 }
 
-/**
- * Sharpe Ratio (annualised proxy, using trade-level returns)
- * Used to determine if increasing tip / slippage is justified.
- */
-function sharpeRatio(returns: number[], riskFreeRate = 0): number {
+function sharpeRatio(returns: number[]): number {
   if (returns.length < 5) return 0;
   const mean = returns.reduce((a, b) => a + b, 0) / returns.length;
   const sd   = stdDev(returns);
-  if (sd === 0) return 0;
-  return (mean - riskFreeRate) / sd;
+  return sd === 0 ? 0 : mean / sd;
 }
 
-// ── Core calibration logic ────────────────────────────────────────────────────
-export function calibrate(trades: TradeRecord[]): StrategyParams {
+// ══ FAST LOOP ════════════════════════════════════════════════════════════════
+// Only touches: MIN_PROFIT_SOL, MIN_SPREAD_BPS
+// Safe to run every 15 min — pure threshold adjustments, no execution logic.
+// ─────────────────────────────────────────────────────────────────────────────
+function runFastTune(): void {
+  const trades = readTelemetry(FAST_WINDOW);
   const current = loadStrategyParams();
 
-  if (trades.length < 10) {
-    logger.warn('[TUNER] Insufficient trade history (<10 records) — keeping current params.');
-    return { ...current, updatedAt: Date.now() };
+  if (trades.length < 5) {
+    logger.debug('[FAST-TUNER] <5 trades in window — skipping');
+    return;
   }
 
-  const profits   = trades.map(t => t.profit_sol);
-  const wins      = trades.filter(t => t.success && t.profit_sol > 0);
-  const losses    = trades.filter(t => !t.success || t.profit_sol <= 0);
+  const profits       = trades.map(t => t.profit_sol);
+  const winningProfits = profits.filter(p => p > 0).sort((a, b) => a - b);
+  const emaWin        = ema(trades.map(t => t.success ? 1 : 0), 10);
+  const spreads       = trades.filter(t => t.spread_bps != null).map(t => t.spread_bps!).sort((a, b) => a - b);
 
-  const winRate   = wins.length / trades.length;
-  const avgWin    = wins.length  > 0 ? wins.reduce((a, t)  => a + t.profit_sol, 0) / wins.length  : 0;
-  const avgLoss   = losses.length > 0 ? Math.abs(losses.reduce((a, t) => a + t.profit_sol, 0) / losses.length) : 0.0001;
+  // MIN_PROFIT: use P25 of recent wins as loose floor; scale by win rate
+  const p25win  = winningProfits.length > 0 ? percentile(winningProfits, 25) : current.MIN_PROFIT_SOL;
+  let newMinProfit = Math.max(0.00005, p25win * 0.85);
+  if (emaWin < 0.35) newMinProfit = Math.min(newMinProfit * 1.4, 0.002); // losing streak → raise bar
+  if (emaWin > 0.65) newMinProfit = Math.max(newMinProfit * 0.9, 0.00005); // winning → lower bar
 
-  // 1. EMA of win rate over last 20 trades (responsive to recent shifts)
-  const recentWins = trades.slice(-20).map(t => t.success ? 1 : 0);
-  const emaWinRate = ema(recentWins, 10);
+  // MIN_SPREAD_BPS: 1.1× the median spread, floor at 4 BPS
+  const medianSpread   = spreads.length > 0 ? percentile(spreads, 50) : current.MIN_SPREAD_BPS;
+  const newMinSpread   = Math.max(4, Math.round(medianSpread * 1.1));
 
-  // 2. Kelly → optimal trade size fraction
-  const kellyF    = kellyFraction(winRate, avgWin, avgLoss);
+  // Clamp changes to ±30% of current to prevent wild swings from outliers
+  const clamp = (val: number, prev: number, pct = 0.30) =>
+    Math.max(prev * (1 - pct), Math.min(prev * (1 + pct), val));
 
-  // 3. Sharpe → risk signal
-  const sharpe    = sharpeRatio(profits);
+  const updated: StrategyParams = {
+    ...current,
+    MIN_PROFIT_SOL: parseFloat(clamp(newMinProfit, current.MIN_PROFIT_SOL).toFixed(6)),
+    MIN_SPREAD_BPS: Math.round(clamp(newMinSpread, current.MIN_SPREAD_BPS)),
+    fastUpdatedAt:  Date.now(),
+  };
 
-  // 4. Profit percentiles (sorted)
-  const sortedProfits = [...profits].sort((a, b) => a - b);
-  const p25 = percentile(sortedProfits, 25);
-  const p50 = percentile(sortedProfits, 50);  // median
-  const p75 = percentile(sortedProfits, 75);
+  saveParams(updated);
+  logger.info(`[FAST-TUNER] ✓ MIN_PROFIT: ${updated.MIN_PROFIT_SOL} SOL  (was ${current.MIN_PROFIT_SOL})  |  MIN_SPREAD: ${updated.MIN_SPREAD_BPS} BPS  |  EMA win: ${(emaWin * 100).toFixed(0)}%`);
+}
 
-  // 5. Volatility
-  const vol = stdDev(profits);
+// ══ SLOW LOOP ════════════════════════════════════════════════════════════════
+// Touches: TIP_PERCENTAGE, MAX_SLIPPAGE_BPS, MAX_TRADE_SIZE_SOL, SPLIT_RATIO
+// Needs 500-trade window and full Kelly/Sharpe/percentile math.
+// Never called on sparse data (guarded by ≥50 trade minimum).
+// ─────────────────────────────────────────────────────────────────────────────
+function runSlowTune(): void {
+  const trades = readTelemetry(SLOW_WINDOW);
+  const current = loadStrategyParams();
 
-  // ── Derive new params ─────────────────────────────────────────────────────
+  if (trades.length < 50) {
+    logger.warn(`[SLOW-TUNER] Only ${trades.length} trades — need ≥50 for full calibration. Keeping current slow params.`);
+    return;
+  }
 
-  // MIN_PROFIT_SOL: use the 25th percentile of positive profits as the floor.
-  // If win rate is low (<40%), raise the bar; if high (>65%), lower it.
-  let newMinProfit = Math.max(0.00005, p25 > 0 ? p25 * 0.8 : current.MIN_PROFIT_SOL);
-  if (emaWinRate < 0.40) newMinProfit = Math.min(newMinProfit * 1.5, 0.002); // raise threshold when losing
-  if (emaWinRate > 0.65) newMinProfit = Math.max(newMinProfit * 0.8, 0.00005); // lower threshold when winning
+  const profits = trades.map(t => t.profit_sol);
+  const wins    = trades.filter(t => t.success && t.profit_sol > 0);
+  const losses  = trades.filter(t => !t.success || t.profit_sol <= 0);
 
-  // TIP_PERCENTAGE: Kelly-derived. High Sharpe → can pay more; low → be stingier.
-  let newTipPct = 0.30 + (kellyF * 0.8); // ranges from ~0.30 to ~0.50
-  if (sharpe > 1.5)  newTipPct = Math.min(newTipPct * 1.2, 0.65); // strong signal → tip more
-  if (sharpe < 0.5)  newTipPct = Math.max(newTipPct * 0.85, 0.25); // weak signal → tip less
-  newTipPct = Math.max(0.20, Math.min(0.70, newTipPct));
+  const winRate = wins.length / trades.length;
+  const avgWin  = wins.length  > 0 ? wins.reduce((a, t)  => a + t.profit_sol, 0) / wins.length  : 0;
+  const avgLoss = losses.length > 0 ? Math.abs(losses.reduce((a, t) => a + t.profit_sol, 0) / losses.length) : 0.0001;
 
-  // MAX_SLIPPAGE_BPS: tighten in volatile periods, loosen in stable ones.
+  const kellyF  = kellyFraction(winRate, avgWin, avgLoss);
+  const sharpe  = sharpeRatio(profits);
+  const vol     = stdDev(profits);
+
+  const sorted  = [...profits].sort((a, b) => a - b);
+  const p50     = percentile(sorted, 50);
+  const p75     = percentile(sorted, 75);
+
+  const spreads = trades.filter(t => t.spread_bps != null).map(t => t.spread_bps!).sort((a, b) => a - b);
+
+  // TIP_PERCENTAGE: Kelly-anchored, Sharpe-adjusted, clamped [0.20, 0.70]
+  let newTip = 0.30 + (kellyF * 0.8);
+  if (sharpe > 1.5) newTip = Math.min(newTip * 1.2, 0.70);
+  if (sharpe < 0.5) newTip = Math.max(newTip * 0.85, 0.20);
+  newTip = Math.max(0.20, Math.min(0.70, newTip));
+
+  // MAX_SLIPPAGE_BPS: volatility-driven, clamped [20, 100]
   let newSlippage = current.MAX_SLIPPAGE_BPS;
-  if (vol > 0.001) newSlippage = Math.min(newSlippage + 10, 100); // high vol → allow more slip
-  if (vol < 0.0002) newSlippage = Math.max(newSlippage - 5, 20); // low vol → tighten slip
+  if (vol > 0.001)  newSlippage = Math.min(newSlippage + 10, 100);
+  if (vol < 0.0002) newSlippage = Math.max(newSlippage - 5,  20);
 
-  // MAX_TRADE_SIZE_SOL: Kelly fraction × a safe capital ceiling (0.1 SOL max for now)
-  const CAPITAL_CEILING = parseFloat(process.env.MAX_CAPITAL_SOL || '0.10');
-  const newTradeSize = Math.max(0.005, Math.min(kellyF * CAPITAL_CEILING, CAPITAL_CEILING));
+  // MAX_TRADE_SIZE_SOL: quarter-Kelly of capital ceiling, clamped [0.005, ceiling]
+  const CEILING  = parseFloat(process.env.MAX_CAPITAL_SOL || '0.10');
+  const newSize  = Math.max(0.005, Math.min(kellyF * CEILING, CEILING));
 
-  // SPLIT_RATIO: If 3-hop performs better than split, lean toward 50/50.
-  // Simple heuristic: if median profit > 75th / 2, balanced split is fine.
-  const newSplitRatio = p75 > 0 && p50 / p75 > 0.6 ? 0.50 : 0.40;
+  // SPLIT_RATIO: balanced (0.50) if median is >60% of P75, else lean to 0.40
+  const newSplit = p75 > 0 && p50 / p75 > 0.60 ? 0.50 : 0.40;
 
-  // MIN_SPREAD_BPS: 1.2× the 25th percentile spread, or at least 5 BPS.
-  const spreads = trades.filter(t => t.spread_bps != null).map(t => t.spread_bps!);
-  const medianSpread = spreads.length > 0 ? percentile([...spreads].sort((a, b) => a - b), 50) : 8;
-  const newMinSpread = Math.max(5, Math.round(medianSpread * 1.2));
+  // Clamp all changes to ±25% of current to prevent stat-noise driven lurches
+  const clamp = (val: number, prev: number, pct = 0.25) =>
+    Math.max(prev * (1 - pct), Math.min(prev * (1 + pct), val));
 
-  const newParams: StrategyParams = {
-    MIN_PROFIT_SOL:     parseFloat(newMinProfit.toFixed(6)),
-    TIP_PERCENTAGE:     parseFloat(newTipPct.toFixed(3)),
-    MAX_SLIPPAGE_BPS:   Math.round(newSlippage),
-    MAX_TRADE_SIZE_SOL: parseFloat(newTradeSize.toFixed(4)),
-    SPLIT_RATIO:        parseFloat(newSplitRatio.toFixed(2)),
-    MIN_SPREAD_BPS:     newMinSpread,
-    updatedAt:          Date.now(),
+  const updated: StrategyParams = {
+    ...current,
+    TIP_PERCENTAGE:     parseFloat(clamp(newTip,      current.TIP_PERCENTAGE,     0.25).toFixed(3)),
+    MAX_SLIPPAGE_BPS:   Math.round(clamp(newSlippage, current.MAX_SLIPPAGE_BPS,   0.25)),
+    MAX_TRADE_SIZE_SOL: parseFloat(clamp(newSize,     current.MAX_TRADE_SIZE_SOL, 0.25).toFixed(4)),
+    SPLIT_RATIO:        parseFloat(newSplit.toFixed(2)),
+    slowUpdatedAt:      Date.now(),
   };
 
-  logger.info(`[TUNER] ── 72h Calibration Complete ──────────────────────────`);
-  logger.info(`[TUNER] Trades analysed   : ${trades.length} (wins: ${wins.length} | losses: ${losses.length})`);
-  logger.info(`[TUNER] Win rate (EMA-10) : ${(emaWinRate * 100).toFixed(1)}%`);
-  logger.info(`[TUNER] Kelly fraction    : ${(kellyF * 100).toFixed(1)}%`);
-  logger.info(`[TUNER] Sharpe ratio      : ${sharpe.toFixed(3)}`);
-  logger.info(`[TUNER] P50 profit        : ${p50.toFixed(6)} SOL  |  Volatility: ${vol.toFixed(6)}`);
-  logger.info(`[TUNER] NEW MIN_PROFIT    : ${newParams.MIN_PROFIT_SOL} SOL  (was ${current.MIN_PROFIT_SOL})`);
-  logger.info(`[TUNER] NEW TIP %         : ${(newParams.TIP_PERCENTAGE * 100).toFixed(1)}%   (was ${(current.TIP_PERCENTAGE * 100).toFixed(1)}%)`);
-  logger.info(`[TUNER] NEW SLIPPAGE      : ${newParams.MAX_SLIPPAGE_BPS} BPS (was ${current.MAX_SLIPPAGE_BPS})`);
-  logger.info(`[TUNER] NEW TRADE SIZE    : ${newParams.MAX_TRADE_SIZE_SOL} SOL (was ${current.MAX_TRADE_SIZE_SOL})`);
-  logger.info(`[TUNER] NEW SPLIT RATIO   : ${(newParams.SPLIT_RATIO * 100).toFixed(0)}% / ${((1 - newParams.SPLIT_RATIO) * 100).toFixed(0)}%`);
-  logger.info(`[TUNER] ─────────────────────────────────────────────────────`);
+  saveParams(updated);
 
-  return newParams;
+  logger.info(`[SLOW-TUNER] ══ 72h Full Recalibration ════════════════════════`);
+  logger.info(`[SLOW-TUNER] Trades: ${trades.length} | Win rate: ${(winRate*100).toFixed(1)}% | Kelly: ${(kellyF*100).toFixed(1)}% | Sharpe: ${sharpe.toFixed(2)} | Vol: ${vol.toFixed(6)}`);
+  logger.info(`[SLOW-TUNER] TIP %       : ${(updated.TIP_PERCENTAGE*100).toFixed(1)}%   (was ${(current.TIP_PERCENTAGE*100).toFixed(1)}%)`);
+  logger.info(`[SLOW-TUNER] SLIPPAGE    : ${updated.MAX_SLIPPAGE_BPS} BPS  (was ${current.MAX_SLIPPAGE_BPS})`);
+  logger.info(`[SLOW-TUNER] TRADE SIZE  : ${updated.MAX_TRADE_SIZE_SOL} SOL (was ${current.MAX_TRADE_SIZE_SOL})`);
+  logger.info(`[SLOW-TUNER] SPLIT RATIO : ${(updated.SPLIT_RATIO*100).toFixed(0)}%/${((1-updated.SPLIT_RATIO)*100).toFixed(0)}% (was ${(current.SPLIT_RATIO*100).toFixed(0)}%/${((1-current.SPLIT_RATIO)*100).toFixed(0)}%)`);
+  logger.info(`[SLOW-TUNER] ═══════════════════════════════════════════════════`);
 }
 
-// ── Persist to disk ──────────────────────────────────────────────────────────
-function saveParams(params: StrategyParams): void {
-  try {
-    fs.writeFileSync(PARAMS_PATH, JSON.stringify(params, null, 2), 'utf-8');
-    logger.info(`[TUNER] Parameters saved → ${PARAMS_PATH}`);
-  } catch (e: any) {
-    logger.error(`[TUNER] Failed to save params: ${e.message}`);
-  }
-}
-
-// ── Scheduled loop — runs every TUNE_INTERVAL_MS ─────────────────────────────
+// ── Public boot function ──────────────────────────────────────────────────────
 export function startStrategyTuner(): void {
-  const intervalHours = TUNE_INTERVAL_MS / (1000 * 60 * 60);
-  logger.info(`[TUNER] Strategy auto-calibration scheduled every ${intervalHours}h`);
+  logger.info(`[TUNER] Two-speed calibration starting:`);
+  logger.info(`[TUNER]   FAST loop → every ${FAST_INTERVAL_MS / 60000} min  (MIN_PROFIT, MIN_SPREAD)`);
+  logger.info(`[TUNER]   SLOW loop → every ${SLOW_INTERVAL_MS / 3600000} h  (TIP%, SLIPPAGE, TRADE SIZE, SPLIT)`);
 
-  const run = () => {
-    logger.info('[TUNER] Starting 72h parameter recalibration...');
-    const trades  = readTelemetry(500);
-    const params  = calibrate(trades);
-    saveParams(params);
-  };
+  // Fast: first run after 60s, then every FAST_INTERVAL_MS
+  setTimeout(() => {
+    runFastTune();
+    setInterval(runFastTune, FAST_INTERVAL_MS);
+  }, 60_000);
 
-  // Run once at startup (after 60s delay to let engine warm up)
-  setTimeout(run, 60_000);
-
-  // Then on schedule
-  setInterval(run, TUNE_INTERVAL_MS);
+  // Slow: first run after 120s (let fast loop run first), then every SLOW_INTERVAL_MS
+  setTimeout(() => {
+    runSlowTune();
+    setInterval(runSlowTune, SLOW_INTERVAL_MS);
+  }, 120_000);
 }
