@@ -142,27 +142,47 @@ class RouteManager {
     return batch;
   }
 
-  // ── Bootstrap with the hardcoded token list ─────────────────────────────────
+  // ── Bootstrap with expanded token list (scored 2026-03-22) ─────────────────
   seedDefaults() {
-    const DEFAULTS = [
-      { mint: USDC,                                                'source': 'default', liq: 1e9,  trust: 100 },
-      { mint: 'EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYtM2wYSzRo', source: 'default', liq: 5e6,  trust: 90  }, // WIF
-      { mint: 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263', source: 'default', liq: 8e6,  trust: 90  }, // BONK
-      { mint: '4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R',  source: 'default', liq: 3e6,  trust: 90  }, // RAY
-      { mint: 'JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbPwdrsxGBK',    source: 'default', liq: 4e6,  trust: 90  }, // JUP
-      { mint: 'HZ1JovNiVvGrGNiiYvEozEVgZ58xaU3AkTftx2K2aFCh', source: 'default', liq: 2e6,  trust: 90  }, // PYTH
-      { mint: 'jtojtomepa8beP8AuQc6eXt5FriJwfFMwQx2v2f9mCL',   source: 'default', liq: 1e6,  trust: 90  }, // JTO
-      { mint: '7GCihgDB8fe6KNjn2gN7ZDB2h2n2i2Z7pW2r2YjN1e8p',  source: 'default', liq: 2e6,  trust: 85  }, // POPCAT
-      { mint: 'ukHH6c7mMyiWCf1b9pnWe25TSpkDDt3H5pQZgM2W8qT',   source: 'default', liq: 1e6,  trust: 80  }, // BOME
-      // PCP token
-      { mint: '4yfwG2VqohXCMpX7SKz3uy7CKzujL4SkhjJMkgKvBAGS', source: 'BagsFm', liq: 50000, trust: 75 },
+    const DEFAULTS: Array<{ mint: string; source: string; liq: number; trust: number; cat: string }> = [
+      // ── Stablecoins (anchor routes) ──────────────────────────────────────────
+      { mint: USDC,                                                  source: 'default', liq: 75_000_000, trust: 100, cat: 'bluechip' },
+      { mint: 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB',       source: 'default', liq: 871_000_000,trust: 100, cat: 'bluechip' }, // USDT
+
+      // ── DeFi LSTs — showed +5-7bps spread in live scoring ────────────────────
+      { mint: 'mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So',       source: 'default', liq: 1_619_000,  trust: 90,  cat: 'defi'     }, // MSOL +6.94bps
+      { mint: 'J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn',       source: 'default', liq: 4_497_000,  trust: 90,  cat: 'defi'     }, // jitoSOL +6.15bps
+      { mint: 'bSo13r4TkiE4KumL71LsHTPpL2euBYLFx6h9HP3piy1',        source: 'default', liq: 618_000,    trust: 88,  cat: 'defi'     }, // bSOL +0.92bps
+      { mint: 'orcaEKTdK7LKz57vaAYr9QeNsVEPfiu6QeMU1kektZE',        source: 'default', liq: 715_000,    trust: 88,  cat: 'defi'     }, // ORCA +5.94bps
+      { mint: '4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R',       source: 'default', liq: 3_492_000,  trust: 75,  cat: 'bluechip' }, // RAY +6.63bps (high rug flag — deweighted)
+
+      // ── High-vol memes — within arb range with 100bps slippage ───────────────
+      { mint: 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263',       source: 'default', liq: 821_000,    trust: 85,  cat: 'meme'     }, // BONK  -9bps (marginal)
+      { mint: 'EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYtM2wYSzRo',       source: 'DexScreener', liq: 4_200_000, trust: 85, cat: 'meme'  }, // WIF   top scored pair
+      { mint: '7GCihgDB8fe6KNjn2gN7ZDB2h2n2i2Z7pW2r2YjN1e8p',       source: 'default', liq: 900_000,    trust: 83,  cat: 'meme'     }, // POPCAT
+      { mint: 'ukHH6c7mMyiWCf1b9pnWe25TSpkDDt3H5pQZgM2W8qT',        source: 'default', liq: 600_000,    trust: 80,  cat: 'meme'     }, // BOME
+      { mint: '6p6xgHyF7AeE6TZkSmFsko444wqoP15icUSqi2jfGiPN',        source: 'DexScreener', liq: 3_000_000, trust: 80, cat: 'meme'  }, // TRUMP  -2bps (marginal)
+      { mint: 'FUAfBo2jgks6gB4Z4LfZkqSZgzNucisEHqnNebaRxM1P',       source: 'DexScreener', liq: 1_000_000, trust: 75, cat: 'meme'  }, // MELANIA
+      { mint: '9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump',        source: 'DexScreener', liq: 2_000_000, trust: 78, cat: 'meme'  }, // FARTCOIN -1bps (near-arb)
+      { mint: 'HeLp6NuQkmYB4pYWo2zYs22mESHXPQYzXbB8n4V98jwC',       source: 'DexScreener', liq: 800_000,   trust: 72, cat: 'meme'  }, // AI16Z
+      { mint: 'JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbPwdrsxGBK',         source: 'default', liq: 12_000_000,  trust: 88,  cat: 'bluechip' }, // JUP
+      { mint: 'jtojtomepa8beP8AuQc6eXt5FriJwfFMwQx2v2f9mCL',        source: 'default', liq: 739_000,    trust: 85,  cat: 'bluechip' }, // JTO
+
+      // ── DexScreener top-boost pairs (discovered 2026-03-22) ──────────────────
+      // (MEW, JELL scored in top 10 by DexScreener volume — watch for arb windows)
+      { mint: '27G8MtK7VtTcCHkpASjSDdkWWYfoqT6ggEuKidVJidD4',       source: 'DexScreener', liq: 9_383_000, trust: 70, cat: 'meme'  }, // MEW
+      { mint: 'HZ1JovNiVvGrGNiiYvEozEVgZ58xaU3AkTftx2K2aFCh',       source: 'default', liq: 200_000,    trust: 85,  cat: 'bluechip' }, // PYTH
+
+      // ── PCP native token ─────────────────────────────────────────────────────
+      { mint: '4yfwG2VqohXCMpX7SKz3uy7CKzujL4SkhjJMkgKvBAGS',       source: 'BagsFm', liq: 50_000,    trust: 75,  cat: 'native'   }, // PCP
     ];
 
     for (const d of DEFAULTS) {
       this.addToken({ mint: d.mint, source: d.source, liquidityUsd: d.liq, trustScore: d.trust, addedAt: Date.now() });
     }
-    logger.info(`[ROUTE-MGR] Seeded ${this.tokens.size} default routes`);
+    logger.info(`[ROUTE-MGR] Seeded ${this.tokens.size} default routes (bluechip + meme + defi + native)`);
   }
+
 
   stats() {
     return {
