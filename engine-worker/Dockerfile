@@ -13,7 +13,10 @@ RUN rm -rf src
 
 # Copy source and build
 COPY src/ src/
-COPY .cargo/ .cargo/
+
+# Create .cargo/config.toml for incremental=false if needed
+RUN mkdir -p .cargo && echo '[build]\nincremental = false' > .cargo/config.toml
+
 RUN cargo build --release
 
 # Runtime stage
@@ -24,6 +27,8 @@ RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/
 WORKDIR /app
 
 COPY --from=builder /build/target/release/arbitrasaas-engine .
+
+# Copy engine config from source
 COPY engine.toml .
 
 EXPOSE 3002
