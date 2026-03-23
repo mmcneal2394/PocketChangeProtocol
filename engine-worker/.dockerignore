@@ -1,2 +1,3 @@
-target/*
-!target/release/arbitrasaas-engine
+target/
+.cargo/
+*.so
