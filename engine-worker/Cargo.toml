@@ -33,6 +33,7 @@ async-trait = "0.1"
 uuid = { version = "1", features = ["v4"] }
 anchor-client = "0.29"
 anyhow = "1"
+bincode = "1"
 
 [profile.release]
 opt-level = 3
