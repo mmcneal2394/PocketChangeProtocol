@@ -1,13 +1,14 @@
 use async_trait::async_trait;
 use rust_decimal::Decimal;
 use rust_decimal::prelude::*;
-use solana_sdk::instruction::Instruction;
-use solana_sdk::signature::Keypair;
+use solana_sdk::instruction::{Instruction, AccountMeta};
+use solana_sdk::pubkey::Pubkey;
+use solana_sdk::signature::{Keypair, Signer};
 use uuid::Uuid;
 use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::Mutex;
-use tracing::{info, debug};
+use tracing::{info, warn, debug};
 use crate::types::*;
 use crate::price::PriceCache;
 use crate::strategy::Strategy;
@@ -15,9 +16,21 @@ use crate::executor::cex_executor::CexDexPosition;
 
 const ESTIMATED_TOTAL_FEE_PCT: f64 = 0.15; // CEX fee + gas + slippage
 
+/// Token symbol -> Solana mint address mapping for Jupiter API calls
+const MINT_MAP: &[(&str, &str)] = &[
+    ("SOL", "So11111111111111111111111111111111111111112"),
+    ("RAY", "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R"),
+    ("WIF", "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm"),
+    ("BONK", "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263"),
+    ("mSOL", "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So"),
+    ("JitoSOL", "J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn"),
+];
+const USDC_MINT: &str = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+
 pub struct CexDexStrategy {
     threshold: Decimal,
     open_position: Arc<Mutex<Option<CexDexPosition>>>,
+    client: reqwest::Client,
 }
 
 impl CexDexStrategy {
@@ -25,7 +38,134 @@ impl CexDexStrategy {
         Self {
             threshold: Decimal::from_f64(threshold).unwrap_or(Decimal::new(1, 0)),
             open_position: Arc::new(Mutex::new(None)),
+            client: reqwest::Client::new(),
         }
+    }
+
+    /// Resolve a token symbol (e.g. "SOL") to its Solana mint address.
+    fn resolve_mint(symbol: &str) -> Option<&'static str> {
+        MINT_MAP.iter().find(|(s, _)| *s == symbol).map(|(_, m)| *m)
+    }
+
+    /// Extract the token symbol from an opportunity route string.
+    /// Routes look like "SOL buy DEX, sell CEX (spread 1.50%)"
+    fn parse_token_from_route(route: &str) -> Option<&str> {
+        route.split_whitespace().next()
+    }
+
+    /// Determine the trade size in token base units from USDC amount and a rough price.
+    /// For the DEX leg we convert USDC notional to lamports/base-units.
+    fn usdc_to_base_units(symbol: &str, usdc_amount: f64) -> u64 {
+        // Rough prices for sizing — actual execution uses Jupiter quote output
+        let (price_est, decimals): (f64, u32) = match symbol {
+            "SOL" => (150.0, 9),
+            "RAY" => (2.0, 6),
+            "WIF" => (1.5, 6),
+            "BONK" => (0.00002, 5),
+            "mSOL" => (160.0, 9),
+            "JitoSOL" => (165.0, 9),
+            _ => (1.0, 6),
+        };
+        let token_amount = usdc_amount / price_est;
+        (token_amount * 10_f64.powi(decimals as i32)) as u64
+    }
+
+    /// Fetch a Jupiter quote for the DEX leg (buy token with USDC or sell token for USDC).
+    async fn fetch_jupiter_quote(
+        &self,
+        input_mint: &str,
+        output_mint: &str,
+        amount: u64,
+    ) -> anyhow::Result<serde_json::Value> {
+        let url = format!(
+            "https://public.jupiterapi.com/quote?inputMint={}&outputMint={}&amount={}&slippageBps=50",
+            input_mint, output_mint, amount
+        );
+        let resp = self.client.get(&url)
+            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+            .timeout(std::time::Duration::from_secs(10))
+            .send()
+            .await?;
+
+        if !resp.status().is_success() {
+            return Err(anyhow::anyhow!("Jupiter quote failed: HTTP {}", resp.status()));
+        }
+        let json: serde_json::Value = resp.json().await?;
+        if json.get("error").is_some() {
+            return Err(anyhow::anyhow!("Jupiter quote error: {}", json));
+        }
+        Ok(json)
+    }
+
+    /// Fetch swap instructions from Jupiter for a given quote.
+    async fn fetch_swap_instructions(
+        &self,
+        quote_response: &serde_json::Value,
+        user_pubkey: &str,
+    ) -> anyhow::Result<Vec<Instruction>> {
+        let payload = serde_json::json!({
+            "quoteResponse": quote_response,
+            "userPublicKey": user_pubkey,
+            "wrapAndUnwrapSol": true,
+        });
+
+        let resp = self.client.post("https://public.jupiterapi.com/swap-instructions")
+            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+            .header("Content-Type", "application/json")
+            .json(&payload)
+            .timeout(std::time::Duration::from_secs(10))
+            .send()
+            .await?;
+
+        let status = resp.status();
+        let body = resp.text().await.unwrap_or_default();
+        if !status.is_success() || body.contains("\"error\"") {
+            return Err(anyhow::anyhow!("Jupiter swap-instructions failed ({}): {}", status, body));
+        }
+
+        let data: serde_json::Value = serde_json::from_str(&body)?;
+        let mut instructions = Vec::new();
+
+        let parse_ix = |ix: &serde_json::Value| -> anyhow::Result<Instruction> {
+            let program_id = ix["programId"].as_str().unwrap_or_default()
+                .parse::<Pubkey>().map_err(|e| anyhow::anyhow!("bad programId: {}", e))?;
+            let data_b64 = ix["data"].as_str().unwrap_or_default();
+            let ix_data = base64::Engine::decode(
+                &base64::engine::general_purpose::STANDARD, data_b64
+            ).unwrap_or_default();
+            let accounts = ix["accounts"].as_array()
+                .ok_or_else(|| anyhow::anyhow!("missing accounts array"))?
+                .iter()
+                .map(|acc| {
+                    let pubkey = acc["pubkey"].as_str().unwrap_or_default()
+                        .parse::<Pubkey>().unwrap_or_default();
+                    let is_signer = acc["isSigner"].as_bool().unwrap_or(false);
+                    let is_writable = acc["isWritable"].as_bool().unwrap_or(false);
+                    if is_writable {
+                        AccountMeta::new(pubkey, is_signer)
+                    } else {
+                        AccountMeta::new_readonly(pubkey, is_signer)
+                    }
+                })
+                .collect();
+            Ok(Instruction { program_id, accounts, data: ix_data })
+        };
+
+        // Setup instructions (ATA creation, etc.)
+        if let Some(setup) = data["setupInstructions"].as_array() {
+            for ix in setup {
+                instructions.push(parse_ix(ix)?);
+            }
+        }
+
+        // Core swap instruction
+        if let Some(swap) = data["swapInstruction"].as_object() {
+            instructions.push(parse_ix(&serde_json::Value::Object(swap.clone()))?);
+        } else {
+            return Err(anyhow::anyhow!("Missing swapInstruction in Jupiter response"));
+        }
+
+        Ok(instructions)
     }
 }
 
@@ -82,10 +222,134 @@ impl Strategy for CexDexStrategy {
         opportunities
     }
 
-    fn build_instructions(&self, opp: &Opportunity, _wallet: &Keypair) -> anyhow::Result<Vec<Instruction>> {
+    fn build_instructions(&self, opp: &Opportunity, wallet: &Keypair) -> anyhow::Result<Vec<Instruction>> {
         // DEX leg only — CEX leg handled by CexExecutor after DEX confirms
         info!("Building DEX leg instructions for CEX-DEX: {}", opp.route);
-        Ok(vec![])
+
+        let token = Self::parse_token_from_route(&opp.route)
+            .ok_or_else(|| anyhow::anyhow!("Cannot parse token from route: {}", opp.route))?;
+        let token_mint = Self::resolve_mint(token)
+            .ok_or_else(|| anyhow::anyhow!("Unknown token mint for: {}", token))?;
+
+        // Determine direction: "buy DEX" means USDC -> token on-chain
+        let buying_on_dex = opp.route.contains("buy DEX");
+        let (input_mint, output_mint, amount) = if buying_on_dex {
+            // Buy token on DEX with USDC
+            let usdc_amount = opp.trade_size_usdc.to_f64().unwrap_or(2000.0);
+            let base_units = (usdc_amount * 1_000_000.0) as u64; // USDC has 6 decimals
+            (USDC_MINT, token_mint, base_units)
+        } else {
+            // Sell token on DEX for USDC
+            let usdc_amount = opp.trade_size_usdc.to_f64().unwrap_or(2000.0);
+            let base_units = Self::usdc_to_base_units(token, usdc_amount);
+            (token_mint, USDC_MINT, base_units)
+        };
+
+        let user_pubkey = wallet.pubkey().to_string();
+
+        // Block on async Jupiter calls from sync context (we're inside a tokio runtime)
+        let handle = tokio::runtime::Handle::current();
+        let client = self.client.clone();
+
+        // Build a temporary strategy ref for the async calls
+        let input_mint = input_mint.to_string();
+        let output_mint = output_mint.to_string();
+
+        let instructions = tokio::task::block_in_place(|| {
+            handle.block_on(async {
+                // Step 1: Get Jupiter quote
+                let quote_url = format!(
+                    "https://public.jupiterapi.com/quote?inputMint={}&outputMint={}&amount={}&slippageBps=50",
+                    input_mint, output_mint, amount
+                );
+                let resp = client.get(&quote_url)
+                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                    .timeout(std::time::Duration::from_secs(10))
+                    .send()
+                    .await
+                    .map_err(|e| anyhow::anyhow!("Jupiter quote request failed: {}", e))?;
+
+                if !resp.status().is_success() {
+                    return Err(anyhow::anyhow!("Jupiter quote HTTP {}", resp.status()));
+                }
+                let quote: serde_json::Value = resp.json().await
+                    .map_err(|e| anyhow::anyhow!("Jupiter quote parse failed: {}", e))?;
+                if quote.get("error").is_some() {
+                    return Err(anyhow::anyhow!("Jupiter quote error: {}", quote));
+                }
+
+                info!("Jupiter quote: {} {} -> {} outAmount={}",
+                    token, input_mint, output_mint,
+                    quote["outAmount"].as_str().unwrap_or("?"));
+
+                // Step 2: Get swap instructions
+                let payload = serde_json::json!({
+                    "quoteResponse": quote,
+                    "userPublicKey": user_pubkey,
+                    "wrapAndUnwrapSol": true,
+                });
+                let resp = client.post("https://public.jupiterapi.com/swap-instructions")
+                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                    .header("Content-Type", "application/json")
+                    .json(&payload)
+                    .timeout(std::time::Duration::from_secs(10))
+                    .send()
+                    .await
+                    .map_err(|e| anyhow::anyhow!("Jupiter swap-instructions request failed: {}", e))?;
+
+                let status = resp.status();
+                let body = resp.text().await.unwrap_or_default();
+                if !status.is_success() || body.contains("\"error\"") {
+                    return Err(anyhow::anyhow!("Jupiter swap-instructions failed ({}): {}", status, body));
+                }
+
+                let data: serde_json::Value = serde_json::from_str(&body)
+                    .map_err(|e| anyhow::anyhow!("swap-instructions JSON parse: {}", e))?;
+
+                let mut ixs = Vec::new();
+
+                let parse_ix = |ix: &serde_json::Value| -> anyhow::Result<Instruction> {
+                    let program_id = ix["programId"].as_str().unwrap_or_default()
+                        .parse::<Pubkey>().map_err(|e| anyhow::anyhow!("bad programId: {}", e))?;
+                    let data_b64 = ix["data"].as_str().unwrap_or_default();
+                    let ix_data = base64::Engine::decode(
+                        &base64::engine::general_purpose::STANDARD, data_b64
+                    ).unwrap_or_default();
+                    let accounts: Vec<AccountMeta> = ix["accounts"].as_array()
+                        .ok_or_else(|| anyhow::anyhow!("missing accounts"))?
+                        .iter()
+                        .map(|acc| {
+                            let pubkey = acc["pubkey"].as_str().unwrap_or_default()
+                                .parse::<Pubkey>().unwrap_or_default();
+                            let is_signer = acc["isSigner"].as_bool().unwrap_or(false);
+                            let is_writable = acc["isWritable"].as_bool().unwrap_or(false);
+                            if is_writable {
+                                AccountMeta::new(pubkey, is_signer)
+                            } else {
+                                AccountMeta::new_readonly(pubkey, is_signer)
+                            }
+                        })
+                        .collect();
+                    Ok(Instruction { program_id, accounts, data: ix_data })
+                };
+
+                if let Some(setup) = data["setupInstructions"].as_array() {
+                    for ix in setup {
+                        ixs.push(parse_ix(ix)?);
+                    }
+                }
+                if let Some(swap) = data["swapInstruction"].as_object() {
+                    ixs.push(parse_ix(&serde_json::Value::Object(swap.clone()))?);
+                } else {
+                    return Err(anyhow::anyhow!("Missing swapInstruction in Jupiter response"));
+                }
+
+                info!("Built {} DEX leg instructions for CEX-DEX {}", ixs.len(), token);
+                Ok(ixs)
+            })
+        })?;
+
+        Ok(instructions)
     }
 
     fn min_profit_threshold(&self) -> Decimal { self.threshold }
