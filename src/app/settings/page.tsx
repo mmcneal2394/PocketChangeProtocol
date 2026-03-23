@@ -20,10 +20,10 @@ export default function SettingsPage() {
         <p style={{ color: "var(--text-secondary)", fontSize: "1rem" }}>Securely manage your KMS encryption master keys, account access, and webhooks.</p>
       </header>
 
-      <div style={{ display: "flex", gap: "32px" }}>
-        
+      <div className="settings-layout" style={{ display: "flex", gap: "32px" }}>
+
         {/* Navigation Sidebar */}
-        <aside style={{ width: "250px", display: "flex", flexDirection: "column", gap: "12px" }}>
+        <aside className="settings-nav" style={{ width: "250px", display: "flex", flexDirection: "column", gap: "12px" }}>
           {tabs.map(tab => (
             <button key={tab.id}
               onClick={() => setSelectedTab(tab.id)}
