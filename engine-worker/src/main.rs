@@ -68,7 +68,7 @@ async fn main() -> anyhow::Result<()> {
 
     // 5. Check vault program
     let vault_program_id = solana_sdk::pubkey::Pubkey::from_str(
-        "FSRUKKMxfWNDiVKKVyxiaaweZR8HZEMnsyHmb8caPjAy"
+        "GKUwMKjS4UU5zFQXV83oNjm8DZmVpYzyiTGAhHEiCnLR"
     ).ok();
     let vault_available = if let Some(pid) = vault_program_id {
         match rpc.get_account(&pid) {

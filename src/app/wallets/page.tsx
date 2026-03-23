@@ -24,7 +24,7 @@ export default function WalletsPage() {
   const [cooldownTime, setCooldownTime] = useState(0); // 0 means inactive
   const [isVaultPaused, setIsVaultPaused] = useState(false); // Admin Pause Auth
 
-  const PROGRAM_ID = new PublicKey("FSRUKKMxfWNDiVKKVyxiaaweZR8HZEMnsyHmb8caPjAy"); 
+  const PROGRAM_ID = new PublicKey("GKUwMKjS4UU5zFQXV83oNjm8DZmVpYzyiTGAhHEiCnLR"); 
   const NETWORK = process.env.NEXT_PUBLIC_NETWORK || "localnet"; 
   const USDC_MINT = NETWORK === "devnet" 
       ? new PublicKey("4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU")

@@ -52,7 +52,7 @@ impl FlashLoanStrategy {
     pub fn new(threshold: f64, vault_available: bool) -> Self {
         // Default PDAs — in production these are derived or loaded from config.
         // Using the on-chain program ID from CLAUDE.md.
-        let program_id = Pubkey::from_str("FSRUKKMxfWNDiVKKVyxiaaweZR8HZEMnsyHmb8caPjAy")
+        let program_id = Pubkey::from_str("GKUwMKjS4UU5zFQXV83oNjm8DZmVpYzyiTGAhHEiCnLR")
             .unwrap_or_default();
         let token_program = spl_token_id();
 
