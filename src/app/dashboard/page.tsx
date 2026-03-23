@@ -76,7 +76,7 @@ export default function DashboardPage() {
       : new PublicKey("J86cnryv65eNYsgXx3KssYcEh34gkDwqwpVR4SYEEoAd"); 
 
   const PCP_MINT = NETWORK === "devnet"
-      ? new PublicKey("PCPxZ3m2v...mockdev") // Placeholder for deployed Devnet PCP
+      ? new PublicKey("11111111111111111111111111111111") // Placeholder for deployed Devnet PCP
       : new PublicKey("HnroupxERUkWZGzqcqWyXHbGF326rV2MkcT4RNcKY3Aw");
 
   const handleDeposit = async () => {
