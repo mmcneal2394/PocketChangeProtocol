@@ -1,85 +1,63 @@
 use std::env;
-use tokio::sync::mpsc;
-use tokio::task;
 use solana_sdk::signature::{Keypair, Signer};
 
-// Simulated modules 
+// Core modules
 mod config;
 mod db;
 mod kms;
 mod engine;
 mod types;
+mod rpc;
+mod price;
+mod strategy;
+mod approval;
+mod executor;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
-    println!("🚀 Starting ArbitraSaaS Multi-Tenant Worker...");
+    println!("Starting ArbitraSaaS Engine Worker...");
 
     // 1. Initialize Log Telemetry
-    let db_client = db::DbClient::new().await;
-    
-    // Test Injecting an audit log manually before booting
-    db_client.inject_audit_log(db::TradeLogEvent {
-        execution_time_ms: 120,
-        timestamp_sec: 0,
-        route: "USDC -> WIF -> USDC".to_string(),
-        tenant_id: "system-1".to_string(),
-        tx_signature: "5xyz...mock".to_string(),
-        profit_sol: 0.150,
-        status: "EXEC_SUCCESS".to_string(),
-        success: true,
-        error_msg: None
-    }).await.unwrap();
+    let telemetry = db::TelemetryWriter::new("telemetry.jsonl");
 
-    // 2. Connect to Central Message Bus
-    let nats_url = env::var("NATS_URL").unwrap_or_else(|_| "nats://localhost:4222".to_string());
-    println!("📡 Connecting to Core Messaging Bus at: {}", nats_url);
-    
-    // 3. Load Assigned Tenants configuration
-    println!("🔐 Authenticating with KMS. Requesting Assigned Wallets...");
-    let kms_client = kms::KMSClient::from_env().unwrap_or_else(|_| {
-        println!("⚠️  KMS_MASTER_KEY not set — using dev placeholder key");
+    // Test injecting a startup telemetry event
+    telemetry.write_event(&types::TelemetryEvent {
+        timestamp: chrono::Utc::now().to_rfc3339(),
+        event: "engine_start".to_string(),
+        strategy: "system".to_string(),
+        route: "N/A".to_string(),
+        expected_profit_pct: 0.0,
+        actual_profit_sol: None,
+        tx_hash: None,
+        mode: "paper".to_string(),
+        execution_time_ms: None,
+        status: "ok".to_string(),
+        error: None,
+    });
+
+    // 2. Load wallet from KMS / env
+    println!("Authenticating with KMS...");
+    let _kms_client = kms::KMSClient::from_env().unwrap_or_else(|_| {
+        println!("WARN: KMS_MASTER_KEY not set -- using dev placeholder key");
         kms::KMSClient::from_key(&[0u8; 32])
     });
-    // In production, load encrypted wallet payload from DB and decrypt here.
-    // For dev, fall back to SOLANA_PRIVATE_KEY env var.
+
     let secret = env::var("SOLANA_PRIVATE_KEY")
         .unwrap_or_else(|_| "11111111111111111111111111111111111111111111".to_string());
     let wallet = Keypair::from_base58_string(&secret);
-    println!("🔑 Successfully loaded E883 Wallet: {}", wallet.pubkey());
+    println!("Loaded wallet: {}", wallet.pubkey());
 
-    // 4. Test Engine Network Connection
-    println!("⚡ Initializing Solana RPC Connection (Devnet)...");
-    let rpc_client = solana_client::rpc_client::RpcClient::new("https://api.devnet.solana.com");
-    let balance = rpc_client.get_balance(&wallet.pubkey()).unwrap_or(0);
-    println!("💰 Devnet Balance for {}: {} SOL", wallet.pubkey(), balance as f64 / 1e9);
-
-    println!("⚡ Initializing Jito Bundler API clients...");
-
-    // Start Main Event Loop (Mocked)
-    println!("🟢 Worker Ready! Waiting for price streams on `solana.rpc.pool_updates`...");
-    
-    // Mock the async multi-tenant stream
-    let (tx, mut rx) = mpsc::channel::<String>(100);
-
-    
-    // Construct the Arbitrage Vault Executor
-    let vault_exe = std::sync::Arc::new(engine::VaultExecutor::new(
+    // 3. Construct the Arbitrage Vault Executor (instruction builder)
+    let _vault_exe = engine::VaultExecutor::new(
         wallet,
-        solana_sdk::pubkey::Pubkey::default(), // Placeholder program ID for engine tests
-        solana_sdk::pubkey::Pubkey::default(), 
-    ));
+        solana_sdk::pubkey::Pubkey::default(), // Placeholder program ID
+        solana_sdk::pubkey::Pubkey::default(),  // Placeholder token program
+    );
 
-    // Background task pulling from NATS (simulated)
-    task::spawn(async move {
-        let _ = tx.send("Init".to_string()).await;
-    });
-    
-    // Listen for opportunities
-    while let Some(_job) = rx.recv().await {
-        println!("⚙️ Executing job...");
-        vault_exe.process_loop().await;
-    }
+    println!("Engine ready. VaultExecutor initialised with instruction builders.");
+    // The orchestrator / strategy layer will call vault_exe.build_vault_ptb() and
+    // vault_exe.fetch_jupiter_instructions() as needed.
 
     Ok(())
 }

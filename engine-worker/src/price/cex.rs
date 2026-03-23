@@ -1,0 +1,1 @@
+// Bitget REST API poller
