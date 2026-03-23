@@ -17,9 +17,20 @@ log = "0.4"
 env_logger = "0.10"
 aes-gcm = "0.10" # For decrypting HSM-managed wallet keys
 # jito-protos = "0.1.0"
-sha2 = "0.10.8"
 futures = "0.3"
 base64 = "0.22.1"
+toml = "0.8"
+axum = { version = "0.7", features = ["json"] }
+tower-http = { version = "0.5", features = ["cors"] }
+chrono = { version = "0.4", features = ["serde"] }
+hmac = "0.12"
+rust_decimal = { version = "1.33", features = ["serde-with-str"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
+async-trait = "0.1"
+uuid = { version = "1", features = ["v4"] }
+anchor-client = "0.29"
+anyhow = "1"
 
 [profile.release]
 opt-level = 3
