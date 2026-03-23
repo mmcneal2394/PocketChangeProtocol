@@ -86,10 +86,19 @@
 
 ---
 
+## Devnet Deployment & Infrastructure
+
+- [x] **Smart contract deployed to devnet** — Program ID: `GKUwMKjS4UU5zFQXV83oNjm8DZmVpYzyiTGAhHEiCnLR`, cost: 2.44 SOL, binary: 342 KB
+- [x] **All program ID references updated** across 9 files (contract, engine, frontend, scripts, docs)
+- [x] **Dockerfile updated** — multi-stage build (builder + debian:bookworm-slim runtime), exposes port 3002
+- [x] **Integration tests added** — 8 tests covering config, PriceCache, circuit breaker, telemetry, KMS, strategies, approval router paper mode
+- [x] **lib.rs created** — re-exports all modules for integration test access
+
+**Test counts:** 48 unit + 8 integration = 56 unique tests (104 total including lib re-run)
+
 ## Remaining Work
 
 - [ ] Drift SDK integration for perp leg (funding rate strategy currently spot-only)
-- [ ] Deploy smart contract to devnet and mainnet
+- [ ] Deploy smart contract to mainnet
 - [ ] Run with real PostgreSQL (currently in-memory store for opportunities API)
-- [ ] Integration test: paper mode end-to-end pipeline
-- [ ] Dockerfile update for engine.toml + port 3002
+- [ ] Update docker-compose.yml for new engine architecture
