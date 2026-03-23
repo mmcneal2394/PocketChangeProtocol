@@ -73,7 +73,7 @@ pub enum OrderType {
 }
 
 #[repr(u8)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PositionDirection {
     Long = 0,
     Short = 1,
@@ -211,6 +211,18 @@ impl OrderParams {
             None => buf.push(0),
         }
         buf
+    }
+}
+
+// --- Market Resolution ---
+
+/// Resolve a perp market name (e.g. "SOL-PERP") to its Drift market index.
+pub fn resolve_market_index(market: &str) -> anyhow::Result<u16> {
+    match market {
+        "SOL-PERP" => Ok(0),
+        "BTC-PERP" => Ok(1),
+        "ETH-PERP" => Ok(2),
+        other => anyhow::bail!("Unknown Drift perp market: {}", other),
     }
 }
 

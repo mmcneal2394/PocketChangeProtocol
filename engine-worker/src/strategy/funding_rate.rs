@@ -12,6 +12,7 @@ use uuid::Uuid;
 use crate::types::*;
 use crate::price::PriceCache;
 use crate::strategy::Strategy;
+use crate::engine::drift::{self, OrderParams, PositionDirection};
 
 /// Drift Protocol markets to monitor for funding rate arbitrage.
 const DRIFT_MARKETS: &[(&str, u32)] = &[
@@ -40,6 +41,10 @@ const SLIPPAGE_BPS: u32 = 50;
 
 /// USDC mint on Solana mainnet (6 decimals).
 const USDC_MINT: &str = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+
+/// Base unit precision for Drift perp markets (9 decimals for all).
+/// 1 SOL/BTC/ETH = 1_000_000_000 base units on Drift.
+const DRIFT_BASE_PRECISION: u64 = 1_000_000_000;
 
 /// Spot mint mappings for perp markets -> underlying spot token.
 const SPOT_MINTS: &[(&str, &str)] = &[
@@ -283,9 +288,26 @@ impl FundingRateStrategy {
         Ok(Instruction { program_id, accounts, data })
     }
 
-    /// Build real Jupiter swap instructions for the spot leg of the funding rate arb.
-    /// For v1, only the spot leg is built via Jupiter. The perp leg requires Drift SDK
-    /// integration (tracked for v2).
+    /// Convert a USDC trade size to Drift perp base asset amount using the spot price.
+    ///
+    /// `base_asset_amount = (usdc_size / spot_price) * DRIFT_BASE_PRECISION`
+    ///
+    /// Example: $5000 USDC at SOL price $150 → 33.33 SOL → 33_333_333_333 base units.
+    fn usdc_to_base_asset_amount(trade_size_usdc: &Decimal, spot_price: f64) -> u64 {
+        if spot_price <= 0.0 {
+            return 0;
+        }
+        let size_f64 = trade_size_usdc.to_f64().unwrap_or(0.0);
+        let token_qty = size_f64 / spot_price;
+        (token_qty * DRIFT_BASE_PRECISION as f64) as u64
+    }
+
+    /// Build Jupiter swap instructions for the spot leg AND Drift perp instructions
+    /// for the hedge leg of the funding rate arb.
+    ///
+    /// Funding rate arb is a delta-neutral strategy:
+    /// - Positive funding (longs pay shorts): buy spot (long) + short perp → collect funding
+    /// - Negative funding (shorts pay longs): sell spot (short) + long perp → collect funding
     async fn build_funding_rate_ixs(
         &self,
         opp: &Opportunity,
@@ -302,7 +324,8 @@ impl FundingRateStrategy {
 
         let user_pubkey = wallet.pubkey().to_string();
 
-        if long_spot {
+        // --- Leg 1: Spot (Jupiter) ---
+        let (swap_ixs, spot_price_estimate) = if long_spot {
             // Long spot: buy the underlying token with USDC
             info!(
                 "Funding rate spot leg: buy {} with {} USDC lamports (long spot)",
@@ -318,36 +341,30 @@ impl FundingRateStrategy {
                 anyhow::bail!("Jupiter returned zero outAmount for spot buy leg");
             }
 
+            // Derive spot price from the quote: price = usdc_amount / token_amount
+            // USDC has 6 decimals, spot tokens have 9 decimals
+            let spot_price = (amount_lamports as f64 / 1e6) / (out_amount as f64 / 1e9);
+
             info!(
-                "Funding rate spot leg quote: {} USDC -> {} {} tokens",
-                amount_lamports, out_amount, market
+                "Funding rate spot leg quote: {} USDC -> {} {} tokens (price ~${:.2})",
+                amount_lamports, out_amount, market, spot_price
             );
 
-            let swap_ixs = self.fetch_swap_instructions(&quote, &user_pubkey).await?;
+            let ixs = self.fetch_swap_instructions(&quote, &user_pubkey).await?;
 
             info!(
                 "Built {} instructions for funding rate spot leg (long {})",
-                swap_ixs.len(), market
+                ixs.len(), market
             );
 
-            // TODO(v2): Add perp short leg via Drift SDK when drift-sdk crate is integrated.
-            // The perp leg would short the same market on Drift to create a delta-neutral
-            // position, collecting the funding rate differential as profit.
-
-            Ok(swap_ixs)
+            (ixs, spot_price)
         } else {
             // Short spot: sell the underlying token for USDC
-            // This requires the wallet to already hold the spot token.
-            // For the sell leg, we swap spot_mint -> USDC.
             info!(
                 "Funding rate spot leg: sell {} for USDC (short spot, amount {} lamports)",
                 market, amount_lamports
             );
 
-            // When selling spot, the amount is in the spot token's units.
-            // We approximate using the USDC amount as a proxy — Jupiter will
-            // resolve the actual route. In practice, the engine would check
-            // the wallet's token balance.
             let quote = self.fetch_jupiter_quote(spot_mint, USDC_MINT, amount_lamports).await?;
 
             let out_amount = quote["outAmount"].as_str()
@@ -357,22 +374,66 @@ impl FundingRateStrategy {
                 anyhow::bail!("Jupiter returned zero outAmount for spot sell leg");
             }
 
+            // Derive spot price: price = usdc_out / tokens_in
+            let spot_price = (out_amount as f64 / 1e6) / (amount_lamports as f64 / 1e9);
+
             info!(
-                "Funding rate spot leg quote: {} tokens -> {} USDC lamports",
-                amount_lamports, out_amount
+                "Funding rate spot leg quote: {} {} tokens -> {} USDC lamports (price ~${:.2})",
+                amount_lamports, market, out_amount, spot_price
             );
 
-            let swap_ixs = self.fetch_swap_instructions(&quote, &user_pubkey).await?;
+            let ixs = self.fetch_swap_instructions(&quote, &user_pubkey).await?;
 
             info!(
                 "Built {} instructions for funding rate spot leg (short {})",
-                swap_ixs.len(), market
+                ixs.len(), market
             );
 
-            // TODO(v2): Add perp long leg via Drift SDK when drift-sdk crate is integrated.
+            (ixs, spot_price)
+        };
 
-            Ok(swap_ixs)
+        // --- Leg 2: Perp (Drift) ---
+        // The perp direction is OPPOSITE to the spot direction (that's the hedge).
+        let perp_direction = if long_spot {
+            PositionDirection::Short
+        } else {
+            PositionDirection::Long
+        };
+
+        // Convert USDC trade size to base asset amount using the spot price
+        let base_asset_amount = Self::usdc_to_base_asset_amount(
+            &opp.trade_size_usdc,
+            spot_price_estimate,
+        );
+
+        if base_asset_amount == 0 {
+            anyhow::bail!(
+                "Could not compute perp base_asset_amount (spot_price={:.2}, trade_size={})",
+                spot_price_estimate, opp.trade_size_usdc
+            );
         }
+
+        let market_index = drift::resolve_market_index(&market)?;
+        let perp_params = OrderParams::market_order(perp_direction, base_asset_amount, market_index);
+        let perp_ix = drift::place_perp_order(&wallet.pubkey(), 0, perp_params);
+
+        info!(
+            "Funding rate perp leg: {:?} {} — base_asset_amount={} (≈{:.4} tokens at ${:.2})",
+            perp_direction, market, base_asset_amount,
+            base_asset_amount as f64 / DRIFT_BASE_PRECISION as f64,
+            spot_price_estimate,
+        );
+
+        // --- Combine both legs ---
+        let mut all_ixs = swap_ixs;
+        all_ixs.push(perp_ix);
+
+        info!(
+            "Built {} total instructions for funding rate arb ({} spot + 1 perp)",
+            all_ixs.len(), all_ixs.len() - 1
+        );
+
+        Ok(all_ixs)
     }
 }
 
@@ -590,5 +651,68 @@ mod tests {
                 "Missing spot mint for Drift market: {}", market_name
             );
         }
+    }
+
+    #[test]
+    fn test_perp_direction_opposite_to_spot() {
+        // When we're long spot, we should be short perp (positive funding rate).
+        // Route format: "SOL-PERP short perp + long spot (rate: 0.15%)"
+        let long_spot_route = "SOL-PERP short perp + long spot (rate: 0.15%)";
+        assert!(
+            FundingRateStrategy::is_long_spot(long_spot_route),
+            "Should detect long spot in route"
+        );
+        // Long spot → perp direction should be Short (the hedge)
+        let perp_dir = if FundingRateStrategy::is_long_spot(long_spot_route) {
+            PositionDirection::Short
+        } else {
+            PositionDirection::Long
+        };
+        assert_eq!(perp_dir as u8, PositionDirection::Short as u8);
+
+        // When we're short spot, we should be long perp (negative funding rate).
+        let short_spot_route = "SOL-PERP long perp + short spot (rate: -0.10%)";
+        assert!(
+            !FundingRateStrategy::is_long_spot(short_spot_route),
+            "Should detect short spot in route"
+        );
+        let perp_dir2 = if FundingRateStrategy::is_long_spot(short_spot_route) {
+            PositionDirection::Short
+        } else {
+            PositionDirection::Long
+        };
+        assert_eq!(perp_dir2 as u8, PositionDirection::Long as u8);
+    }
+
+    #[test]
+    fn test_usdc_to_base_asset_amount() {
+        // $5000 USDC at SOL price $150 → 33.333... SOL → ~33_333_333_333 base units
+        let trade_size = Decimal::new(5000, 0);
+        let base_amount = FundingRateStrategy::usdc_to_base_asset_amount(&trade_size, 150.0);
+        // 5000 / 150 = 33.333... SOL × 1e9 = 33_333_333_333
+        assert_eq!(base_amount, 33_333_333_333);
+
+        // $10000 USDC at BTC price $60000 → 0.1667 BTC
+        let trade_size_btc = Decimal::new(10000, 0);
+        let base_btc = FundingRateStrategy::usdc_to_base_asset_amount(&trade_size_btc, 60000.0);
+        // 10000 / 60000 = 0.16667 BTC × 1e9 = 166_666_666
+        assert_eq!(base_btc, 166_666_666);
+
+        // Edge: zero price should return 0
+        let base_zero = FundingRateStrategy::usdc_to_base_asset_amount(&trade_size, 0.0);
+        assert_eq!(base_zero, 0);
+
+        // Edge: negative price should return 0
+        let base_neg = FundingRateStrategy::usdc_to_base_asset_amount(&trade_size, -100.0);
+        assert_eq!(base_neg, 0);
+    }
+
+    #[test]
+    fn test_drift_market_index_resolution() {
+        // Verify Drift market indices match what the funding rate strategy expects
+        assert_eq!(drift::resolve_market_index("SOL-PERP").unwrap(), 0);
+        assert_eq!(drift::resolve_market_index("BTC-PERP").unwrap(), 1);
+        assert_eq!(drift::resolve_market_index("ETH-PERP").unwrap(), 2);
+        assert!(drift::resolve_market_index("DOGE-PERP").is_err());
     }
 }
