@@ -154,7 +154,7 @@ export default function YieldStrategies() {
         </p>
       </header>
 
-      <section style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: "32px" }}>
+      <section className="grid-1fr-2fr" style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: "32px" }}>
         {/* Controls */}
         <div className="glassmorphism fade-in" style={{ padding: "32px", borderRadius: "16px", border: "1px solid rgba(255,255,255,0.15)" }}>
             <h3 style={{ fontSize: "1.2rem", fontWeight: 600, marginBottom: "24px", color: "white" }}>Strategy Deployment</h3>
