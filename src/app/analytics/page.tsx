@@ -7,11 +7,16 @@ export default function AnalyticsPage() {
   const [data, setData] = useState<any>({
       totalTrades: 0, winRate: "0.0%", totalPnL: "0.00 SOL", volume: "0.00 SOL"
   });
+  const [engineData, setEngineData] = useState<any>(null);
 
   useEffect(() => {
       fetch('/api/analytics').then(r => r.json()).then(res => {
           if (!res.error) setData(res);
-      });
+      }).catch(() => {});
+
+      fetch('/api/engine?path=status').then(r => r.json()).then(status => {
+          if (!status.error) setEngineData(status);
+      }).catch(() => {});
   }, []);
 
   return (
@@ -67,6 +72,36 @@ export default function AnalyticsPage() {
           </p>
         </div>
       </section>
+
+      {/* Engine Live Metrics */}
+      {engineData && (
+        <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "24px" }}>
+          <div className="glassmorphism fade-in" style={{ padding: "24px", borderRadius: "16px", border: "1px solid rgba(0,255,170,0.2)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "16px" }}>
+              <p style={{ color: "var(--text-secondary)", fontWeight: 600 }}>Engine Mode</p>
+              <ShowChart style={{ color: "var(--success)" }} />
+            </div>
+            <h2 style={{ fontSize: "2.2rem", fontWeight: 800, color: "#fff", textTransform: "uppercase" as const }}>{engineData.mode || "offline"}</h2>
+            <p style={{ color: engineData.circuit_breaker?.active ? "var(--error)" : "var(--success)", fontSize: "0.9rem", display: "flex", alignItems: "center", gap: "4px", marginTop: "8px" }}>
+              <span style={{ width: "8px", height: "8px", borderRadius: "50%", display: "inline-block", background: engineData.circuit_breaker?.active ? "var(--error)" : "var(--success)" }} />
+              {engineData.circuit_breaker?.active ? `Breaker: ${engineData.circuit_breaker.reason || "TRIPPED"}` : "Circuit Breaker OK"}
+            </p>
+          </div>
+
+          <div className="glassmorphism fade-in" style={{ padding: "24px", borderRadius: "16px", border: "1px solid rgba(255,255,255,0.1)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "16px" }}>
+              <p style={{ color: "var(--text-secondary)", fontWeight: 600 }}>Engine Uptime</p>
+              <TrendingUp style={{ color: "var(--primary)" }} />
+            </div>
+            <h2 style={{ fontSize: "2.2rem", fontWeight: 800, color: "#fff" }}>
+              {engineData.uptime_secs ? `${Math.floor(engineData.uptime_secs / 3600)}h ${Math.floor((engineData.uptime_secs % 3600) / 60)}m` : "--"}
+            </h2>
+            <p style={{ color: "var(--text-secondary)", fontSize: "0.9rem", marginTop: "8px" }}>
+              {engineData.uptime_secs ? `${engineData.uptime_secs.toLocaleString()}s total` : "Engine not connected"}
+            </p>
+          </div>
+        </section>
+      )}
 
       {/* Main Charts area */}
       <div style={{ display: "flex", gap: "24px", flexWrap: "wrap" }}>

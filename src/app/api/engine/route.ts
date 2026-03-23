@@ -1,8 +1,8 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
 const ENGINE_BASE = process.env.ENGINE_API_URL || 'http://localhost:3002/api';
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const sub = searchParams.get('path') || 'status';
@@ -12,7 +12,11 @@ export async function GET(req: Request) {
     const segment = allowed.includes(sub) ? sub : 'status';
 
     const url = `${ENGINE_BASE}/${segment}`;
-    const res = await fetch(url, { next: { revalidate: 0 }, cache: 'no-store' });
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    const secret = process.env.ENGINE_API_SECRET;
+    if (secret) headers['Authorization'] = `Bearer ${secret}`;
+
+    const res = await fetch(url, { cache: 'no-store', headers });
     if (!res.ok) throw new Error(`engine ${res.status}`);
     const data = await res.json();
     return NextResponse.json(data);
@@ -25,5 +29,31 @@ export async function GET(req: Request) {
       sniperStatus: 'Engine offline',
       error: e instanceof Error ? e.message : 'unknown',
     }, { status: 200 });
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { action, id } = body as { action: string; id: string };
+
+    // Whitelist actions
+    if (!['approve', 'reject'].includes(action) || !id) {
+      return NextResponse.json({ error: 'Invalid action or missing id' }, { status: 400 });
+    }
+
+    const url = `${ENGINE_BASE}/opportunities/${encodeURIComponent(id)}/${action}`;
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    const secret = process.env.ENGINE_API_SECRET;
+    if (secret) headers['Authorization'] = `Bearer ${secret}`;
+
+    const res = await fetch(url, { method: 'POST', cache: 'no-store', headers });
+    if (!res.ok) throw new Error(`engine ${res.status}`);
+    const data = await res.json();
+    return NextResponse.json(data);
+  } catch (e: unknown) {
+    return NextResponse.json({
+      error: e instanceof Error ? e.message : 'unknown',
+    }, { status: 502 });
   }
 }
