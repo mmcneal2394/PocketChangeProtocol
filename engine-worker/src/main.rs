@@ -213,21 +213,24 @@ async fn main() -> anyhow::Result<()> {
                 let mut last_update_id: i64 = 0;
                 loop {
                     let commands = bot.poll_updates(&mut last_update_id).await;
-                    for cmd in commands {
+                    for (_chat_id, cmd) in commands {
                         match cmd {
+                            approval::telegram::TelegramCommand::Start => {
+                                // Auto-handled in poll_updates — welcome sent, chat subscribed
+                            }
                             approval::telegram::TelegramCommand::Approve(id) => {
                                 match r.approve(&id).await {
-                                    Ok(_) => { let _ = bot.send_alert("Approved").await; }
-                                    Err(e) => { let _ = bot.send_alert(&format!("Approve failed: {}", e)).await; }
+                                    Ok(_) => { let _ = bot.send_alert("✅ Approved").await; }
+                                    Err(e) => { let _ = bot.send_alert(&format!("❌ Approve failed: {}", e)).await; }
                                 }
                             }
                             approval::telegram::TelegramCommand::Reject(id) => {
                                 let _ = r.reject(&id).await;
-                                let _ = bot.send_alert("Rejected").await;
+                                let _ = bot.send_alert("🚫 Rejected").await;
                             }
                             approval::telegram::TelegramCommand::Resume => {
                                 cb.write().await.resume();
-                                let _ = bot.send_alert("Circuit breaker resumed").await;
+                                let _ = bot.send_alert("🔄 Circuit breaker resumed").await;
                             }
                         }
                     }
