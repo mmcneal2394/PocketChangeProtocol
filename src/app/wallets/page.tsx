@@ -112,12 +112,12 @@ export default function WalletsPage() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "32px", animation: "fadeIn 0.4s ease forwards" }}>
-      <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <header className="page-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
           <h1 style={{ fontSize: "2rem", fontWeight: 800, marginBottom: "8px" }}>Vault Staking</h1>
           <p style={{ color: "var(--text-secondary)", fontSize: "1rem" }}>Deposit USDC and earn auto-compounding yields from the Arbitrage execution layer.</p>
         </div>
-        <div style={{ display: "flex", gap: "16px" }}>
+        <div className="page-header-actions" style={{ display: "flex", gap: "16px" }}>
             <button onClick={() => setIsVaultPaused(!isVaultPaused)} style={{
                 background: isVaultPaused ? "rgba(255, 68, 68, 0.15)" : "rgba(255, 255, 255, 0.05)", 
                 border: isVaultPaused ? "1px solid rgba(255, 68, 68, 0.4)" : "1px solid var(--border)", 
@@ -233,7 +233,7 @@ export default function WalletsPage() {
         )}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
+      <div className="grid-2-col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
         <div className="glassmorphism fade-in" style={{ padding: "24px", borderRadius: "16px", border: "1px solid rgba(255,255,255,0.2)" }}>
           <h3 style={{ fontSize: "1.2rem", fontWeight: 600, marginBottom: "16px" }}>Unstaking Execution</h3>
           <p style={{ color: "var(--text-secondary)", fontSize: "0.95rem", lineHeight: 1.6, marginBottom: "16px" }}>
@@ -271,7 +271,7 @@ export default function WalletsPage() {
 
       {isDepositModalOpen && (
         <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.8)", backdropFilter: "blur(10px)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div className="glassmorphism fade-in" style={{ width: "450px", padding: "32px", borderRadius: "20px", border: "1px solid rgba(255, 255, 255, 0.2)", position: "relative" }}>
+          <div className="glassmorphism fade-in modal-responsive" style={{ width: "450px", padding: "32px", borderRadius: "20px", border: "1px solid rgba(255, 255, 255, 0.2)", position: "relative" }}>
              <button onClick={() => setIsDepositModalOpen(false)} style={{ position: "absolute", top: "24px", right: "24px", background: "transparent", border: "none", color: "var(--text-secondary)", cursor: "pointer" }}>
                  <Close />
              </button>

@@ -106,7 +106,7 @@ export default function AnalyticsPage() {
       {/* Main Charts area */}
       <div style={{ display: "flex", gap: "24px", flexWrap: "wrap" }}>
         {/* PnL Growth Chart */}
-        <section className="glassmorphism fade-in" style={{ flex: 2, minWidth: "500px", padding: "32px", borderRadius: "16px" }}>
+        <section className="glassmorphism fade-in flex-min-500" style={{ flex: 2, minWidth: "500px", padding: "32px", borderRadius: "16px" }}>
             <h3 style={{ fontSize: "1.2rem", fontWeight: 600, marginBottom: "24px" }}>Cummulative PnL (Rolling 30 Days)</h3>
             
             {/* Mock Chart Area */}
@@ -130,7 +130,7 @@ export default function AnalyticsPage() {
         </section>
 
         {/* Top 5 Wallets Ranked */}
-        <section className="glassmorphism fade-in" style={{ flex: 1, minWidth: "350px", padding: "32px", borderRadius: "16px" }}>
+        <section className="glassmorphism fade-in flex-min-350" style={{ flex: 1, minWidth: "350px", padding: "32px", borderRadius: "16px" }}>
              <h3 style={{ fontSize: "1.2rem", fontWeight: 600, marginBottom: "24px" }}>Top Performing Fleet Wallets</h3>
              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                  {[
