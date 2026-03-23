@@ -73,7 +73,7 @@ Optional:
 
 ## Anchor Program
 
-Program ID: `FSRUKKMxfWNDiVKKVyxiaaweZR8HZEMnsyHmb8caPjAy`
+Program ID: `GKUwMKjS4UU5zFQXV83oNjm8DZmVpYzyiTGAhHEiCnLR`
 
 The vault uses a PDA-based share system: `shares_to_mint = (amount × total_shares) / total_deposits`.
 

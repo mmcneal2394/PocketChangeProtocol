@@ -45,3 +45,5 @@ anchor/.anchor/
 **/new_wallet.json  
 **/*keypair*.json  
 optimized-jupiter-bot/*.json  
+engine-worker/Cargo.lock
+engine-worker/.cargo/

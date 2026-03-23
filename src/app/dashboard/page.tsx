@@ -67,7 +67,7 @@ export default function DashboardPage() {
   const NETWORK = process.env.NEXT_PUBLIC_NETWORK || "localnet"; 
   const RPC_URL = NETWORK === "devnet" ? "https://api.devnet.solana.com" : "http://127.0.0.1:8899";
 
-  const PROGRAM_ID = new PublicKey("FSRUKKMxfWNDiVKKVyxiaaweZR8HZEMnsyHmb8caPjAy"); // Same ID persists between deployments
+  const PROGRAM_ID = new PublicKey("GKUwMKjS4UU5zFQXV83oNjm8DZmVpYzyiTGAhHEiCnLR"); // Same ID persists between deployments
   
   // Dynamic Mints based on active network
   const USDC_MINT = NETWORK === "devnet" 
