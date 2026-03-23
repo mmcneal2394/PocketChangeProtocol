@@ -9,7 +9,7 @@ const connection = new Connection("http://127.0.0.1:8899", "confirmed");
 const authFile = fs.readFileSync('C:/Users/admin/.config/solana/id.json', 'utf8');
 const keypair = Keypair.fromSecretKey(new Uint8Array(JSON.parse(authFile)));
 
-const PROGRAM_ID = new PublicKey("FSRUKKMxfWNDiVKKVyxiaaweZR8HZEMnsyHmb8caPjAy");
+const PROGRAM_ID = new PublicKey("GKUwMKjS4UU5zFQXV83oNjm8DZmVpYzyiTGAhHEiCnLR");
 
 function getDiscriminator(name) {
     return createHash('sha256').update(`global:${name}`).digest().slice(0, 8);
