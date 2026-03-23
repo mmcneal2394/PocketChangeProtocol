@@ -1,3 +1,5 @@
+pub mod drift;
+
 use solana_sdk::{
     instruction::{Instruction, AccountMeta},
     pubkey::Pubkey,
