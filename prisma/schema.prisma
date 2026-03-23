@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
 }
 
 model User {
@@ -95,4 +95,20 @@ model ActivePosition {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   closedAt        DateTime?
+}
+
+model Opportunity {
+  id              String    @id @default(uuid())
+  strategy        String
+  route           String
+  expectedProfit  Float
+  tradeSize       Float
+  status          String    @default("PENDING")
+  mode            String
+  detectedAt      DateTime  @default(now())
+  resolvedAt      DateTime?
+  resolvedBy      String?
+  executionTxHash String?
+  executionProfit Float?
+  createdAt       DateTime  @default(now())
 }
