@@ -41,4 +41,11 @@ impl PriceCache {
     pub fn get_price(&self, mint: &str) -> Option<f64> {
         self.prices.get(mint).map(|e| e.price_usdc)
     }
+
+    /// Remove entries from a given source that are older than `max_age`.
+    pub fn mark_stale(&mut self, source: &str, max_age: Duration) {
+        self.prices.retain(|_, entry| {
+            !(entry.source == source && entry.updated_at.elapsed() > max_age)
+        });
+    }
 }
