@@ -37,8 +37,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     // 3. Load Assigned Tenants configuration
     println!("🔐 Authenticating with KMS. Requesting Assigned Wallets...");
-    let kms_client = kms::KMSClient::new();
-    let secret = kms_client.decrypt_tenant_key("tenant_1_e883_enc", "nonce").unwrap();
+    let kms_client = kms::KMSClient::from_env().unwrap_or_else(|_| {
+        println!("⚠️  KMS_MASTER_KEY not set — using dev placeholder key");
+        kms::KMSClient::from_key(&[0u8; 32])
+    });
+    // In production, load encrypted wallet payload from DB and decrypt here.
+    // For dev, fall back to SOLANA_PRIVATE_KEY env var.
+    let secret = env::var("SOLANA_PRIVATE_KEY")
+        .unwrap_or_else(|_| "11111111111111111111111111111111111111111111".to_string());
     let wallet = Keypair::from_base58_string(&secret);
     println!("🔑 Successfully loaded E883 Wallet: {}", wallet.pubkey());
 
