@@ -1,0 +1,30 @@
+mode = "paper"
+jito_endpoint = "https://mainnet.block-engine.jito.wtf"
+auto_execute_threshold_default = 0.5
+approval_timeout_secs = 300
+max_loss_24h = 50.0
+max_trade_size = 10.0
+max_cex_exposure_secs = 300
+
+# RPC fallback list (primary first, tried in order)
+rpc_fallback_urls = ["https://api.devnet.solana.com"]
+
+[strategy.triangular]
+auto_execute_threshold = 0.3
+enabled = true
+
+[strategy.cex_dex]
+auto_execute_threshold = 1.0
+enabled = true
+
+[strategy.flash_loan]
+auto_execute_threshold = 0.3
+enabled = true
+
+[strategy.funding_rate]
+auto_execute_threshold = 0.08
+enabled = false
+
+[strategy.statistical]
+auto_execute_threshold = 2.0
+enabled = false
