@@ -4,6 +4,7 @@
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "skipLibCheck": true,
+    "typeRoots": ["./node_modules/@types"],
     "strict": true,
     "noEmit": true,
     "esModuleInterop": true,
@@ -30,5 +31,5 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules", "anchor", "scripts"]
+  "exclude": ["node_modules", "anchor", "scripts", "optimized-jupiter-bot", "engine-worker", "programs"]
 }

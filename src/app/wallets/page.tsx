@@ -30,7 +30,7 @@ export default function WalletsPage() {
       ? new PublicKey("4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU")
       : new PublicKey("J86cnryv65eNYsgXx3KssYcEh34gkDwqwpVR4SYEEoAd"); 
   const PCP_MINT = NETWORK === "devnet"
-      ? new PublicKey("PCPxZ3m2v...mockdev")
+      ? new PublicKey("11111111111111111111111111111111")
       : new PublicKey("HnroupxERUkWZGzqcqWyXHbGF326rV2MkcT4RNcKY3Aw");
 
   useEffect(() => {
