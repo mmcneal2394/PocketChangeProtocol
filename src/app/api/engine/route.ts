@@ -1,10 +1,18 @@
 import { NextResponse } from 'next/server';
 
-const ENGINE_URL = process.env.ENGINE_API_URL || 'http://localhost:3002/api/status';
+const ENGINE_BASE = process.env.ENGINE_API_URL || 'http://localhost:3002/api';
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
-    const res = await fetch(ENGINE_URL, { next: { revalidate: 0 }, cache: 'no-store' });
+    const { searchParams } = new URL(req.url);
+    const sub = searchParams.get('path') || 'status';
+
+    // Whitelist allowed sub-paths to prevent open proxy
+    const allowed = ['status', 'opportunities', 'positions'];
+    const segment = allowed.includes(sub) ? sub : 'status';
+
+    const url = `${ENGINE_BASE}/${segment}`;
+    const res = await fetch(url, { next: { revalidate: 0 }, cache: 'no-store' });
     if (!res.ok) throw new Error(`engine ${res.status}`);
     const data = await res.json();
     return NextResponse.json(data);

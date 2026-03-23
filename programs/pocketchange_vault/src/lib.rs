@@ -18,6 +18,9 @@ pub mod pocketchange_vault {
         vault_state.profit_share_treasury_bp = profit_share_treasury_bp; // e.g., 2000 = 20%
         vault_state.total_shares = 0;
         vault_state.total_deposits = 0;
+        vault_state.is_borrowing = false;
+        vault_state.borrow_amount = 0;
+        vault_state.pre_borrow_balance = 0;
         Ok(())
     }
 
@@ -41,9 +44,9 @@ pub mod pocketchange_vault {
         } else {
             (amount as u128)
                 .checked_mul(ctx.accounts.vault_state.total_shares as u128)
-                .unwrap()
+                .ok_or(VaultError::MathOverflow)?
                 .checked_div(ctx.accounts.vault_state.total_deposits as u128)
-                .unwrap() as u64
+                .ok_or(VaultError::MathOverflow)? as u64
         };
 
         // Mint PCP Shares to the User
@@ -65,8 +68,8 @@ pub mod pocketchange_vault {
 
         // Update Global State
         let vault_state = &mut ctx.accounts.vault_state;
-        vault_state.total_deposits = vault_state.total_deposits.checked_add(amount).unwrap();
-        vault_state.total_shares = vault_state.total_shares.checked_add(shares_to_mint).unwrap();
+        vault_state.total_deposits = vault_state.total_deposits.checked_add(amount).ok_or(VaultError::MathOverflow)?;
+        vault_state.total_shares = vault_state.total_shares.checked_add(shares_to_mint).ok_or(VaultError::MathOverflow)?;
 
         msg!("Deposited {} USDC, Minted {} PCP", amount, shares_to_mint);
         Ok(())
@@ -76,8 +79,13 @@ pub mod pocketchange_vault {
     /// This requires atomic transaction composability where the Admin MUST repay
     /// the principal + profit before the end of the transaction.
     pub fn borrow_for_arbitrage(ctx: Context<BorrowForArbitrage>, amount: u64) -> Result<()> {
-        let vault_state = &ctx.accounts.vault_state;
+        let vault_state = &mut ctx.accounts.vault_state;
         require!(ctx.accounts.admin.key() == vault_state.admin, VaultError::Unauthorized);
+        require!(!vault_state.is_borrowing, VaultError::BorrowAlreadyActive);
+
+        vault_state.is_borrowing = true;
+        vault_state.borrow_amount = amount;
+        vault_state.pre_borrow_balance = ctx.accounts.vault_usdc_account.amount;
 
         let vault_bump = ctx.bumps.vault_state;
         let seeds = &["vault".as_bytes(), &[vault_bump]];
@@ -86,7 +94,7 @@ pub mod pocketchange_vault {
         let transfer_accounts = Transfer {
             from: ctx.accounts.vault_usdc_account.to_account_info(),
             to: ctx.accounts.admin_usdc_account.to_account_info(),
-            authority: ctx.accounts.vault_state.to_account_info(),
+            authority: vault_state.to_account_info(),
         };
         let cpi_program = ctx.accounts.token_program.to_account_info();
         let cpi_ctx = CpiContext::new_with_signer(cpi_program, transfer_accounts, signer);
@@ -102,16 +110,17 @@ pub mod pocketchange_vault {
     pub fn process_arbitrage(ctx: Context<ProcessArbitrage>, total_profit: u64) -> Result<()> {
         let vault_state = &mut ctx.accounts.vault_state;
         require!(ctx.accounts.admin.key() == vault_state.admin, VaultError::Unauthorized);
+        require!(vault_state.is_borrowing, VaultError::InsufficientRepayment);
         require!(total_profit > 0, VaultError::ZeroProfit);
 
         // Calculate treasury share based on profit_share_treasury_bp (e.g., 20% = 2000 bp)
         let treasury_share = (total_profit as u128)
             .checked_mul(vault_state.profit_share_treasury_bp as u128)
-            .unwrap()
+            .ok_or(VaultError::MathOverflow)?
             .checked_div(10000)
-            .unwrap() as u64;
+            .ok_or(VaultError::MathOverflow)? as u64;
 
-        let pool_share = total_profit.checked_sub(treasury_share).unwrap();
+        let pool_share = total_profit.checked_sub(treasury_share).ok_or(VaultError::MathOverflow)?;
 
         // Transfer treasury share from vault to treasury
         if treasury_share > 0 {
@@ -130,10 +139,14 @@ pub mod pocketchange_vault {
         }
 
         // The pool_share remains in the vault. We update total_deposits so the exchange rate of PCP increases.
-        vault_state.total_deposits = vault_state.total_deposits.checked_add(pool_share).unwrap();
+        vault_state.total_deposits = vault_state.total_deposits.checked_add(pool_share).ok_or(VaultError::MathOverflow)?;
+
+        // Clear borrow state
+        vault_state.is_borrowing = false;
+        vault_state.borrow_amount = 0;
 
         msg!("Arbitrage Processed. Profit: {} USDC (Treasury: {}, Pool: {})", total_profit, treasury_share, pool_share);
-        
+
         Ok(())
     }
 
@@ -145,18 +158,18 @@ pub mod pocketchange_vault {
         // Calculate User's Underlying USDC balance based on their shares
         let usdc_value = (shares as u128)
             .checked_mul(vault_state.total_deposits as u128)
-            .unwrap()
+            .ok_or(VaultError::MathOverflow)?
             .checked_div(vault_state.total_shares as u128)
-            .unwrap() as u64;
+            .ok_or(VaultError::MathOverflow)? as u64;
 
         // Calculate unstaking fee (e.g., 50 bp = 0.5%)
         let fee = (usdc_value as u128)
             .checked_mul(vault_state.unstaking_fee_basis_points as u128)
-            .unwrap()
+            .ok_or(VaultError::MathOverflow)?
             .checked_div(10000)
-            .unwrap() as u64;
+            .ok_or(VaultError::MathOverflow)? as u64;
 
-        let usdc_to_return = usdc_value.checked_sub(fee).unwrap();
+        let usdc_to_return = usdc_value.checked_sub(fee).ok_or(VaultError::MathOverflow)?;
 
         // Burn User's PCP
         let burn_accounts = Burn {
@@ -187,11 +200,11 @@ pub mod pocketchange_vault {
 
         // Update state
         // The burned shares are removed from total_shares
-        vault_state.total_shares = vault_state.total_shares.checked_sub(shares).unwrap();
-        
-        // total_deposits decreases by `usdc_to_return`. The `fee` stays in the vault, 
+        vault_state.total_shares = vault_state.total_shares.checked_sub(shares).ok_or(VaultError::MathOverflow)?;
+
+        // total_deposits decreases by `usdc_to_return`. The `fee` stays in the vault,
         // effectively distributed to the remaining pool participants!
-        vault_state.total_deposits = vault_state.total_deposits.checked_sub(usdc_to_return).unwrap();
+        vault_state.total_deposits = vault_state.total_deposits.checked_sub(usdc_to_return).ok_or(VaultError::MathOverflow)?;
 
         msg!("Withdrew {} USDC (Fee: {} USDC) for {} PCP burned", usdc_to_return, fee, shares);
 
@@ -211,7 +224,7 @@ pub struct Initialize<'info> {
     #[account(
         init,
         payer = admin,
-        space = 8 + 32 + 32 + 32 + 32 + 2 + 2 + 8 + 8,
+        space = 8 + 32 + 32 + 32 + 32 + 2 + 2 + 8 + 8 + 1 + 8 + 8,
         seeds = [b"vault"],
         bump
     )]
@@ -315,6 +328,9 @@ pub struct VaultState {
     pub profit_share_treasury_bp: u16,
     pub total_shares: u64,
     pub total_deposits: u64,
+    pub is_borrowing: bool,
+    pub borrow_amount: u64,
+    pub pre_borrow_balance: u64,
 }
 
 #[error_code]
@@ -327,4 +343,10 @@ pub enum VaultError {
     ZeroProfit,
     #[msg("Unauthorized execution. Only the primary engine node can process arbitrage.")]
     Unauthorized,
+    #[msg("Math overflow")]
+    MathOverflow,
+    #[msg("Borrow already active")]
+    BorrowAlreadyActive,
+    #[msg("Insufficient repayment")]
+    InsufficientRepayment,
 }
