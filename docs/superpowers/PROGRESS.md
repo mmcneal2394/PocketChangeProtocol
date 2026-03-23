@@ -1,14 +1,16 @@
 # Engine Implementation Progress
 
-**Date:** 2026-03-22
-**Status:** Layer 1 + Layer 2 complete
+**Date:** 2026-03-23
+**Status:** All engine work complete (Layers 1-2 + Drift perp + infrastructure)
 
 ## Summary
 
-- **48 unit tests passing**, 0 failures
+- **65 unique tests passing** (57 unit + 8 integration), 0 failures
 - Release build compiles
-- All strategy `evaluate()` AND `build_instructions()` wired to real APIs
-- 5 PRs merged to main (#3, #4, #5, and layer 2 finish)
+- All 5 strategies fully wired to real APIs, including Drift perp hedge for funding rate
+- Drift instruction builder with PDA derivation, Borsh serialization, full perp order support
+- PostgreSQL deployed on Railway, devnet contract live, Docker multi-stage build ready
+- 7 PRs merged to main (#3–#9)
 
 ---
 
@@ -96,9 +98,24 @@
 
 **Test counts:** 48 unit + 8 integration = 56 unique tests (104 total including lib re-run)
 
+## Drift Protocol Integration (PR #8)
+
+- [x] **Drift instruction builder** (`engine/drift.rs`) — PDA derivation, Borsh serialization, place_perp_order, cancel_order, initialize_user (6 tests)
+- [x] **Funding rate perp leg** — full hedge: Jupiter spot + Drift perp in opposite direction, USDC-to-base-unit conversion (11 tests total)
+
+## Infrastructure (PR #9)
+
+- [x] **PostgreSQL on Railway** — deployed, schema synced via `prisma db push`
+- [x] **Devnet contract deployed** — Program ID: `GKUwMKjS4UU5zFQXV83oNjm8DZmVpYzyiTGAhHEiCnLR`
+- [x] **Dockerfile** — multi-stage build, port 3002
+- [x] **Integration tests** — 8 tests covering paper mode pipeline
+- [x] **docker-compose.yml** — updated for new architecture (engine + web, Railway Postgres)
+- [x] **.env.local** — generated with KMS key, engine secret, Railway DB URL
+
+**Final test count:** 65 unique tests (57 unit + 8 integration), all passing
+
 ## Remaining Work
 
-- [ ] Drift SDK integration for perp leg (funding rate strategy currently spot-only)
-- [ ] Deploy smart contract to mainnet
-- [ ] Run with real PostgreSQL (currently in-memory store for opportunities API)
-- [ ] Update docker-compose.yml for new engine architecture
+- [ ] Deploy smart contract to mainnet (needs real SOL + audit review)
+- [ ] Fill in Telegram bot token and Bitget API keys in .env.local
+- [ ] First paper mode test run (`cargo run` with engine.toml mode = "paper")
