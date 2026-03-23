@@ -1,17 +1,32 @@
 "use client";
 
-import { PlayArrow, Stop, Speed, NetworkCheck, Router, NetworkPing, SwapHoriz } from "@mui/icons-material";
-import { useState, useRef, useEffect } from "react";
+import { PlayArrow, Stop, Speed, NetworkCheck, Router, NetworkPing, SwapHoriz, CheckCircle, Cancel, HourglassEmpty } from "@mui/icons-material";
+import { useState, useRef, useEffect, useCallback } from "react";
+
+interface EngineStatusData {
+  mode?: string;
+  uptime_secs?: number;
+  circuit_breaker?: { active: boolean; reason?: string };
+  error?: string;
+}
+
+interface OpportunityData {
+  id: string;
+  strategy: string;
+  route: string;
+  expected_profit_pct: number | string;
+  trade_size_usdc: number | string;
+}
 
 export default function YieldStrategies() {
   const [isRunning, setIsRunning] = useState(false);
   const [capitalAllocation, setCapitalAllocation] = useState(500000); // 500k TVL allocation
   const [strategyMix, setStrategyMix] = useState(5); // 5 Core Strategies
-  
+
   const [consoleLogs, setConsoleLogs] = useState<string[]>([
     "[PCP] Arbitrage execution layer offline. Awaiting activation..."
   ]);
-  
+
   const [metrics, setMetrics] = useState({
     avgYield: 0,
     ptbSuccessRate: 0,
@@ -19,7 +34,46 @@ export default function YieldStrategies() {
     flashLoansExecuted: 0,
   });
 
+  const [engineStatus, setEngineStatus] = useState<EngineStatusData | null>(null);
+  const [opportunities, setOpportunities] = useState<OpportunityData[]>([]);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const fetchEngineData = useCallback(() => {
+    fetch('/api/engine?path=status')
+      .then(r => r.json())
+      .then(status => { if (!status.error) setEngineStatus(status); })
+      .catch(() => {});
+
+    fetch('/api/engine?path=opportunities')
+      .then(r => r.json())
+      .then(opps => { if (Array.isArray(opps)) setOpportunities(opps); })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    fetchEngineData();
+    const interval = setInterval(fetchEngineData, 4000);
+    return () => clearInterval(interval);
+  }, [fetchEngineData]);
+
+  const handleAction = async (id: string, action: 'approve' | 'reject') => {
+    setActionLoading(id);
+    try {
+      await fetch('/api/engine', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, id }),
+      });
+      // Refresh opportunities list
+      fetchEngineData();
+    } catch {
+      // ignore
+    } finally {
+      setActionLoading(null);
+    }
+  };
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -184,6 +238,101 @@ export default function YieldStrategies() {
                  </div>
             </div>
         </div>
+      </section>
+
+      {/* Live Engine Status */}
+      {engineStatus && (
+        <section className="glassmorphism fade-in" style={{ padding: "32px", borderRadius: "16px", border: "1px solid rgba(255,255,255,0.1)" }}>
+          <h3 style={{ fontSize: "1.2rem", fontWeight: 700, marginBottom: "20px" }}>Live Engine Status</h3>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "16px" }}>
+            <div style={{ padding: "16px", background: "rgba(0,0,0,0.3)", borderRadius: "12px" }}>
+              <div style={{ color: "var(--text-secondary)", fontSize: "0.8rem", fontWeight: 600, marginBottom: "6px" }}>MODE</div>
+              <div style={{ fontSize: "1.4rem", fontWeight: 800, textTransform: "uppercase" as const }}>{engineStatus.mode || "offline"}</div>
+            </div>
+            <div style={{ padding: "16px", background: "rgba(0,0,0,0.3)", borderRadius: "12px" }}>
+              <div style={{ color: "var(--text-secondary)", fontSize: "0.8rem", fontWeight: 600, marginBottom: "6px" }}>UPTIME</div>
+              <div style={{ fontSize: "1.4rem", fontWeight: 800 }}>
+                {engineStatus.uptime_secs ? `${Math.floor(engineStatus.uptime_secs / 3600)}h ${Math.floor((engineStatus.uptime_secs % 3600) / 60)}m` : "--"}
+              </div>
+            </div>
+            <div style={{ padding: "16px", background: "rgba(0,0,0,0.3)", borderRadius: "12px" }}>
+              <div style={{ color: "var(--text-secondary)", fontSize: "0.8rem", fontWeight: 600, marginBottom: "6px" }}>CIRCUIT BREAKER</div>
+              <div style={{ fontSize: "1.4rem", fontWeight: 800, color: engineStatus.circuit_breaker?.active ? "var(--error)" : "var(--success)" }}>
+                {engineStatus.circuit_breaker?.active ? "TRIPPED" : "OK"}
+              </div>
+              {engineStatus.circuit_breaker?.active && engineStatus.circuit_breaker.reason && (
+                <div style={{ fontSize: "0.8rem", color: "var(--error)", marginTop: "4px" }}>{engineStatus.circuit_breaker.reason}</div>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Pending Opportunities */}
+      <section className="glassmorphism fade-in" style={{ padding: "32px", borderRadius: "16px", border: "1px solid rgba(255,255,255,0.1)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+          <h3 style={{ fontSize: "1.2rem", fontWeight: 700 }}>Pending Opportunities</h3>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <HourglassEmpty style={{ fontSize: "1rem", color: "var(--text-secondary)" }} />
+            <span style={{ fontSize: "0.9rem", color: "var(--text-secondary)", fontWeight: 600 }}>{opportunities.length} awaiting review</span>
+          </div>
+        </div>
+
+        {opportunities.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "40px", color: "var(--text-secondary)", fontSize: "0.95rem" }}>
+            No pending opportunities. Opportunities below auto-execute threshold will appear here for manual approval.
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            {opportunities.map((opp) => (
+              <div key={opp.id} style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                padding: "16px", background: "rgba(0,0,0,0.3)", borderRadius: "12px",
+                border: "1px solid rgba(255,255,255,0.08)"
+              }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "4px" }}>
+                    <span style={{ fontWeight: 700, fontSize: "0.95rem" }}>{opp.route}</span>
+                    <span style={{ fontSize: "0.75rem", padding: "2px 8px", borderRadius: "6px", background: "rgba(255,255,255,0.08)", color: "var(--text-secondary)", fontWeight: 600, textTransform: "uppercase" as const }}>
+                      {opp.strategy}
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", gap: "16px", fontSize: "0.8rem", color: "var(--text-secondary)" }}>
+                    <span>Profit: <strong style={{ color: "var(--success)" }}>+{Number(opp.expected_profit_pct).toFixed(3)}%</strong></span>
+                    <span>Size: <strong style={{ color: "#fff" }}>${Number(opp.trade_size_usdc).toLocaleString()}</strong></span>
+                    <span style={{ fontFamily: "monospace", fontSize: "0.7rem" }}>ID: {opp.id.slice(0, 12)}...</span>
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: "8px", marginLeft: "16px" }}>
+                  <button
+                    onClick={() => handleAction(opp.id, 'approve')}
+                    disabled={actionLoading === opp.id}
+                    style={{
+                      padding: "8px 16px", borderRadius: "8px", border: "none", cursor: "pointer",
+                      background: "rgba(0,255,170,0.2)", color: "var(--success)", fontWeight: 700, fontSize: "0.85rem",
+                      display: "flex", alignItems: "center", gap: "4px",
+                      opacity: actionLoading === opp.id ? 0.5 : 1,
+                    }}
+                  >
+                    <CheckCircle style={{ fontSize: "1rem" }} /> Approve
+                  </button>
+                  <button
+                    onClick={() => handleAction(opp.id, 'reject')}
+                    disabled={actionLoading === opp.id}
+                    style={{
+                      padding: "8px 16px", borderRadius: "8px", border: "none", cursor: "pointer",
+                      background: "rgba(255,51,102,0.2)", color: "var(--error)", fontWeight: 700, fontSize: "0.85rem",
+                      display: "flex", alignItems: "center", gap: "4px",
+                      opacity: actionLoading === opp.id ? 0.5 : 1,
+                    }}
+                  >
+                    <Cancel style={{ fontSize: "1rem" }} /> Reject
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
     </div>
   );

@@ -63,6 +63,7 @@ export default function DashboardPage() {
   const [depositAmount, setDepositAmount] = useState("");
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [txStatus, setTxStatus] = useState("");
+  const [engineStatus, setEngineStatus] = useState<any>(null);
 
   const NETWORK = process.env.NEXT_PUBLIC_NETWORK || "localnet"; 
   const RPC_URL = NETWORK === "devnet" ? "https://api.devnet.solana.com" : "http://127.0.0.1:8899";
@@ -180,9 +181,22 @@ export default function DashboardPage() {
       }
     };
 
+    const fetchEngineStatus = () => {
+      fetch('/api/engine?path=status')
+        .then(r => r.json())
+        .then(status => {
+          if (!status.error) {
+            setEngineStatus(status);
+          }
+        })
+        .catch(() => {});
+    };
+
     fetchLogs(); // Initial load
+    fetchEngineStatus();
     const intervalId = setInterval(fetchLogs, 2500);
-    return () => clearInterval(intervalId);
+    const engineIntervalId = setInterval(fetchEngineStatus, 5000);
+    return () => { clearInterval(intervalId); clearInterval(engineIntervalId); };
   }, []);
 
   return (
@@ -206,6 +220,32 @@ export default function DashboardPage() {
           <p style={{ color: "var(--text-secondary)", fontSize: "1.05rem", fontWeight: 500 }}>
             Deposit crypto. Earn institutional-grade DeFi Arbitrage Yields natively.
           </p>
+          {engineStatus && (
+            <div style={{ display: "flex", alignItems: "center", gap: "12px", marginTop: "10px" }}>
+              <div style={{
+                display: "inline-flex", alignItems: "center", gap: "6px",
+                background: engineStatus.circuit_breaker?.active ? "rgba(255,51,102,0.15)" : "rgba(0,255,170,0.1)",
+                border: `1px solid ${engineStatus.circuit_breaker?.active ? "var(--error)" : "var(--success)"}`,
+                padding: "6px 14px", borderRadius: "20px", fontSize: "0.8rem", fontWeight: 700,
+              }}>
+                <span style={{
+                  width: "8px", height: "8px", borderRadius: "50%",
+                  background: engineStatus.circuit_breaker?.active ? "var(--error)" : "var(--success)",
+                  boxShadow: `0 0 8px ${engineStatus.circuit_breaker?.active ? "var(--error)" : "var(--success)"}`,
+                  animation: "fadeIn 1s infinite alternate",
+                }} />
+                Engine: {engineStatus.mode?.toUpperCase() || "UNKNOWN"}
+              </div>
+              {engineStatus.circuit_breaker?.active && (
+                <span style={{ fontSize: "0.8rem", color: "var(--error)", fontWeight: 600 }}>
+                  Circuit Breaker: {engineStatus.circuit_breaker.reason || "TRIPPED"}
+                </span>
+              )}
+              <span style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>
+                Uptime: {engineStatus.uptime_secs ? `${Math.floor(engineStatus.uptime_secs / 3600)}h ${Math.floor((engineStatus.uptime_secs % 3600) / 60)}m` : "--"}
+              </span>
+            </div>
+          )}
         </div>
         <div style={{ zIndex: 10 }}>
           <WalletMultiButton className="neon-btn" style={{ 
