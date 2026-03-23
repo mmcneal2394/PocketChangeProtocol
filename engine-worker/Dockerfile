@@ -14,7 +14,6 @@ RUN rm -rf src
 # Copy source and build
 COPY src/ src/
 
-# Create .cargo/config.toml for incremental=false if needed
 RUN mkdir -p .cargo && echo '[build]\nincremental = false' > .cargo/config.toml
 
 RUN cargo build --release
@@ -28,8 +27,35 @@ WORKDIR /app
 
 COPY --from=builder /build/target/release/arbitrasaas-engine .
 
-# Copy engine config from source
-COPY engine.toml .
+# Embed engine config directly (avoids COPY issues with Railway build context)
+RUN printf 'mode = "paper"\n\
+jito_endpoint = "https://mainnet.block-engine.jito.wtf"\n\
+auto_execute_threshold_default = 0.5\n\
+approval_timeout_secs = 300\n\
+max_loss_24h = 50.0\n\
+max_trade_size = 10.0\n\
+max_cex_exposure_secs = 300\n\
+rpc_fallback_urls = ["https://api.devnet.solana.com"]\n\
+\n\
+[strategy.triangular]\n\
+auto_execute_threshold = 0.3\n\
+enabled = true\n\
+\n\
+[strategy.cex_dex]\n\
+auto_execute_threshold = 1.0\n\
+enabled = true\n\
+\n\
+[strategy.flash_loan]\n\
+auto_execute_threshold = 0.3\n\
+enabled = true\n\
+\n\
+[strategy.funding_rate]\n\
+auto_execute_threshold = 0.08\n\
+enabled = false\n\
+\n\
+[strategy.statistical]\n\
+auto_execute_threshold = 2.0\n\
+enabled = false\n' > engine.toml
 
 EXPOSE 3002
 
