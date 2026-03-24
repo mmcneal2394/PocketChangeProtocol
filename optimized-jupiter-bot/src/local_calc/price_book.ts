@@ -25,13 +25,16 @@ export class PriceBook {
         const now = Date.now();
         // Here we would deserialize the buffer based on DEX layout
         // For architectural setup, we mock the parsing
+        // Base USDC reserve per 100 SOL at realistic market price (~$130/SOL)
+        // Small ±0.3% natural variance only — no artificial discrepancy injected
+        const BASE_USDC_PER_100SOL = 13000; // ~$130 SOL price
+        const jitter = () => Math.floor(BASE_USDC_PER_100SOL * (1 + (Math.random() - 0.5) * 0.006));
         if (owner.includes("675kPX9MHTjS")) {
-            this.raydiumPools.set(pubkey, { address: pubkey, dex: "Raydium", tokenA: "SOL", tokenB: "USDC", reserveA: 100n, reserveB: BigInt(Math.floor(15000 + Math.random() * 50)), feeRate: 0.0025, lastUpdated: now });
+            this.raydiumPools.set(pubkey, { address: pubkey, dex: "Raydium", tokenA: "SOL", tokenB: "USDC", reserveA: 100n, reserveB: BigInt(jitter()), feeRate: 0.0025, lastUpdated: now });
         } else if (owner.includes("whirLbMiicV")) {
-            // Massive simulated discrepancy mapping
-            this.orcaPools.set(pubkey, { address: pubkey, dex: "Orca", tokenA: "SOL", tokenB: "USDC", reserveA: 100n, reserveB: BigInt(Math.floor(65200 + Math.random() * 50)), feeRate: 0.0030, lastUpdated: now });
+            this.orcaPools.set(pubkey, { address: pubkey, dex: "Orca", tokenA: "SOL", tokenB: "USDC", reserveA: 100n, reserveB: BigInt(jitter()), feeRate: 0.0030, lastUpdated: now });
         } else if (owner.includes("Eo7WjKq67r")) {
-            this.meteoraPools.set(pubkey, { address: pubkey, dex: "Meteora", tokenA: "SOL", tokenB: "USDC", reserveA: 100n, reserveB: 14980n, feeRate: 0.0015, lastUpdated: now });
+            this.meteoraPools.set(pubkey, { address: pubkey, dex: "Meteora", tokenA: "SOL", tokenB: "USDC", reserveA: 100n, reserveB: BigInt(jitter()), feeRate: 0.0015, lastUpdated: now });
         }
     }
 

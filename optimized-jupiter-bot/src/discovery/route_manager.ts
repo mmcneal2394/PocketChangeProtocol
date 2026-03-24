@@ -119,6 +119,39 @@ class RouteManager {
   private tokens = new Map<string, TokenEntry>();
   private routeCooldowns = new Map<string, number>(); // routeKey → lastScanTs
 
+  constructor() {
+    // ── Fix 2: routeCooldowns TTL eviction (6h) ────────────────────────────
+    // routeCooldowns accumulates 32 entries/min in a 8-route session → 28,800/day.
+    // Entries older than 6h are stale (route already rescanned many times).
+    const COOLDOWN_TTL = 6 * 3600_000;
+    setInterval(() => {
+      const cutoff = Date.now() - COOLDOWN_TTL;
+      for (const [key, ts] of this.routeCooldowns) {
+        if (ts < cutoff) this.routeCooldowns.delete(key);
+      }
+      logger.debug(`[ROUTE-MGR] cooldown map size after evict: ${this.routeCooldowns.size}`);
+    }, 30 * 60_000);
+
+    // ── Fix 3: dead-token pruning (24h with non-positive EMA) ────────────────
+    // Tokens added by launchpad_scanner that rugged or died accumulate forever.
+    // Prune if: not scanned in 24h AND EMA profit ≤ 0 (no historical value).
+    const TOKEN_TTL    = 24 * 3600_000;
+    const PROTECTED    = new Set([WSOL, USDC]); // never prune anchors
+    setInterval(() => {
+      const cutoff = Date.now() - TOKEN_TTL;
+      let pruned = 0;
+      for (const [mint, e] of this.tokens) {
+        if (PROTECTED.has(mint)) continue;
+        if (e.lastScannedAt > 0 && e.lastScannedAt < cutoff && e.emaProfitBps <= 0) {
+          this.tokens.delete(mint);
+          this.routeCooldowns.delete(`WSOL-${mint}`);
+          pruned++;
+        }
+      }
+      if (pruned > 0) logger.info(`[ROUTE-MGR] Pruned ${pruned} dead tokens (tokens remaining: ${this.tokens.size})`);
+    }, 30 * 60_000);
+  }
+
   // ── Add a new token (from any launchpad scanner) ────────────────────────────
   addToken(opts: { mint: string; source: string; category?: string; liquidityUsd: number; trustScore: number; addedAt: number }) {
     if (this.tokens.has(opts.mint)) {
@@ -248,6 +281,17 @@ class RouteManager {
     logger.info(`[ROUTE-MGR] Seeded ${this.tokens.size} default routes (bluechip + meme + defi + native)`);
   }
 
+
+  /**
+   * Return the 20-period EMA profit (in bps) for a mint.
+   * Used by handlers.ts to fast-fail routes before paying for quote API calls.
+   * Returns null if the route has never been scanned (no priors → always fetch).
+   */
+  getEmaEstimate(mint: string): number | null {
+    const e = this.tokens.get(mint);
+    if (!e || e.scanCount === 0) return null; // no data → allow through
+    return e.emaProfitBps;
+  }
 
   stats() {
     return {

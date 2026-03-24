@@ -1,0 +1,46 @@
+name: position_limits
+version: "1.0"
+description: |
+  Hard position and exposure limits for the PCP swarm.
+  The Coordinator Agent must query these before assigning any execution.
+  The Risk Manager Agent enforces them with veto power.
+
+limits:
+  per_opportunity:
+    max_pct_of_aum: 10        # Never risk more than 10% of total wallet on one trade
+    absolute_max_sol: 1.0     # Hard cap regardless of AUM (until track record established)
+    comment: "Increase absolute_max_sol after 30 days of profitable operation"
+
+  per_asset:
+    max_exposure_pct: 20      # Max 20% of AUM in any single token at once
+    
+  portfolio:
+    max_concurrent_positions: 10
+    max_leverage: 1.0         # NO borrowed funds, ever
+    min_gas_reserve_sol: 0.05 # Always keep this available (unallocatable)
+
+  daily:
+    max_trades_per_day: 500   # Sanity cap — review logs if approaching
+    max_loss_sol: 0.2         # If we lose more than this in a day, halt and review
+
+graduated_limits:
+  # Increase limits as track record builds
+  phase_1:
+    label: "Bootstrap (0-30 days)"
+    absolute_max_sol: 0.2
+    max_concurrent: 3
+  phase_2:
+    label: "Early operation (30-90 days)"
+    absolute_max_sol: 0.5
+    max_concurrent: 7
+  phase_3:
+    label: "Established (90+ days)"
+    absolute_max_sol: 1.0
+    max_concurrent: 10
+
+current_phase: "phase_1"  # Update manually as appropriate
+
+violation_response:
+  - "Coordinator rejects the opportunity"
+  - "Risk manager logs violation to /risk_events"
+  - "Coordinator reputation score decremented by 5 if it tried to violate"

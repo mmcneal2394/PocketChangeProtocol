@@ -6,22 +6,67 @@ import { submitTransactionWithRacing } from '../execution/racing';
 import { buildVersionedTransaction } from '../execution/transaction';
 import { loadStrategyParams, DEFAULT_PARAMS, StrategyParams } from '../strategy_tuner';
 
+// ── AdaptiveMemory — EMA-20 route performance tracker ────────────────────────
+// Uses exponential moving average (α = 2/(20+1) ≈ 0.0952) so recent scans
+// outweigh old data and stale routes naturally decay without explicit resets.
+// Entries older than 24h are evicted every 30 minutes to prevent map bloat.
+const EMA_ALPHA  = 2 / (20 + 1);          // 20-period EMA
+const ENTRY_TTL  = 24 * 60 * 60 * 1000;   // 24h — stale route expiry
+
 class AdaptiveMemory {
-    private routePerformance = new Map<string, { avgProfitBps: number, count: number }>();
+    private routePerformance = new Map<string, {
+        emaProfit:  number;   // EMA of profit BPS
+        count:      number;   // total observations (for warm-up weighting)
+        lastSeenTs: number;   // ms timestamp, used for TTL eviction
+    }>();
+
+    constructor() {
+        // Sweep expired entries every 30 minutes
+        setInterval(() => this.evict(), 30 * 60 * 1000);
+    }
+
+    private evict() {
+        const cutoff = Date.now() - ENTRY_TTL;
+        for (const [key, entry] of this.routePerformance) {
+            if (entry.lastSeenTs < cutoff) this.routePerformance.delete(key);
+        }
+    }
 
     recordOutcome(routeKey: string, profitBps: number) {
-        const current = this.routePerformance.get(routeKey) || { avgProfitBps: 0, count: 0 };
-        const newCount = current.count + 1;
-        const newAvg = (current.avgProfitBps * current.count + profitBps) / newCount;
-        this.routePerformance.set(routeKey, { avgProfitBps: newAvg, count: newCount });
+        const existing = this.routePerformance.get(routeKey);
+        if (!existing) {
+            // First observation — seed EMA with the raw value
+            this.routePerformance.set(routeKey, { emaProfit: profitBps, count: 1, lastSeenTs: Date.now() });
+        } else {
+            // EMA update: EMA_t = alpha * new + (1 - alpha) * EMA_{t-1}
+            const newEma = EMA_ALPHA * profitBps + (1 - EMA_ALPHA) * existing.emaProfit;
+            this.routePerformance.set(routeKey, {
+                emaProfit:  newEma,
+                count:      existing.count + 1,
+                lastSeenTs: Date.now(),
+            });
+        }
     }
 
     getExpectedProfit(routeKey: string): number {
-        return this.routePerformance.get(routeKey)?.avgProfitBps || 0;
+        return this.routePerformance.get(routeKey)?.emaProfit || 0;
+    }
+
+    /** Returns true if the route has warmed up (≥3 observations) */
+    isWarmedUp(routeKey: string): boolean {
+        return (this.routePerformance.get(routeKey)?.count || 0) >= 3;
+    }
+
+    /** Snapshot for logging — sorted by descending EMA profit */
+    snapshot(): Array<{ routeKey: string; emaProfit: number; count: number }> {
+        return [...this.routePerformance.entries()]
+            .map(([routeKey, v]) => ({ routeKey, emaProfit: v.emaProfit, count: v.count }))
+            .sort((a, b) => b.emaProfit - a.emaProfit);
     }
 }
 
 export const globalAdaptiveMemory = new AdaptiveMemory();
+
 
 export interface Opportunity {
     type: string;
@@ -42,7 +87,7 @@ export class ArbEngine {
         const computeUnits = 1400000;
         
         // Priority Fee Logic (Formula: microLamports * CU / 1_000_000)
-        const priorityFeeMicroLamports = 250000; 
+        const priorityFeeMicroLamports = params.PRIORITY_MICRO_LAMPORTS || config.PRIORITY_MICRO_LAMPORTS || 250000; 
         const priorityFeeLamports = (priorityFeeMicroLamports * computeUnits) / 1000000;
         const priorityFeeSol = priorityFeeLamports / 1e9;
         
@@ -265,10 +310,7 @@ export class ArbEngine {
                 priceBookSnapshot: null
             });
 
-            // Prevent log spam, explicitly block memory tracing dynamically during continuous testing
-            globalPriceBook.getAllPools().forEach(p => p.reserveB = 15000n);
-            
-            // Native execution without verification wrappers
+            // Execute best opportunity
             await this.executeArbitrage(best);
         }
     }
@@ -301,22 +343,32 @@ export class ArbEngine {
                 }
             };
 
-            const q1Req = await fetchWithTimeout(`https://lite-api.jup.ag/swap/v1/quote?inputMint=So11111111111111111111111111111111111111112&outputMint=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&amount=${Math.floor(opp.expectedInSol * 1e9)}&slippageBps=500`, { headers: { 'x-api-key': API_KEY } });
+            // ── Jupiter authenticated endpoints (600 req/min) ────────────────────────
+            const JAUTH_BASE = 'https://quote-api.jup.ag/v6';
+            const AUTH_HDR   = { 'x-api-key': API_KEY };
+
+            const q1Req = await fetchWithTimeout(
+              `${JAUTH_BASE}/quote?inputMint=So11111111111111111111111111111111111111112&outputMint=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&amount=${Math.floor(opp.expectedInSol * 1e9)}&slippageBps=500`,
+              { headers: AUTH_HDR }
+            );
             const quote1 = await q1Req?.json();
-            
-            const q2Req = await fetchWithTimeout(`https://lite-api.jup.ag/swap/v1/quote?inputMint=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&outputMint=So11111111111111111111111111111111111111112&amount=${quote1.outAmount}&slippageBps=500`, { headers: { 'x-api-key': API_KEY } });
+
+            const q2Req = await fetchWithTimeout(
+              `${JAUTH_BASE}/quote?inputMint=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&outputMint=So11111111111111111111111111111111111111112&amount=${quote1.outAmount}&slippageBps=500`,
+              { headers: AUTH_HDR }
+            );
             const quote2 = await q2Req?.json();
 
-            const ix1Req = await fetchWithTimeout('https://lite-api.jup.ag/swap/v1/swap-instructions', {
+            const ix1Req = await fetchWithTimeout(`${JAUTH_BASE}/swap-instructions`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
+                headers: { 'Content-Type': 'application/json', ...AUTH_HDR },
                 body: JSON.stringify({ quoteResponse: quote1, userPublicKey: config.WALLET_PUBLIC_KEY, wrapAndUnwrapSol: true, prioritizationFeeLamports: "auto" })
             });
             const ix1 = await ix1Req?.json();
 
-            const ix2Req = await fetchWithTimeout('https://lite-api.jup.ag/swap/v1/swap-instructions', {
+            const ix2Req = await fetchWithTimeout(`${JAUTH_BASE}/swap-instructions`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
+                headers: { 'Content-Type': 'application/json', ...AUTH_HDR },
                 body: JSON.stringify({ quoteResponse: quote2, userPublicKey: config.WALLET_PUBLIC_KEY, wrapAndUnwrapSol: true, prioritizationFeeLamports: "auto" })
             });
             const ix2 = await ix2Req?.json();

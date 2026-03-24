@@ -5,7 +5,20 @@ import { logger } from '../utils/logger';
 let cachedBlockhash: string | null = null;
 const connection = new Connection(config.RPC_ENDPOINT, { commitment: 'processed', confirmTransactionInitialTimeout: 5000 });
 
-let altCache: Map<string, AddressLookupTableAccount> = new Map();
+// ── ALT cache with 6h TTL eviction ──────────────────────────────────────────
+// Prevents unbounded Map growth during long production sessions where many
+// unique ALT addresses are encountered across thousands of route executions.
+const ALT_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
+interface AltEntry { table: AddressLookupTableAccount; fetchedAt: number; }
+let altCache: Map<string, AltEntry> = new Map();
+
+// Evict stale ALT entries every 30 minutes
+setInterval(() => {
+  const cutoff = Date.now() - ALT_TTL_MS;
+  for (const [addr, entry] of altCache) {
+    if (entry.fetchedAt < cutoff) altCache.delete(addr);
+  }
+}, 30 * 60 * 1000);
 
 async function fetchRecentBlockhash() {
     try {
@@ -40,15 +53,17 @@ export function getCachedBlockhash() {
 }
 
 export async function getAddressLookupTable(address: string, forceRefresh = false) {
-  if (!forceRefresh && altCache.has(address)) {
-    return altCache.get(address);
+  const cached = altCache.get(address);
+  // Return cached entry if still within TTL and not force-refreshed
+  if (!forceRefresh && cached && (Date.now() - cached.fetchedAt) < ALT_TTL_MS) {
+    return cached.table;
   }
 
   try {
     const pubkey = new PublicKey(address);
     const lookupTable = await connection.getAddressLookupTable(pubkey);
     if (lookupTable.value) {
-      altCache.set(address, lookupTable.value);
+      altCache.set(address, { table: lookupTable.value, fetchedAt: Date.now() });
       return lookupTable.value;
     }
   } catch (error) {

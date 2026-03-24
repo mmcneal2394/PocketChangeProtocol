@@ -56,6 +56,27 @@ db.exec(`
     )
 `);
 
+// ── Fix 4: SQLite log rotation (30-day retention) ─────────────────────────────
+// Prevents unbounded row growth after weeks of live trading.
+// Runs once at startup (clears any backlog) then every 24h.
+// wal_checkpoint(TRUNCATE) reclaims the disk space immediately.
+function rotateLogs() {
+  try {
+    const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000; // 30 days ago in ms
+    const r1 = db.prepare('DELETE FROM trades      WHERE timestamp < ?').run(cutoff);
+    const r2 = db.prepare('DELETE FROM test_trades WHERE timestamp < ?').run(cutoff);
+    const deleted = (r1.changes || 0) + (r2.changes || 0);
+    if (deleted > 0) {
+      db.pragma('wal_checkpoint(TRUNCATE)'); // reclaim disk space
+      logger.info(`[LOGGER] Log rotation: deleted ${deleted} rows older than 30d`);
+    }
+  } catch (e: any) {
+    logger.warn(`[LOGGER] Log rotation failed: ${e.message}`);
+  }
+}
+rotateLogs();                                          // startup sweep
+setInterval(rotateLogs, 24 * 60 * 60 * 1000);         // daily thereafter
+
 db.exec(`
     CREATE TABLE IF NOT EXISTS test_trades (
         id INTEGER PRIMARY KEY AUTOINCREMENT,

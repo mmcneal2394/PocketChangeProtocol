@@ -30,13 +30,19 @@ dist/
 **/wallet.json
 **/new_wallet.json
 **/safe_wallet.json
+**/test_wallet.json
+**/*wallet*.json
 **/*keypair*.json
 **/*secret*.json
 **/*private*.json
+**/*_wallet.json
+ata_cache.json
+**/ata_cache.json
 optimized-jupiter-bot/*.json
 !optimized-jupiter-bot/package.json
 !optimized-jupiter-bot/tsconfig.json
 !optimized-jupiter-bot/tip_accounts.json
+
 
 # ── LOG FILES — contain wallet addresses & trade data ─────────────────────────
 *.log

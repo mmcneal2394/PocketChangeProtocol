@@ -20,26 +20,53 @@ import path from 'path';
 
 // ── CLI args ──────────────────────────────────────────────────────────────────
 const args          = process.argv.slice(2);
-const CAPITAL_USD   = parseFloat(args[args.indexOf('--capital')   + 1] || '200');
-const DURATION_MIN  = parseInt (args[args.indexOf('--duration')   + 1] || '60');
-const REPORT_EVERY  = parseInt (args[args.indexOf('--report')     + 1] || '5'); // min
+const MIN_MODE      = args.includes('--min-mode');
+
+// ── Min-mode overrides (must set before any module reads process.env) ─────────
+// Targets ~$5 operation: 0.005 SOL trade size, batch 1, no LST floor.
+if (MIN_MODE) {
+  process.env.MIN_MODE             = 'true';
+  process.env.SCAN_BATCH_SIZE      = '1';         // one route at a time
+  process.env.LST_MIN_TRADE_SOL    = '0.005';     // disable LST 1 SOL floor
+  process.env.MAX_TRADE_SIZE_SOL   = '0.005';     // $0.45 per trade at $90/SOL
+  process.env.PRIORITY_MICRO_LAMPORTS = '100000'; // lower priority fee
+}
+
+// Safe named-arg parser — returns undefined if the next token is another flag or missing
+function argVal(name: string): string | undefined {
+  const i = args.indexOf(name);
+  if (i === -1) return undefined;
+  const next = args[i + 1];
+  return (next && !next.startsWith('--')) ? next : undefined;
+}
+
+const CAPITAL_USD  = parseFloat(argVal('--capital')  ?? (MIN_MODE ? '5'   : '200'));
+const DURATION_MIN = parseInt  (argVal('--duration') ?? '60');
+const REPORT_EVERY = parseInt  (argVal('--report')   ?? '5');
+
 
 const WSOL = 'So11111111111111111111111111111111111111112';
 const USDC = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 
+
 // ── Rate-limit tracker ────────────────────────────────────────────────────────
+// jupiter_auth = authenticated quote-api.jup.ag  (600 req/min)
+// jupiter_free = unauthenticated lite-api.jup.ag (60 req/min, used as fallback)
 const RL = {
-  jupiter:     { calls: 0, errors429: 0, lastReset: Date.now(), windowMs: 60_000, maxPerMin: 60  },
-  dexscreener: { calls: 0, errors429: 0, lastReset: Date.now(), windowMs: 60_000, maxPerMin: 30  },
-  rugcheck:    { calls: 0, errors429: 0, lastReset: Date.now(), windowMs: 60_000, maxPerMin: 20  },
-  helius:      { calls: 0, errors429: 0, lastReset: Date.now(), windowMs: 60_000, maxPerMin: 100 },
-  pumpfun:     { calls: 0, errors429: 0, lastReset: Date.now(), windowMs: 60_000, maxPerMin: 10  },
+  jupiter_auth:   { calls: 0, errors429: 0, lastReset: Date.now(), windowMs: 60_000, maxPerMin: 600 },
+  jupiter_free:   { calls: 0, errors429: 0, lastReset: Date.now(), windowMs: 60_000, maxPerMin: 60  },
+  dexscreener:    { calls: 0, errors429: 0, lastReset: Date.now(), windowMs: 60_000, maxPerMin: 30  },
+  rugcheck:       { calls: 0, errors429: 0, lastReset: Date.now(), windowMs: 60_000, maxPerMin: 20  },
+  geckoterminal:  { calls: 0, errors429: 0, lastReset: Date.now(), windowMs: 60_000, maxPerMin: 8   }, // conservative: 8 token screens/min
+  solscan:        { calls: 0, errors429: 0, lastReset: Date.now(), windowMs: 60_000, maxPerMin: 30  },
+  helius:         { calls: 0, errors429: 0, lastReset: Date.now(), windowMs: 60_000, maxPerMin: 100 },
+  pumpfun:        { calls: 0, errors429: 0, lastReset: Date.now(), windowMs: 60_000, maxPerMin: 10  },
 };
 
 function trackCall(source: keyof typeof RL, status: number) {
   const r = RL[source];
   const now = Date.now();
-  if (now - r.lastReset > r.windowMs) { r.calls = 0; r.lastReset = now; }
+  if (now - r.lastReset > r.windowMs) { r.calls = 0; r.errors429 = 0; r.lastReset = now; }
   r.calls++;
   if (status === 429) r.errors429++;
 }
@@ -138,7 +165,7 @@ async function getSolPrice(): Promise<number> {
   // Source 1: Jupiter Price API v2
   try {
     const { data: d1 } = await rateLimitedFetch(
-      'jupiter',
+      'jupiter_auth',
       'https://price.jup.ag/v6/price?ids=SOL',
     );
     const p1 = parseFloat(d1?.data?.SOL?.price || '0');
@@ -170,42 +197,170 @@ async function getSolPrice(): Promise<number> {
     if (p3 > 0) { console.log(`   Source: Binance → $${p3.toFixed(2)}`); return p3; }
   } catch {}
 
-  // Fallback — user confirmed ~$90 (2026-03-22)
+  // Fallback
   console.warn(`   ⚠️  All price APIs failed — using fallback: $90`);
   return 90;
 }
 
-// ── In-process screen cache (10 min TTL) ─────────────────────────────────────
-const screenCache = new Map<string, { result: { safe: boolean; score: number; flags: string[] }; ts: number }>();
-const SCREEN_TTL = 10 * 60 * 1000;
+// ── In-process screen cache (30 min TTL for pass, 5 min for fail) ────────────
+const screenCache = new Map<string, { result: { safe: boolean; score: number; flags: string[] }; ts: number; pass: boolean }>();
+const SCREEN_TTL_PASS = 30 * 60 * 1000;
+const SCREEN_TTL_FAIL =  5 * 60 * 1000;
 
-// ── Screener summary (lightweight, cached) ────────────────────────────────────
-async function screenTokenLight(mint: string): Promise<{ safe: boolean; score: number; flags: string[] }> {
+let jupStrictSet:   Set<string> = new Set();
+let jupStrictTs     = 0;
+const SIM_TRUSTED = new Set([
+  'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', // USDC
+  'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB',  // USDT
+]);
+async function ensureJupStrict(): Promise<void> {
+  if (Date.now() - jupStrictTs < 24 * 3600_000) return;
+  try {
+    const r = await fetch('https://token.jup.ag/strict', { signal: AbortSignal.timeout(8000) });
+    if (r.ok) { const d = await r.json(); jupStrictSet = new Set(d.map((t: any) => t.address)); jupStrictTs = Date.now(); }
+  } catch { /* degrade gracefully */ }
+}
+
+// ── GeckoTerminal call stagger ─────────────────────────────────────────────────────────
+// Serialises gecko calls with 900ms gap to prevent 8-token parallel burst
+// from saturating the limit (30 req/min ≈ 2s between calls in the strict sense).
+let geckoLastCallTs = 0;
+async function geckoFetch(mint: string): ReturnType<typeof rateLimitedFetch> {
+  const now  = Date.now();
+  const wait = Math.max(0, geckoLastCallTs + 900 - now);
+  if (wait > 0) await new Promise(r => setTimeout(r, wait));
+  geckoLastCallTs = Date.now();
+  return rateLimitedFetch(
+    'geckoterminal',
+    `https://api.geckoterminal.com/api/v2/networks/solana/tokens/${mint}?include=top_pools`,
+    { headers: { 'Accept': 'application/json;version=20230302' } }
+  );
+}
+
+// ── screenTokenFull — all 4 validation APIs + existing on-chain checks ────────
+// Checks (parallel):
+//   A) DexScreener      — liquidity, 1h volatility  (existing)
+//   B) On-chain RPC     — mint/freeze/decimals/supply/age  (existing)
+//   C) Jupiter strict   — +20 verified bonus, skip Rugcheck if listed
+//   D) Rugcheck.xyz     — composite risk score 0-1000
+//   E) GeckoTerminal    — 24h volume, buy/sell ratio, pool depth
+//   F) Solscan          — holder count, top-3 whale concentration
+async function screenTokenFull(mint: string): Promise<{ safe: boolean; score: number; flags: string[] }> {
   const cached = screenCache.get(mint);
-  if (cached && Date.now() - cached.ts < SCREEN_TTL) return cached.result;
+  if (cached) {
+    const ttl = cached.pass ? SCREEN_TTL_PASS : SCREEN_TTL_FAIL;
+    if (Date.now() - cached.ts < ttl) return cached.result;
+  }
 
   const flags: string[] = [];
   let score = 100;
+  await ensureJupStrict();
 
-  // Run DexScreener + Rugcheck in parallel
-  const [dsRes, rugRes] = await Promise.all([
-    rateLimitedFetch('dexscreener', `https://api.dexscreener.com/latest/dex/tokens/${mint}`),
-    rateLimitedFetch('rugcheck',    `https://api.rugcheck.xyz/v1/tokens/${mint}/report/summary`),
+  // —— A) DexScreener —————————————————————————————————————————
+  const dsRes = await rateLimitedFetch('dexscreener', `https://api.dexscreener.com/latest/dex/tokens/${mint}`);
+  if (dsRes.status === 429) session.rateLimitWarnings.push(`DexScreener 429 ${mint.slice(0,8)}`);
+  const solPairs   = (dsRes.data?.pairs || []).filter((p: any) => p.chainId === 'solana');
+  const best       = solPairs.reduce((a: any, b: any) => (b.liquidity?.usd || 0) > (a.liquidity?.usd || 0) ? b : a, {});
+  const maxLiq     = best?.liquidity?.usd || 0;
+  const priceChg1h = Math.abs(parseFloat(best?.priceChange?.h1 || '0'));
+  if (maxLiq < 500)         { flags.push(`low-liq($${maxLiq.toFixed(0)})`); score -= 25; }
+  if (maxLiq > 100_000)     score += 10;
+  if (priceChg1h > 200)     { flags.push(`volatile-200%+1h`); score -= 20; }
+  else if (priceChg1h > 80) { flags.push(`volatile-80%+1h`);  score -= 10; }
+
+  // —— B) On-chain RPC ————————————————————————————————————————
+  try {
+    const rpc = process.env.RPC_ENDPOINT || '';
+    const { Connection: Conn, PublicKey: PK } = await import('@solana/web3.js');
+    const { getMint: gm } = await import('@solana/spl-token');
+    const conn = new Conn(rpc, 'confirmed');
+    const pk   = new PK(mint);
+    const info = await gm(conn, pk, 'confirmed');
+    if (!SIM_TRUSTED.has(mint) && info.mintAuthority !== null)   { flags.push('mint-auth-active');   score -= 40; }
+    if (!SIM_TRUSTED.has(mint) && info.freezeAuthority !== null) { flags.push('freeze-auth-active'); score -= 30; }
+    const dec = info.decimals;
+    if (dec === 0 || dec === 1 || dec >= 18) { flags.push(`bad-decimals(${dec})`); score -= 15; }
+    const normSupply = dec > 0 ? Number(info.supply) / Math.pow(10, dec) : Number(info.supply);
+    if (normSupply > 1e15) { flags.push('huge-supply'); score -= 15; }
+    const sigs = await conn.getSignaturesForAddress(pk, { limit: 1 });
+    if (sigs.length > 0 && sigs[0].blockTime) {
+      const ageDays = (Date.now() / 1000 - sigs[0].blockTime) / 86400;
+      if (ageDays < 1)      { flags.push('age<1d'); score -= 20; }
+      else if (ageDays < 3) { flags.push('age<3d'); score -=  8; }
+    }
+  } catch { /* RPC unavailable — skip */ }
+
+  // —— C) Jupiter strict list ————————————————————————————————
+  const jupVerified = SIM_TRUSTED.has(mint) || jupStrictSet.has(mint);
+  if (jupVerified) { score += 20; flags.push('jup-strict-verified(+20)'); }
+
+  // —— D + E + F running in parallel ——————————————————————————————
+  const [rugRes, geckoRes, solRes] = await Promise.allSettled([
+    // D) Rugcheck — skip for Jupiter-verified (save the 20/min budget)
+    jupVerified
+      ? Promise.resolve({ score: -1, risks: [] })
+      : rateLimitedFetch('rugcheck', `https://api.rugcheck.xyz/v1/tokens/${mint}/report/summary`).then(r => ({
+          score: r.data?.score ?? r.data?.risk_score ?? -1 as number,
+          risks: ((r.data?.risks || []) as any[]).map((x:any) => `${x.name}(${x.level})`).slice(0,3),
+        })).catch(() => ({ score: -1, risks: [] })),
+    // E) GeckoTerminal — staggered (geckoFetch enforces 900ms gap between calls)
+    geckoFetch(mint).then(r => {
+      const attr = r.data?.data?.attributes;
+      if (!attr) return null;
+      const vol24h = parseFloat(attr.volume_usd?.h24 || '0');
+      let buys = 0, sells = 0;
+      for (const pool of (r.data?.included || [])) {
+        const txns = pool?.attributes?.transactions?.h24;
+        if (txns) { buys += txns.buys || 0; sells += txns.sells || 0; }
+      }
+      const ratio = sells > 0 ? buys / sells : (buys > 0 ? 2 : 1);
+      return { vol24h, buys, sells, ratio };
+    }).catch(() => null),
+    // F) Solscan
+    rateLimitedFetch('solscan',
+      `https://public-api.solscan.io/token/holders?tokenAddress=${mint}&limit=10&offset=0`
+    ).then(r => {
+      const holders: any[] = r.data?.data ?? [];
+      if (!holders.length) return null;
+      const amts = holders.map((h:any) => parseFloat(h.amount || '0'));
+      const tot  = amts.reduce((a,b) => a+b, 0);
+      const top3 = amts.slice(0,3).reduce((a,b) => a+b, 0);
+      return { total: r.data?.total ?? 0, top3Pct: tot > 0 ? top3/tot : 0 };
+    }).catch(() => null),
   ]);
 
-  if (dsRes.status  === 429) session.rateLimitWarnings.push(`DexScreener 429 ${mint.slice(0,8)}`);
-  if (rugRes.status === 429) session.rateLimitWarnings.push(`Rugcheck 429 ${mint.slice(0,8)}`);
+  // D) Apply Rugcheck result
+  if (rugRes.status === 'fulfilled') {
+    const rc = rugRes.value;
+    if (rc.score >= 500) { flags.push(`rugcheck-high(${rc.score})`); score -= 35;
+    } else if (rc.score >= 300) { flags.push(`rugcheck-mod(${rc.score})`); score -= 15;
+    } else if (rc.score >= 0 && rc.score < 100) { flags.push(`rugcheck-clean(${rc.score})`); score += 10; }
+    if (rugRes.status === 'fulfilled' && rc.score === 429) session.rateLimitWarnings.push(`Rugcheck 429 ${mint.slice(0,8)}`);
+  }
 
-  const solPairs = (dsRes.data?.pairs || []).filter((p: any) => p.chainId === 'solana');
-  const maxLiq   = solPairs.length ? Math.max(...solPairs.map((p: any) => p.liquidity?.usd || 0)) : 0;
-  if (maxLiq < 500)    { flags.push(`low-liq($${maxLiq.toFixed(0)})`); score -= 25; }
-  if (maxLiq > 100000) score += 10;
+  // E) Apply GeckoTerminal result
+  if (geckoRes.status === 'fulfilled' && geckoRes.value) {
+    const g = geckoRes.value;
+    if (g.vol24h > 0 && g.vol24h < 1000) { flags.push(`gecko:low-vol($${g.vol24h.toFixed(0)})`); score -= 8; }
+    if (g.ratio < 0.4)                    { flags.push(`gecko:sell-pres(${g.ratio.toFixed(2)})`); score -= 20; }
+    if (g.buys + g.sells < 10)            { flags.push(`gecko:thin-txns(${g.buys+g.sells})`); score -= 15; }
+    if (g.vol24h > 50_000 && g.ratio >= 0.8) score += 10;
+  } else if (geckoRes.status === 'fulfilled' && geckoRes.value === null) {
+    flags.push('gecko:no-data'); // token not indexed yet — neutral
+  }
 
-  const rugScore = rugRes.data?.score ?? rugRes.data?.risk_score;
-  if (rugScore != null && rugScore > 800) { flags.push(`rug-score-${rugScore}`); score -= 30; }
+  // F) Apply Solscan result
+  if (solRes.status === 'fulfilled' && solRes.value) {
+    const s = solRes.value;
+    if (s.total > 0 && s.total < 50) { flags.push(`solscan:thin-holders(${s.total})`); score -= 20; }
+    if (s.top3Pct > 0.80)            { flags.push(`solscan:whale-top3(${(s.top3Pct*100).toFixed(0)}%)`); score -= 25; }
+    else if (s.top3Pct > 0.60)       { flags.push(`solscan:conc-top3(${(s.top3Pct*100).toFixed(0)}%)`); score -= 10; }
+    if (s.total > 1000)               score += 5;
+  }
 
-  const result = { safe: score >= 40, score: Math.max(0, score), flags };
-  screenCache.set(mint, { result, ts: Date.now() });
+  const safe   = score >= 40;
+  const result = { safe, score: Math.max(0, score), flags };
+  screenCache.set(mint, { result, ts: Date.now(), pass: safe });
   return result;
 }
 
@@ -229,6 +384,53 @@ const LST_MIN_TRADE   = 1.0;            // [7] 1 SOL floor for defi routes
 // Per-category slippage [2]
 const CAT_SLIP: Record<string, number> = { bluechip: 30, defi: 50, meme: 100, launch: 200, native: 150, default: 50 };
 
+// ── Dual-endpoint Jupiter quote helper ───────────────────────────────────────────────
+// 1️⃣  Tries authenticated quote-api.jup.ag  (600 req/min)
+// 2️⃣  On 429 or failure: falls back to lite-api.jup.ag (60 req/min, keyless)
+// Returns the quote JSON on success, null on permanent failure.
+const JAUTH = 'https://quote-api.jup.ag/v6';   // authenticated  — 600 req/min
+const JFREE = 'https://lite-api.jup.ag/swap/v1'; // unauthenticated — 60 req/min
+const JAUTH_KEY = process.env.JUPITER_API_KEY || '';
+const JAUTH_HEADERS: Record<string, string> = JAUTH_KEY ? { 'x-api-key': JAUTH_KEY } : {};
+
+async function jupiterQuote(
+  inputMint: string,
+  outputMint: string,
+  amount: number,
+  slippageBps: number,
+  mintLabel: string,
+  leg: string
+): Promise<any | null> {
+  // —— Attempt 1: authenticated endpoint (600/min) ——————————————————————
+  if (JAUTH_KEY) {
+    const url = `${JAUTH}/quote?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amount}&slippageBps=${slippageBps}`;
+    const res = await rateLimitedFetch('jupiter_auth', url, { headers: JAUTH_HEADERS });
+    if (res.ok && res.data?.outAmount) {
+      return res.data; // ✅ auth success
+    }
+    if (res.status !== 429) {
+      // Hard error (400, 0, etc.) — no point retrying on free tier for same mint
+      if (res.status !== 0) session.inputParseErrors.push(`${leg} null outAmount ${mintLabel} (${res.status})`);
+      return null;
+    }
+    // 429 on auth — fall through to free tier
+    session.rateLimitWarnings.push(`Jupiter auth 429 ${leg} ${mintLabel}`);
+  }
+
+  // —— Attempt 2: free / lite-api fallback (60/min) ———————————————————
+  const freeUrl = `${JFREE}/quote?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amount}&slippageBps=${slippageBps}`;
+  const freeRes = await rateLimitedFetch('jupiter_free', freeUrl);
+  if (freeRes.ok && freeRes.data?.outAmount) {
+    return freeRes.data; // ⚠️  free-tier hit — logged via RL tracker
+  }
+  if (freeRes.status === 429) {
+    session.rateLimitWarnings.push(`Jupiter free 429 ${leg} ${mintLabel}`);
+  } else if (freeRes.status !== 0) {
+    session.inputParseErrors.push(`${leg} null outAmount ${mintLabel} (${freeRes.status})`);
+  }
+  return null;
+}
+
 // ── Simulate one arb scan on a route (ATA-aware) ─────────────────────────
 async function simArbRoute(
   mint: string,
@@ -240,27 +442,15 @@ async function simArbRoute(
   const actualTrade = cat === 'defi' ? Math.max(tradeSol, LST_MIN_TRADE) : tradeSol;
   const lamports = Math.floor(actualTrade * 1e9);
 
-  // Use authenticated Jupiter endpoint + API key from .env
-  const API_KEY = process.env.JUPITER_API_KEY || '';
-  const headers: any = API_KEY ? { 'x-api-key': API_KEY } : {};
-
-  // Quote leg 1: SOL → Token (use lite-api)
-  const LITE   = 'https://lite-api.jup.ag/swap/v1';
-  const q1Url  = `${LITE}/quote?inputMint=${WSOL}&outputMint=${mint}&amount=${lamports}&slippageBps=${slip}`;
-  const { data: q1, status: q1Status } = await rateLimitedFetch('jupiter', q1Url, { headers });
-  if (q1Status === 429) { session.rateLimitWarnings.push(`Jupiter 429 leg1 ${mint.slice(0,8)}`); return null; }
-  if (!q1?.outAmount) {
-    if (q1Status !== 0) session.inputParseErrors.push(`q1 null outAmount ${mint.slice(0,8)} (${q1Status})`);
-    return null;
-  }
+  // ── Dual-endpoint Jupiter quote: auth (600/min) → fallback free (60/min) ──
+  const q1 = await jupiterQuote(WSOL, mint, lamports, slip, mint.slice(0,8), 'leg1');
+  if (q1 === null) return null;
 
   const interAmt = Number(q1.outAmount);
   if (isNaN(interAmt) || interAmt <= 0) { session.inputParseErrors.push(`q1 invalid: "${q1.outAmount}" ${mint.slice(0,8)}`); return null; }
 
   // Quote leg 2: Token → SOL
-  const q2Url = `${LITE}/quote?inputMint=${mint}&outputMint=${WSOL}&amount=${interAmt}&slippageBps=${slip}`;
-  const { data: q2, status: q2Status } = await rateLimitedFetch('jupiter', q2Url, { headers });
-  if (q2Status === 429) { session.rateLimitWarnings.push(`Jupiter 429 leg2 ${mint.slice(0,8)}`); return null; }
+  const q2 = await jupiterQuote(mint, WSOL, interAmt, slip, mint.slice(0,8), 'leg2');
   if (!q2?.outAmount) return null;
 
   const outAmt = Number(q2.outAmount);
@@ -391,7 +581,7 @@ async function main() {
   console.log(`\n🛡  Pre-screening ${candidates.length} tokens (parallel)...`);
   let approvedTokens: Array<{ mint: string; cat: string }> = [];
   await Promise.all(candidates.map(async mint => {
-    const screen = await screenTokenLight(mint);
+    const screen = await screenTokenFull(mint);
     const cat    = ['mSoLz','J1tos','bSo13','orcaE'].some(p => mint.startsWith(p)) ? 'defi'
                  : ['EPjFW','Es9vM'].some(p => mint.startsWith(p)) ? 'bluechip' : 'meme';
     if (screen.safe) {
@@ -425,7 +615,7 @@ async function main() {
       if (newMints.length) {
         console.log(`   🆕 +${newMints.length} new tokens — screening...`);
         await Promise.all(newMints.map(async mint => {
-          const screen = await screenTokenLight(mint);
+          const screen = await screenTokenFull(mint);
           if (screen.safe) { approvedTokens.push({ mint, cat: 'meme' }); session.tokensApproved++; }
           else session.tokensBlocked.push(`${mint.slice(0,8)}…: ${screen.flags.join(',')}`);
         }));
@@ -474,7 +664,7 @@ async function main() {
       }
     }
 
-    await new Promise(r => setTimeout(r, 2000)); // 2s between batches
+    await new Promise(r => setTimeout(r, 5000)); // 5s between batches — stays within Jupiter free-tier 60/min
 
     if (Date.now() > nextReport) {
       checkpoint(`${REPORT_EVERY}min checkpoint`);

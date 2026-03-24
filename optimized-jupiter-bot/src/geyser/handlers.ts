@@ -31,11 +31,64 @@ import { startLaunchpadScanner,
          handleNewPoolEvent,
          LAUNCHPAD_PROGRAMS }                from '../discovery/launchpad_scanner';
 import { loadStrategyParams }                from '../strategy_tuner';
+import fs   from 'fs';
+import path from 'path';
+
+// ── Swarm signal files (written by scripts/maintain/opportunity_signals.ts) ──────
+const SIGNALS_DIR    = path.join(process.cwd(), 'signals');
+const EPOCH_FILE     = path.join(SIGNALS_DIR, 'epoch_boost.json');
+const VOL_FILE       = path.join(SIGNALS_DIR, 'volatility.json');
+const LAUNCH_FILE    = path.join(SIGNALS_DIR, 'fresh_launches.json');
+const SIGNAL_MAX_AGE = 2 * 60 * 1000; // ignore signals older than 2 min
+
+interface EpochSignal  { active: boolean; boost: number; updatedAt: number; }
+interface VolSignal    { mints: Array<{ mint: string; pct1h: number }>; updatedAt: number; }
+interface LaunchSignal { mints: Array<{ mint: string; source: string }>; updatedAt: number; }
+
+let epochSignal:  EpochSignal  = { active: false, boost: 0, updatedAt: 0 };
+let volSignal:    VolSignal    = { mints: [], updatedAt: 0 };
+let launchSignal: LaunchSignal = { mints: [], updatedAt: 0 };
+
+function readSignal<T>(file: string, fallback: T): T {
+  try {
+    if (!fs.existsSync(file)) return fallback;
+    const raw = JSON.parse(fs.readFileSync(file, 'utf-8'));
+    if (Date.now() - (raw.updatedAt || 0) > SIGNAL_MAX_AGE) return fallback; // stale
+    return raw as T;
+  } catch { return fallback; }
+}
+
+// Refresh signals every 60s (non-blocking)
+setInterval(() => {
+  epochSignal  = readSignal<EpochSignal> (EPOCH_FILE,  { active: false, boost: 0, updatedAt: 0 });
+  volSignal    = readSignal<VolSignal>   (VOL_FILE,    { mints: [], updatedAt: 0 });
+  launchSignal = readSignal<LaunchSignal>(LAUNCH_FILE, { mints: [], updatedAt: 0 });
+}, 60_000);
+// Initial read
+epochSignal  = readSignal<EpochSignal> (EPOCH_FILE,  { active: false, boost: 0, updatedAt: 0 });
+volSignal    = readSignal<VolSignal>   (VOL_FILE,    { mints: [], updatedAt: 0 });
+launchSignal = readSignal<LaunchSignal>(LAUNCH_FILE, { mints: [], updatedAt: 0 });
+
+// ── Min-mode: low-capital operation (~$5 / 0.05 SOL) ────────────────────────────
+// Activated by: MIN_MODE=true in env, or --min-mode CLI flag via dry_run_sim.ts
+// Overrides: trade size 0.005 SOL, LST floor 0.005 SOL, batch size 1.
+const MIN_MODE      = process.env.MIN_MODE === 'true';
 
 // [7] Minimum trade size for LST/defi routes (to clear gas+ATA floor)
-const LST_MIN_TRADE_SOL = parseFloat(process.env.LST_MIN_TRADE_SOL || '1.0');
+//     Min-mode lowers this to 0.005 SOL (disables the 1 SOL LST requirement)
+const LST_MIN_TRADE_SOL = MIN_MODE
+  ? parseFloat(process.env.LST_MIN_TRADE_SOL || '0.005')
+  : parseFloat(process.env.LST_MIN_TRADE_SOL || '1.0');
+
 // [1] Parallel batch size per Geyser tick
-const BATCH_SIZE = parseInt(process.env.SCAN_BATCH_SIZE || '5');
+//     Min-mode forces 1 to avoid 5 concurrent 0.005 SOL holds
+const BATCH_SIZE = MIN_MODE
+  ? 1
+  : parseInt(process.env.SCAN_BATCH_SIZE || '5');
+
+if (MIN_MODE) {
+  logger.info(`[MIN-MODE] 🌱 Low-capital mode active — trade: ${LST_MIN_TRADE_SOL} SOL | batch: ${BATCH_SIZE} | LST floor: ${LST_MIN_TRADE_SOL} SOL`);
+}
 
 
 // ── Wallet state (cached, refreshed every 30s) ────────────────────────────────
@@ -77,13 +130,40 @@ export async function handleAccountUpdate(data: any) {
   const jitterMs = Math.floor(Math.random() * 20) + 5;
   await new Promise(r => setTimeout(r, jitterMs));
 
-  // [1] Get top BATCH_SIZE (5) priority routes, scan all concurrently
-  const routes = globalRouteManager.getNextBatch(BATCH_SIZE);
+  // [1] Get top BATCH_SIZE routes — apply swarm signal boosts
+  let routes = globalRouteManager.getNextBatch(BATCH_SIZE);
   if (routes.length === 0) return;
+
+  // ── Boost 1: Fresh launches → prepend to batch (one-scan priority) ─────────
+  if (launchSignal.mints.length > 0) {
+    const freshMints = new Set(launchSignal.mints.map(m => m.mint));
+    const freshRoutes = routes.filter(r => freshMints.has(r.outputMint));
+    const rest        = routes.filter(r => !freshMints.has(r.outputMint));
+    routes = [...freshRoutes, ...rest].slice(0, BATCH_SIZE);
+    if (freshRoutes.length > 0) logger.debug(`[SIGNAL] 🚀 ${freshRoutes.length} fresh launch(es) elevated to batch head`);
+  }
+
+  // ── Boost 2: Volatility spikes → elevate spiking mints ──────────────────
+  if (volSignal.mints.length > 0) {
+    const volMints    = new Set(volSignal.mints.map(m => m.mint));
+    const volRoutes   = routes.filter(r => volMints.has(r.outputMint));
+    const otherRoutes = routes.filter(r => !volMints.has(r.outputMint));
+    routes = [...volRoutes, ...otherRoutes].slice(0, BATCH_SIZE);
+    if (volRoutes.length > 0) logger.debug(`[SIGNAL] ⚡ ${volRoutes.length} volatile route(s) elevated`);
+  }
 
   await Promise.allSettled(routes.map(route =>
     scanRoute(route.outputMint, route.entry.category, params, startMs)
   ));
+}
+
+// ── Dynamic Jito tip calculator ──────────────────────────────────────────────
+// When DYNAMIC_TIP_ENABLED=true, pay TIP_CEIL_PCT × netProfitLam as tip,
+// floored at TIP_FLOOR_LAMPORTS. Falls back to fixed JITO_TIP_AMOUNT if disabled.
+function calcJitoTip(netProfitLam: number): number {
+  if (!config.DYNAMIC_TIP_ENABLED) return config.JITO_TIP_AMOUNT;
+  const dynamic = Math.floor(netProfitLam * config.TIP_CEIL_PCT);
+  return Math.max(config.TIP_FLOOR_LAMPORTS, dynamic);
 }
 
 // ── Scan a single route ───────────────────────────────────────────────────────
@@ -107,6 +187,19 @@ async function scanRoute(outputMint: string, category: string, params: ReturnTyp
     return;
   }
 
+  // ── EMA fast-fail: skip quote API if route is consistently net-negative ──
+  // Only applies after ≥10 scans — avoids false rejects on new routes.
+  // Saves ~1 Helius RPC call + 1 Jupiter quote call per skipped route.
+  const emaEst = globalRouteManager.getEmaEstimate(outputMint);
+  if (emaEst !== null) {
+    // Convert bps threshold to lamports for apples-to-apples comparison
+    const minProfitBps = (params.MIN_PROFIT_SOL / tradeSOL) * 10_000;
+    if (emaEst < -minProfitBps) {
+      logger.debug(`[FAST-FAIL] ${outputMint.slice(0,8)}… EMA ${emaEst.toFixed(2)}bps below threshold — skipped quote fetch`);
+      return;
+    }
+  }
+
   // [8] Quote with timestamp for telemetry
   const quoteStartMs = Date.now();
   const quote1 = await fetchJupiterQuote(WSOL, outputMint, tradeLamports);
@@ -123,20 +216,27 @@ async function scanRoute(outputMint: string, category: string, params: ReturnTyp
   const netProfitBps        = (netProfitLam / tradeLamports) * 10_000;
   const netProfitSOL        = netProfitLam / 1e9;
 
-  // Record EMA outcome
-  globalRouteManager.recordOutcome(outputMint, netProfitBps, netProfitSOL > params.MIN_PROFIT_SOL);
+  // ── Dynamic Jito tip — only charged on execution (see below) ────────────────
+  // Pre-calculate here for accurate profit check & logging.
+  const jitoTipLam          = calcJitoTip(Math.max(0, netProfitLam));
+  const netAfterTipLam      = netProfitLam - jitoTipLam;
+  const netAfterTipSOL      = netAfterTipLam / 1e9;
+  const netAfterTipBps      = (netAfterTipLam / tradeLamports) * 10_000;
+
+  // Record EMA outcome (using post-tip profit — most accurate signal)
+  globalRouteManager.recordOutcome(outputMint, netAfterTipBps, netAfterTipSOL > params.MIN_PROFIT_SOL);
 
   const totalElapsed = Date.now() - startMs;
 
-  if (netProfitBps > 0) {
-    logger.info(`✅ [ARB] SOL→${outputMint.slice(0, 6)}… | ${tradeSOL}SOL | +${netProfitBps.toFixed(2)}bps (+${netProfitSOL.toFixed(5)}SOL) | quote:${quoteAgeMs}ms total:${totalElapsed}ms`);
+  if (netAfterTipBps > 0) {
+    logger.info(`✅ [ARB] SOL→${outputMint.slice(0, 6)}… | ${tradeSOL}SOL | +${netAfterTipBps.toFixed(2)}bps (+${netAfterTipSOL.toFixed(5)}SOL) | tip:${jitoTipLam}L | quote:${quoteAgeMs}ms total:${totalElapsed}ms`);
   } else {
-    logger.debug(`❌ [SCAN] SOL→${outputMint.slice(0, 6)}… | ${netProfitBps.toFixed(2)}bps | quote:${quoteAgeMs}ms`);
+    logger.debug(`❌ [SCAN] SOL→${outputMint.slice(0, 6)}… | gross:${netProfitBps.toFixed(2)}bps tip:${jitoTipLam}L net:${netAfterTipBps.toFixed(2)}bps | quote:${quoteAgeMs}ms`);
   }
 
-  // ── Execute if profitable ────────────────────────────────────────────────
-  if (netProfitSOL >= params.MIN_PROFIT_SOL) {
-    logger.warn(`🔥 EXECUTING: ${tradeSOL}SOL→${outputMint.slice(0,8)}… | Est. net +${netProfitSOL.toFixed(5)}SOL | signal-age:${quoteAgeMs}ms`);
+  // ── Execute if profitable (post-tip) ────────────────────────────────────
+  if (netAfterTipSOL >= params.MIN_PROFIT_SOL) {
+    logger.warn(`🔥 EXECUTING: ${tradeSOL}SOL→${outputMint.slice(0,8)}… | Est. net +${netAfterTipSOL.toFixed(5)}SOL post-tip | tip:${jitoTipLam}L (${config.DYNAMIC_TIP_ENABLED ? 'dynamic' : 'fixed'}) | signal-age:${quoteAgeMs}ms`);
 
     let signatureStr: string | null = null;
     let success = false;
@@ -170,8 +270,9 @@ async function scanRoute(outputMint: string, category: string, params: ReturnTyp
       inputMint:         WSOL,
       outputMint,
       tradeSizeSOL:      tradeSOL,
-      expectedProfitSOL: netProfitSOL,
-      expectedProfitBps: netProfitBps,
+      expectedProfitSOL: netAfterTipSOL,
+      expectedProfitBps: netAfterTipBps,
+      jitoTipLamports:   jitoTipLam,
       signature:         signatureStr,
       success,
       // [8] Telemetry fields

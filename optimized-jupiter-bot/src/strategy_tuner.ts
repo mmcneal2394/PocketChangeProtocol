@@ -37,19 +37,23 @@ const TELEMETRY_PATHS = [
 ];
 
 // ── Default parameters ────────────────────────────────────────────────────────
+// ENV overrides take priority — allows MIN_MODE to inject 0.005 SOL trade size
+// without mutating strategy_params.json.
 export const DEFAULT_PARAMS = {
   // --- Fast-loop owned ---
-  MIN_PROFIT_SOL:   0.0001,
-  MIN_SPREAD_BPS:   8,
+  MIN_PROFIT_SOL:          0.0001,
+  MIN_SPREAD_BPS:          8,
+  PRIORITY_MICRO_LAMPORTS: parseInt(process.env.PRIORITY_MICRO_LAMPORTS || '250000'),
   // --- Slow-loop owned ---
-  TIP_PERCENTAGE:   0.50,
-  MAX_SLIPPAGE_BPS: 50,
-  MAX_TRADE_SIZE_SOL: 0.02,
-  SPLIT_RATIO:      0.50,
+  TIP_PERCENTAGE:          0.50,
+  MAX_SLIPPAGE_BPS:        50,
+  MAX_TRADE_SIZE_SOL:      parseFloat(process.env.MAX_TRADE_SIZE_SOL || '0.02'),
+  SPLIT_RATIO:             0.50,
   // --- Metadata ---
   fastUpdatedAt: 0,
   slowUpdatedAt: 0,
 };
+
 
 export type StrategyParams = typeof DEFAULT_PARAMS;
 
@@ -151,6 +155,11 @@ function runFastTune(): void {
   const medianSpread   = spreads.length > 0 ? percentile(spreads, 50) : current.MIN_SPREAD_BPS;
   const newMinSpread   = Math.max(4, Math.round(medianSpread * 1.1));
 
+  // PRIORITY_MICRO_LAMPORTS: scale by win rate. Higher fees on losing streak to fight harder.
+  let newPriority = current.PRIORITY_MICRO_LAMPORTS;
+  if (emaWin < 0.40) newPriority = Math.min(newPriority * 1.3, 1000000); // 1.3x boost, max 1M
+  if (emaWin > 0.70) newPriority = Math.max(newPriority * 0.8, 50000);    // 0.8x reduction, min 50K
+
   // Clamp changes to ±30% of current to prevent wild swings from outliers
   const clamp = (val: number, prev: number, pct = 0.30) =>
     Math.max(prev * (1 - pct), Math.min(prev * (1 + pct), val));
@@ -159,11 +168,12 @@ function runFastTune(): void {
     ...current,
     MIN_PROFIT_SOL: parseFloat(clamp(newMinProfit, current.MIN_PROFIT_SOL).toFixed(6)),
     MIN_SPREAD_BPS: Math.round(clamp(newMinSpread, current.MIN_SPREAD_BPS)),
+    PRIORITY_MICRO_LAMPORTS: Math.round(clamp(newPriority, current.PRIORITY_MICRO_LAMPORTS)),
     fastUpdatedAt:  Date.now(),
   };
 
   saveParams(updated);
-  logger.info(`[FAST-TUNER] ✓ MIN_PROFIT: ${updated.MIN_PROFIT_SOL} SOL  (was ${current.MIN_PROFIT_SOL})  |  MIN_SPREAD: ${updated.MIN_SPREAD_BPS} BPS  |  EMA win: ${(emaWin * 100).toFixed(0)}%`);
+  logger.info(`[FAST-TUNER] ✓ MIN_PROFIT: ${updated.MIN_PROFIT_SOL} SOL | MIN_SPREAD: ${updated.MIN_SPREAD_BPS} BPS | PRIORITY: ${updated.PRIORITY_MICRO_LAMPORTS} microL | EMA win: ${(emaWin * 100).toFixed(0)}%`);
 }
 
 // ══ SLOW LOOP ════════════════════════════════════════════════════════════════

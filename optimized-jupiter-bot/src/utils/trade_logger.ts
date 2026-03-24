@@ -12,6 +12,7 @@ export interface ArbitrageMetrics {
     tradeSizeSOL: number;
     expectedProfitSOL: number;
     expectedProfitBps: number;
+    jitoTipLamports?: number;   // dynamic Jito tip paid (lamports)
     signature?: string | null;
     success: boolean;
     // [8] Telemetry
