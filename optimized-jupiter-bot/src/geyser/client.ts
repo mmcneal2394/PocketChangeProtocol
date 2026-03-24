@@ -32,8 +32,12 @@ async function connectWithReconnect(Client: any, attempt = 0): Promise<{ client:
   }
 
   try {
-    const client = new Client(config.GEYSER_RPC, config.GEYSER_API_TOKEN, undefined);
-    await client.connect();
+    // v0.6.0 API: Client(endpoint_with_https, xToken, channelOptions)
+    // No .connect() method — call .subscribe() directly
+    const endpoint = config.GEYSER_RPC.startsWith('http')
+      ? config.GEYSER_RPC
+      : `https://${config.GEYSER_RPC}`;
+    const client = new Client(endpoint, config.GEYSER_API_TOKEN, undefined);
     const stream = await client.subscribe();
     stream.write(SUBSCRIPTION_REQUEST);
 
