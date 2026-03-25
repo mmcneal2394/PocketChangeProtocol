@@ -181,49 +181,62 @@ impl Strategy for CexDexStrategy {
         }
 
         let mut opportunities = Vec::new();
-        let pairs = [("SOL", "bitget"), ("RAY", "bitget"), ("WIF", "bitget")];
+        let tokens = ["SOL", "RAY", "WIF", "BONK"];
 
-        for (token, _cex) in &pairs {
-            // Get DEX and CEX prices
+        for token in &tokens {
+            // DEX (Jupiter) price — stored under plain mint key
             let dex_price = match prices.get_price(token) {
                 Some(p) => p,
                 None => continue,
             };
 
-            // CEX prices are stored with same mint name but source "bitget"
-            // For now, use the same cache — in production, separate source check
-            // The price difference comes from the feed latency/source difference
-            let cex_entry = match prices.get(token) {
-                Some(e) => e,
-                None => continue,
-            };
+            // Check all configured CEX sources for this token
+            let cex_prices = prices.get_cex_prices(token);
+            if cex_prices.is_empty() {
+                continue;
+            }
 
-            let cex_price = cex_entry.price_usdc;
-            let spread_pct = ((cex_price - dex_price) / dex_price * 100.0).abs();
-            let net_profit = spread_pct - ESTIMATED_TOTAL_FEE_PCT;
+            for (source, cex_price) in &cex_prices {
+                let spread_pct = ((cex_price - dex_price) / dex_price * 100.0).abs();
+                let net_profit = spread_pct - ESTIMATED_TOTAL_FEE_PCT;
 
-            // Only execute when spread > 2x fees
-            if net_profit > self.threshold.to_f64().unwrap_or(1.0) && spread_pct > ESTIMATED_TOTAL_FEE_PCT * 2.0 {
-                let direction = if cex_price > dex_price { "buy DEX, sell CEX" } else { "buy CEX, sell DEX" };
-                debug!("CEX-DEX opportunity: {} spread {:.4}% ({})", token, spread_pct, direction);
+                // Only execute when spread > 2x fees
+                if net_profit > self.threshold.to_f64().unwrap_or(1.0)
+                    && spread_pct > ESTIMATED_TOTAL_FEE_PCT * 2.0
+                {
+                    let direction = if cex_price > &dex_price {
+                        "buy DEX, sell CEX"
+                    } else {
+                        "buy CEX, sell DEX"
+                    };
+                    debug!(
+                        "CEX-DEX opportunity: {} on {} spread {:.4}% ({})",
+                        token, source, spread_pct, direction
+                    );
 
-                opportunities.push(Opportunity {
-                    id: Uuid::new_v4().to_string(),
-                    strategy: StrategyKind::CexDex,
-                    route: format!("{} {} (spread {:.2}%)", token, direction, spread_pct),
-                    expected_profit_pct: Decimal::from_f64(net_profit).unwrap_or_default(),
-                    trade_size_usdc: Decimal::new(2000, 0), // Lower size for non-atomic
-                    instructions: vec![],
-                    detected_at: Instant::now(),
-                });
+                    opportunities.push(Opportunity {
+                        id: Uuid::new_v4().to_string(),
+                        strategy: StrategyKind::CexDex,
+                        route: format!(
+                            "{} {} via {} (spread {:.2}%)",
+                            token, direction, source, spread_pct
+                        ),
+                        expected_profit_pct: Decimal::from_f64(net_profit).unwrap_or_default(),
+                        trade_size_usdc: Decimal::new(2000, 0), // Lower size for non-atomic
+                        instructions: vec![],
+                        detected_at: Instant::now(),
+                    });
+                }
             }
         }
 
+        // Sort by profit — best opportunity first
+        opportunities.sort_by(|a, b| b.expected_profit_pct.cmp(&a.expected_profit_pct));
         opportunities
     }
 
     fn build_instructions(&self, opp: &Opportunity, wallet: &Keypair) -> anyhow::Result<Vec<Instruction>> {
-        // DEX leg only — CEX leg handled by CexExecutor after DEX confirms
+        // DEX leg only — CEX leg handled by MultiCexExecutor after DEX confirms
         info!("Building DEX leg instructions for CEX-DEX: {}", opp.route);
 
         let token = Self::parse_token_from_route(&opp.route)
@@ -366,6 +379,7 @@ mod tests {
         *strategy.open_position.lock().await = Some(CexDexPosition {
             id: "test".into(),
             status: crate::executor::cex_executor::CexDexStatus::DexConfirmed,
+            exchange: "mexc".into(),
             dex_tx_hash: None,
             cex_order_id: None,
             pair: "SOL".into(),
