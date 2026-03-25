@@ -225,6 +225,10 @@ impl TelegramBot {
         Ok(())
     }
 
+    pub async fn subscriber_count(&self) -> usize {
+        self.subscribers.lock().await.len()
+    }
+
     pub fn parse_command(text: &str) -> Option<TelegramCommand> {
         let text = text.trim();
         let text = text.split('@').next().unwrap_or(text);
