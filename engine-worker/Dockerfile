@@ -54,7 +54,7 @@ auto_execute_threshold = 0.05\n\
 enabled = true\n\
 \n\
 [strategy.statistical]\n\
-auto_execute_threshold = 1.5\n\
+auto_execute_threshold = 3.0\n\
 enabled = true\n' > engine.toml
 
 EXPOSE 3002
