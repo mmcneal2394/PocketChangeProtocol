@@ -19,13 +19,13 @@ pub struct ApprovalRouter {
     config: Arc<EngineConfig>,
     pending: Arc<Mutex<HashMap<String, PendingOpportunity>>>,
     executor_tx: mpsc::Sender<Opportunity>,
-    telegram: Option<telegram::TelegramBot>,
+    telegram: Option<Arc<telegram::TelegramBot>>,
 }
 
 impl ApprovalRouter {
     pub fn new(
         config: Arc<EngineConfig>,
-        telegram: Option<telegram::TelegramBot>,
+        telegram: Option<Arc<telegram::TelegramBot>>,
         executor_tx: mpsc::Sender<Opportunity>,
     ) -> Self {
         Self {
