@@ -43,7 +43,7 @@ enabled = true\n\
 \n\
 [strategy.cex_dex]\n\
 auto_execute_threshold = 0.5\n\
-enabled = false\n\
+enabled = true\n\
 \n\
 [strategy.flash_loan]\n\
 auto_execute_threshold = 0.1\n\
@@ -54,7 +54,7 @@ auto_execute_threshold = 0.05\n\
 enabled = true\n\
 \n\
 [strategy.statistical]\n\
-auto_execute_threshold = 5.0\n\
+auto_execute_threshold = 3.0\n\
 enabled = true\n' > engine.toml
 
 EXPOSE 3002

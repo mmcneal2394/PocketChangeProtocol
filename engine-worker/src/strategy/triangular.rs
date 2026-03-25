@@ -439,7 +439,7 @@ impl Strategy for TriangularStrategy {
                     strategy: StrategyKind::Triangular,
                     route,
                     expected_profit_pct: Decimal::from_f64(net_profit).unwrap_or_default(),
-                    trade_size_usdc: Decimal::new(5000, 0),
+                    trade_size_usdc: Decimal::new(100, 0),
                     instructions: vec![],
                     detected_at: Instant::now(),
                 });
