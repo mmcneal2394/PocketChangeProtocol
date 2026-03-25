@@ -9,7 +9,9 @@ pub enum TelegramCommand {
     Approve(String),
     Reject(String),
     Resume,
-    Start,  // /start — registers the chat
+    Start,
+    Stop,
+    Status,
 }
 
 pub struct TelegramBot {
@@ -122,10 +124,10 @@ impl TelegramBot {
         Ok(())
     }
 
-    /// Poll for updates and auto-register any chat that messages the bot
+    /// Poll for updates — handles messages, commands, AND bot added/removed from groups
     pub async fn poll_updates(&self, last_update_id: &mut i64) -> Vec<(i64, TelegramCommand)> {
         let url = format!(
-            "https://api.telegram.org/bot{}/getUpdates?offset={}&timeout=1",
+            "https://api.telegram.org/bot{}/getUpdates?offset={}&timeout=1&allowed_updates=[\"message\",\"my_chat_member\"]",
             self.token, *last_update_id + 1
         );
         let resp = match self.client.get(&url).send().await {
@@ -144,22 +146,39 @@ impl TelegramBot {
                     *last_update_id = uid;
                 }
 
-                // Auto-register any chat that sends a message
-                if let Some(chat_id) = update["message"]["chat"]["id"].as_i64() {
-                    self.subscribe(chat_id).await;
+                // Handle bot added/removed from groups (auto-start like pump-claims)
+                if let Some(member_update) = update.get("my_chat_member") {
+                    let chat_id = member_update["chat"]["id"].as_i64().unwrap_or(0);
+                    let new_status = member_update["new_chat_member"]["status"].as_str().unwrap_or("");
 
+                    if new_status == "member" || new_status == "administrator" {
+                        // Bot was added to a group — auto-subscribe and welcome
+                        self.subscribe(chat_id).await;
+                        let _ = self.send_welcome(chat_id).await;
+                        info!("Bot added to chat {}, auto-subscribed", chat_id);
+                    } else if new_status == "left" || new_status == "kicked" {
+                        // Bot was removed — unsubscribe
+                        self.subscribers.lock().await.remove(&chat_id);
+                        info!("Bot removed from chat {}, unsubscribed", chat_id);
+                    }
+                    continue;
+                }
+
+                // Handle regular messages with commands
+                if let Some(chat_id) = update["message"]["chat"]["id"].as_i64() {
                     if let Some(text) = update["message"]["text"].as_str() {
                         if let Some(cmd) = Self::parse_command(text) {
-                            if cmd == TelegramCommand::Start {
-                                // Send welcome message to this specific chat
-                                let welcome = "🚀 *PocketChange Engine Connected*\n\n\
-                                    This chat will receive arbitrage alerts.\n\n\
-                                    Commands:\n\
-                                    /approve\\_<id> — approve an opportunity\n\
-                                    /reject\\_<id> — reject an opportunity\n\
-                                    /resume — resume after circuit breaker halt\n\
-                                    /status — engine status";
-                                let _ = self.send_to_chat(chat_id, welcome).await;
+                            match &cmd {
+                                TelegramCommand::Start => {
+                                    self.subscribe(chat_id).await;
+                                    let _ = self.send_welcome(chat_id).await;
+                                }
+                                TelegramCommand::Stop => {
+                                    self.subscribers.lock().await.remove(&chat_id);
+                                    let _ = self.send_to_chat(chat_id, "Notifications paused. Send /start to resume.").await;
+                                    info!("Chat {} unsubscribed via /stop", chat_id);
+                                }
+                                _ => {}
                             }
                             commands.push((chat_id, cmd));
                         }
@@ -170,7 +189,32 @@ impl TelegramBot {
         commands
     }
 
-    /// Send to a specific chat (for welcome messages, direct replies)
+    /// Send welcome message (used on /start and when bot is added to group)
+    async fn send_welcome(&self, chat_id: i64) -> anyhow::Result<()> {
+        let welcome = "<b>PocketChange Arbitrage Engine</b>\n\n\
+            This chat will receive real-time arbitrage alerts.\n\n\
+            <b>Commands:</b>\n\
+            /approve_&lt;id&gt; — execute an opportunity\n\
+            /reject_&lt;id&gt; — skip an opportunity\n\
+            /resume — resume after circuit breaker halt\n\
+            /status — engine health check\n\
+            /stop — pause notifications";
+        self.send_to_chat_html(chat_id, welcome).await
+    }
+
+    /// Send to a specific chat with HTML parse mode
+    async fn send_to_chat_html(&self, chat_id: i64, text: &str) -> anyhow::Result<()> {
+        let url = format!("https://api.telegram.org/bot{}/sendMessage", self.token);
+        let body = serde_json::json!({
+            "chat_id": chat_id,
+            "text": text,
+            "parse_mode": "HTML"
+        });
+        self.client.post(&url).json(&body).send().await?;
+        Ok(())
+    }
+
+    /// Send to a specific chat (Markdown)
     async fn send_to_chat(&self, chat_id: i64, text: &str) -> anyhow::Result<()> {
         let url = format!("https://api.telegram.org/bot{}/sendMessage", self.token);
         let body = serde_json::json!({
@@ -184,8 +228,16 @@ impl TelegramBot {
 
     pub fn parse_command(text: &str) -> Option<TelegramCommand> {
         let text = text.trim();
+        // Strip @botname suffix (e.g., /start@PCP_notibot)
+        let text = text.split('@').next().unwrap_or(text);
         if text == "/start" {
             return Some(TelegramCommand::Start);
+        }
+        if text == "/stop" {
+            return Some(TelegramCommand::Stop);
+        }
+        if text == "/status" {
+            return Some(TelegramCommand::Status);
         }
         if text == "/resume" {
             return Some(TelegramCommand::Resume);

@@ -209,14 +209,31 @@ async fn main() -> anyhow::Result<()> {
         if let Some(bot) = approval::telegram::TelegramBot::from_env() {
             let r = router.clone();
             let cb = circuit_breaker.clone();
+            let cfg = config.clone();
+            let start = std::time::Instant::now();
             tasks.spawn(async move {
                 let mut last_update_id: i64 = 0;
                 loop {
                     let commands = bot.poll_updates(&mut last_update_id).await;
                     for (_chat_id, cmd) in commands {
                         match cmd {
-                            approval::telegram::TelegramCommand::Start => {
-                                // Auto-handled in poll_updates — welcome sent, chat subscribed
+                            approval::telegram::TelegramCommand::Start |
+                            approval::telegram::TelegramCommand::Stop => {
+                                // Handled in poll_updates
+                            }
+                            approval::telegram::TelegramCommand::Status => {
+                                let cb_state = cb.read().await;
+                                let uptime = start.elapsed().as_secs();
+                                let hours = uptime / 3600;
+                                let mins = (uptime % 3600) / 60;
+                                let mode = format!("{:?}", cfg.mode);
+                                let msg = format!(
+                                    "<b>Engine Status</b>\n\nMode: {}\nUptime: {}h {}m\nCircuit Breaker: {}",
+                                    mode, hours, mins,
+                                    if cb_state.is_tripped() { "🔴 TRIPPED" } else { "🟢 OK" }
+                                );
+                                drop(cb_state);
+                                let _ = bot.send_alert(&msg).await;
                             }
                             approval::telegram::TelegramCommand::Approve(id) => {
                                 match r.approve(&id).await {
