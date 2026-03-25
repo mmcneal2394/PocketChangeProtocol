@@ -6,19 +6,13 @@ use solana_sdk::instruction::{AccountMeta, Instruction};
 use solana_sdk::pubkey::Pubkey;
 use solana_sdk::signature::{Keypair, Signer};
 use uuid::Uuid;
-use std::collections::VecDeque;
 use std::time::Instant;
-use tokio::sync::Mutex;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 use crate::types::*;
 use crate::price::PriceCache;
-use crate::strategy::{Strategy, execution_cost_pct};
-
-const WINDOW_SIZE: usize = 100;
-const HISTORICAL_PCT_PER_Z: f64 = 0.5; // Expected % return per z-score unit
+use crate::strategy::{Strategy, estimate_execution_cost_usdc};
 
 const JUPITER_API: &str = "https://public.jupiterapi.com";
-const USDC_MINT: &str = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 
 const TOKEN_MINTS: &[(&str, &str)] = &[
     ("SOL", "So11111111111111111111111111111111111111112"),
@@ -26,59 +20,24 @@ const TOKEN_MINTS: &[(&str, &str)] = &[
     ("mSOL", "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So"),
 ];
 
-/// Tracked pair for statistical arbitrage
-struct PairState {
-    token_a: String,
-    token_b: String,
-    ratios: VecDeque<f64>,
-}
-
-impl PairState {
-    fn new(a: &str, b: &str) -> Self {
-        Self {
-            token_a: a.into(),
-            token_b: b.into(),
-            ratios: VecDeque::with_capacity(WINDOW_SIZE + 1),
-        }
-    }
-
-    fn push_ratio(&mut self, ratio: f64) {
-        self.ratios.push_back(ratio);
-        if self.ratios.len() > WINDOW_SIZE {
-            self.ratios.pop_front();
-        }
-    }
-
-    fn z_score(&self) -> Option<f64> {
-        if self.ratios.len() < 20 {
-            return None; // Need minimum data
-        }
-        let n = self.ratios.len() as f64;
-        let mean: f64 = self.ratios.iter().sum::<f64>() / n;
-        let variance: f64 = self.ratios.iter().map(|r| (r - mean).powi(2)).sum::<f64>() / n;
-        let std_dev = variance.sqrt();
-        if std_dev < 1e-10 {
-            return None;
-        }
-        let current = *self.ratios.back()?;
-        Some((current - mean) / std_dev)
-    }
-}
+/// Round-trip pairs for atomic LSD arbitrage.
+/// Each entry is (base_token, derivative_token).
+/// We swap base -> derivative -> base and check if we end up with more than we started.
+const ROUND_TRIP_PAIRS: &[(&str, &str)] = &[
+    ("SOL", "JitoSOL"),
+    ("SOL", "mSOL"),
+];
 
 pub struct StatisticalStrategy {
+    /// Minimum net profit percentage to emit an opportunity.
     threshold: Decimal,
-    pairs: Mutex<Vec<PairState>>,
     client: reqwest::Client,
 }
 
 impl StatisticalStrategy {
     pub fn new(threshold: f64) -> Self {
         Self {
-            threshold: Decimal::from_f64(threshold).unwrap_or(Decimal::new(2, 0)),
-            pairs: Mutex::new(vec![
-                PairState::new("SOL", "JitoSOL"),
-                PairState::new("SOL", "mSOL"),
-            ]),
+            threshold: Decimal::from_f64(threshold).unwrap_or(Decimal::new(5, 2)), // default 0.05%
             client: reqwest::Client::new(),
         }
     }
@@ -88,7 +47,7 @@ impl StatisticalStrategy {
         TOKEN_MINTS.iter().find(|(s, _)| *s == symbol).map(|(_, m)| *m)
     }
 
-    /// Estimate base units from a USDC amount and token symbol.
+    /// Convert a USDC notional amount to base units (lamports) for a given token.
     fn usdc_to_base_units(symbol: &str, usdc_amount: f64) -> u64 {
         let (price_est, decimals): (f64, u32) = match symbol {
             "SOL" => (150.0, 9),
@@ -98,38 +57,6 @@ impl StatisticalStrategy {
         };
         let token_amount = usdc_amount / price_est;
         (token_amount * 10_f64.powi(decimals as i32)) as u64
-    }
-
-    /// Parse the statistical arb route to extract the long and short token symbols.
-    ///
-    /// Route format: "SOL/JitoSOL long JitoSOL / short SOL (z=-2.45)"
-    /// Returns (long_token, short_token).
-    fn parse_pair_direction(route: &str) -> anyhow::Result<(String, String)> {
-        // Find "long <TOKEN>" and "short <TOKEN>" in the route string
-        let long_token = route
-            .find("long ")
-            .and_then(|idx| {
-                let after = &route[idx + 5..];
-                // Take up to the next whitespace or '/'
-                let end = after.find(|c: char| c == '/' || c == ' ' || c == '(')
-                    .unwrap_or(after.len());
-                let token = after[..end].trim();
-                if token.is_empty() { None } else { Some(token.to_string()) }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Cannot parse long token from route: {}", route))?;
-
-        let short_token = route
-            .find("short ")
-            .and_then(|idx| {
-                let after = &route[idx + 6..];
-                let end = after.find(|c: char| c == '/' || c == ' ' || c == '(')
-                    .unwrap_or(after.len());
-                let token = after[..end].trim();
-                if token.is_empty() { None } else { Some(token.to_string()) }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Cannot parse short token from route: {}", route))?;
-
-        Ok((long_token, short_token))
     }
 
     /// Fetch a Jupiter V6 quote for a single swap leg.
@@ -144,11 +71,13 @@ impl StatisticalStrategy {
             JUPITER_API, input_mint, output_mint, amount
         );
 
-        let resp = self.client.get(&url)
+        let mut req = self.client.get(&url)
             .header("User-Agent", "ArbitraSaaS-Engine/0.1")
-            .timeout(std::time::Duration::from_secs(10))
-            .send()
-            .await?;
+            .timeout(std::time::Duration::from_secs(10));
+        if let Ok(key) = std::env::var("JUPITER_API_KEY") {
+            req = req.header("x-api-key", key);
+        }
+        let resp = req.send().await?;
 
         if !resp.status().is_success() {
             let status = resp.status();
@@ -176,9 +105,13 @@ impl StatisticalStrategy {
             "wrapAndUnwrapSol": true,
         });
 
-        let resp = self.client.post(&format!("{}/swap-instructions", JUPITER_API))
+        let mut req = self.client.post(&format!("{}/swap-instructions", JUPITER_API))
             .header("User-Agent", "ArbitraSaaS-Engine/0.1")
-            .header("Content-Type", "application/json")
+            .header("Content-Type", "application/json");
+        if let Ok(key) = std::env::var("JUPITER_API_KEY") {
+            req = req.header("x-api-key", key);
+        }
+        let resp = req
             .json(&payload)
             .timeout(std::time::Duration::from_secs(10))
             .send()
@@ -254,70 +187,84 @@ impl StatisticalStrategy {
         Ok(Instruction { program_id, accounts, data })
     }
 
-    /// Build Jupiter swap instructions for both legs of the pair trade.
+    /// Parse the round-trip route to extract (token_a, token_b).
     ///
-    /// Long leg: buy underperformer (USDC -> token) via Jupiter
-    /// Short leg: sell outperformer (token -> USDC) via Jupiter
-    async fn build_pair_trade_ixs(
+    /// Route format: "SOL -> JitoSOL -> SOL (round-trip arb, net 0.15%)"
+    /// Returns ("SOL", "JitoSOL").
+    fn parse_round_trip_route(route: &str) -> anyhow::Result<(String, String)> {
+        // Extract the part before the parenthetical
+        let core = route.split('(').next().unwrap_or(route).trim();
+        let tokens: Vec<&str> = core.split("->").map(|s| s.trim()).collect();
+        if tokens.len() < 3 {
+            anyhow::bail!("Cannot parse round-trip route (expected A -> B -> A): {}", route);
+        }
+        Ok((tokens[0].to_string(), tokens[1].to_string()))
+    }
+
+    /// Build Jupiter swap instructions for both legs of the round-trip arb.
+    ///
+    /// Leg 1: token_a -> token_b (via Jupiter)
+    /// Leg 2: token_b -> token_a (via Jupiter, using output of leg 1)
+    async fn build_round_trip_ixs(
         &self,
         opp: &Opportunity,
         wallet: &Keypair,
     ) -> anyhow::Result<Vec<Instruction>> {
-        let (long_token, short_token) = Self::parse_pair_direction(&opp.route)?;
+        let (token_a, token_b) = Self::parse_round_trip_route(&opp.route)?;
         let user_pubkey = wallet.pubkey().to_string();
 
-        let long_mint = Self::resolve_mint(&long_token)
-            .ok_or_else(|| anyhow::anyhow!("Unknown token mint for long leg: {}", long_token))?;
-        let short_mint = Self::resolve_mint(&short_token)
-            .ok_or_else(|| anyhow::anyhow!("Unknown token mint for short leg: {}", short_token))?;
+        let mint_a = Self::resolve_mint(&token_a)
+            .ok_or_else(|| anyhow::anyhow!("Unknown mint for {}", token_a))?;
+        let mint_b = Self::resolve_mint(&token_b)
+            .ok_or_else(|| anyhow::anyhow!("Unknown mint for {}", token_b))?;
 
-        // Split trade size evenly between the two legs
-        let half_usdc = opp.trade_size_usdc.to_f64().unwrap_or(1000.0) / 2.0;
+        // Leg 1: token_a -> token_b
+        let trade_usdc = opp.trade_size_usdc.to_f64().unwrap_or(100.0);
+        let amount_a = Self::usdc_to_base_units(&token_a, trade_usdc);
 
-        // --- Long leg: buy underperformer (USDC -> long_token) ---
-        let long_amount_usdc = (half_usdc * 1_000_000.0) as u64; // USDC has 6 decimals
         info!(
-            "Stat arb long leg: USDC ({}) -> {} ({}), amount={}",
-            USDC_MINT, long_token, long_mint, long_amount_usdc
+            "Round-trip leg 1: {} ({}) -> {} ({}), amount={}",
+            token_a, mint_a, token_b, mint_b, amount_a
         );
 
-        let long_quote = self.fetch_jupiter_quote(USDC_MINT, long_mint, long_amount_usdc).await
-            .map_err(|e| anyhow::anyhow!("Long leg quote failed: {}", e))?;
+        let quote_1 = self.fetch_jupiter_quote(mint_a, mint_b, amount_a).await
+            .map_err(|e| anyhow::anyhow!("Leg 1 quote failed: {}", e))?;
 
+        let out_b: u64 = quote_1["outAmount"]
+            .as_str()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(0);
+
+        info!("Leg 1 output: {} base units of {}", out_b, token_b);
+
+        let ixs_1 = self.fetch_swap_instructions(&quote_1, &user_pubkey).await
+            .map_err(|e| anyhow::anyhow!("Leg 1 swap instructions failed: {}", e))?;
+
+        // Leg 2: token_b -> token_a (using the output from leg 1)
         info!(
-            "Long leg quote: outAmount={}",
-            long_quote["outAmount"].as_str().unwrap_or("?")
+            "Round-trip leg 2: {} ({}) -> {} ({}), amount={}",
+            token_b, mint_b, token_a, mint_a, out_b
         );
 
-        let long_ixs = self.fetch_swap_instructions(&long_quote, &user_pubkey).await
-            .map_err(|e| anyhow::anyhow!("Long leg swap instructions failed: {}", e))?;
+        let quote_2 = self.fetch_jupiter_quote(mint_b, mint_a, out_b).await
+            .map_err(|e| anyhow::anyhow!("Leg 2 quote failed: {}", e))?;
 
-        // --- Short leg: sell outperformer (short_token -> USDC) ---
-        let short_amount = Self::usdc_to_base_units(&short_token, half_usdc);
         info!(
-            "Stat arb short leg: {} ({}) -> USDC ({}), amount={}",
-            short_token, short_mint, USDC_MINT, short_amount
+            "Leg 2 output: {} base units of {}",
+            quote_2["outAmount"].as_str().unwrap_or("?"),
+            token_a
         );
 
-        let short_quote = self.fetch_jupiter_quote(short_mint, USDC_MINT, short_amount).await
-            .map_err(|e| anyhow::anyhow!("Short leg quote failed: {}", e))?;
+        let ixs_2 = self.fetch_swap_instructions(&quote_2, &user_pubkey).await
+            .map_err(|e| anyhow::anyhow!("Leg 2 swap instructions failed: {}", e))?;
+
+        let mut all_ixs = Vec::with_capacity(ixs_1.len() + ixs_2.len());
+        all_ixs.extend(ixs_1);
+        all_ixs.extend(ixs_2);
 
         info!(
-            "Short leg quote: outAmount={}",
-            short_quote["outAmount"].as_str().unwrap_or("?")
-        );
-
-        let short_ixs = self.fetch_swap_instructions(&short_quote, &user_pubkey).await
-            .map_err(|e| anyhow::anyhow!("Short leg swap instructions failed: {}", e))?;
-
-        // Combine: buy first, then sell
-        let mut all_ixs = Vec::with_capacity(long_ixs.len() + short_ixs.len());
-        all_ixs.extend(long_ixs);
-        all_ixs.extend(short_ixs);
-
-        info!(
-            "Built {} total instructions for stat arb pair trade ({} long {} / short {})",
-            all_ixs.len(), opp.route, long_token, short_token
+            "Built {} total instructions for round-trip arb: {}",
+            all_ixs.len(), opp.route
         );
 
         Ok(all_ixs)
@@ -331,73 +278,110 @@ impl Strategy for StatisticalStrategy {
 
     async fn evaluate(&self, prices: &PriceCache) -> Vec<Opportunity> {
         let mut opportunities = Vec::new();
-        let mut pairs = self.pairs.lock().await;
+        let sol_price = prices.get_price("SOL").unwrap_or(150.0);
+        let trade_size_usdc = 100.0_f64;
 
-        for pair in pairs.iter_mut() {
-            let price_a = match prices.get_price(&pair.token_a) {
-                Some(p) if p > 0.0 => p,
-                _ => continue,
+        for &(token_a, token_b) in ROUND_TRIP_PAIRS {
+            let mint_a = match Self::resolve_mint(token_a) {
+                Some(m) => m,
+                None => continue,
             };
-            let price_b = match prices.get_price(&pair.token_b) {
-                Some(p) if p > 0.0 => p,
-                _ => continue,
+            let mint_b = match Self::resolve_mint(token_b) {
+                Some(m) => m,
+                None => continue,
             };
 
-            let ratio = price_a / price_b;
-            pair.push_ratio(ratio);
+            // Leg 1: token_a -> token_b (1 SOL = 10^9 lamports as the probe amount)
+            let amount_a = Self::usdc_to_base_units(token_a, trade_size_usdc);
 
-            if let Some(z) = pair.z_score() {
-                let z_abs = z.abs();
-                let threshold = self.threshold.to_f64().unwrap_or(2.0);
-
-                if z_abs > threshold {
-                    let direction = if z > 0.0 {
-                        format!("long {} / short {}", pair.token_b, pair.token_a)
-                    } else {
-                        format!("long {} / short {}", pair.token_a, pair.token_b)
-                    };
-
-                    // --- Accurate fee calculation ---
-                    let sol_price = prices.get_price("SOL").unwrap_or(150.0);
-                    let trade_size = 100.0_f64; // USDC
-                    // 2 legs (buy + sell), each is 1 transaction = 2 txs total
-                    let fees_pct = execution_cost_pct(sol_price, trade_size, 2);
-                    let gross_profit = z_abs * HISTORICAL_PCT_PER_Z;
-                    let net_profit = gross_profit - fees_pct;
-
-                    debug!(
-                        "Stat arb: {}/{} z={:.2} gross={:.4}% fees={:.4}% net={:.4}% -> {}",
-                        pair.token_a, pair.token_b, z, gross_profit, fees_pct, net_profit, direction
-                    );
-
-                    if net_profit <= 0.0 {
-                        debug!("Stat arb {}/{} z={:.2}: fees exceed expected profit, skipping", pair.token_a, pair.token_b, z);
-                        continue;
-                    }
-
-                    opportunities.push(Opportunity {
-                        id: Uuid::new_v4().to_string(),
-                        strategy: StrategyKind::Statistical,
-                        route: format!("{}/{} {} (z={:.2})", pair.token_a, pair.token_b, direction, z),
-                        expected_profit_pct: Decimal::from_f64(net_profit)
-                            .unwrap_or_default(),
-                        estimated_fees_pct: Decimal::from_f64(fees_pct).unwrap_or_default(),
-                        trade_size_usdc: Decimal::new(100, 0),
-                        instructions: vec![],
-                        detected_at: Instant::now(),
-                    });
+            let quote_1 = match self.fetch_jupiter_quote(mint_a, mint_b, amount_a).await {
+                Ok(q) => q,
+                Err(e) => {
+                    debug!("Round-trip {}->{}: leg 1 quote failed: {}", token_a, token_b, e);
+                    continue;
                 }
+            };
+
+            let out_b: u64 = match quote_1["outAmount"]
+                .as_str()
+                .and_then(|s| s.parse().ok())
+            {
+                Some(v) if v > 0 => v,
+                _ => {
+                    debug!("Round-trip {}->{}: leg 1 returned 0 output", token_a, token_b);
+                    continue;
+                }
+            };
+
+            // Leg 2: token_b -> token_a (feed leg 1 output)
+            let quote_2 = match self.fetch_jupiter_quote(mint_b, mint_a, out_b).await {
+                Ok(q) => q,
+                Err(e) => {
+                    debug!("Round-trip {}->{}->{}: leg 2 quote failed: {}", token_a, token_b, token_a, e);
+                    continue;
+                }
+            };
+
+            let out_a_final: u64 = match quote_2["outAmount"]
+                .as_str()
+                .and_then(|s| s.parse().ok())
+            {
+                Some(v) if v > 0 => v,
+                _ => {
+                    debug!("Round-trip {}->{}->{}: leg 2 returned 0 output", token_a, token_b, token_a);
+                    continue;
+                }
+            };
+
+            // Calculate round-trip gross profit percentage
+            let gross_profit_pct = ((out_a_final as f64 - amount_a as f64) / amount_a as f64) * 100.0;
+
+            // Deduct execution fees: 2 transactions (leg 1 + leg 2)
+            let fees_usdc = estimate_execution_cost_usdc(sol_price, 2);
+            let fees_pct = (fees_usdc / trade_size_usdc) * 100.0;
+            let net_profit_pct = gross_profit_pct - fees_pct;
+
+            debug!(
+                "Round-trip {} -> {} -> {}: in={} out={} gross={:.4}% fees={:.4}% net={:.4}%",
+                token_a, token_b, token_a, amount_a, out_a_final, gross_profit_pct, fees_pct, net_profit_pct
+            );
+
+            let threshold = self.threshold.to_f64().unwrap_or(0.05);
+            if net_profit_pct <= threshold {
+                debug!(
+                    "Round-trip {} -> {} -> {}: net {:.4}% below threshold {:.4}%, skipping",
+                    token_a, token_b, token_a, net_profit_pct, threshold
+                );
+                continue;
             }
+
+            let route = format!(
+                "{} -> {} -> {} (round-trip arb, net {:.2}%)",
+                token_a, token_b, token_a, net_profit_pct
+            );
+
+            info!("Atomic arb detected: {}", route);
+
+            opportunities.push(Opportunity {
+                id: Uuid::new_v4().to_string(),
+                strategy: StrategyKind::Statistical,
+                route,
+                expected_profit_pct: Decimal::from_f64(net_profit_pct).unwrap_or_default(),
+                estimated_fees_pct: Decimal::from_f64(fees_pct).unwrap_or_default(),
+                trade_size_usdc: Decimal::new(100, 0),
+                instructions: vec![],
+                detected_at: Instant::now(),
+            });
         }
 
         opportunities
     }
 
     fn build_instructions(&self, opp: &Opportunity, wallet: &Keypair) -> anyhow::Result<Vec<Instruction>> {
-        info!("Building stat arb instructions for {}", opp.route);
+        info!("Building round-trip arb instructions for {}", opp.route);
         use tokio::runtime::Handle;
         let instructions = tokio::task::block_in_place(|| {
-            Handle::current().block_on(self.build_pair_trade_ixs(opp, wallet))
+            Handle::current().block_on(self.build_round_trip_ixs(opp, wallet))
         })?;
         Ok(instructions)
     }
@@ -405,67 +389,13 @@ impl Strategy for StatisticalStrategy {
     fn min_profit_threshold(&self) -> Decimal { self.threshold }
 
     fn normalized_profit_pct(&self, opp: &Opportunity) -> Decimal {
-        opp.expected_profit_pct // Already converted from z-score * pct_per_z
+        opp.expected_profit_pct
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_z_score_calculation() {
-        let mut pair = PairState::new("SOL", "JitoSOL");
-        // Push 20 values with slight variance so std_dev > 0
-        for i in 0..20 {
-            pair.push_ratio(1.0 + (i as f64) * 0.0001);
-        }
-        // Push one more value near the mean
-        pair.push_ratio(1.001);
-        let z = pair.z_score().unwrap();
-        assert!(z.abs() < 1.0, "Near-mean value should have small z: got {}", z);
-
-        // Push an outlier well above the mean
-        pair.push_ratio(1.1);
-        let z = pair.z_score().unwrap();
-        assert!(z > 1.0, "Outlier should produce positive z-score: got {}", z);
-    }
-
-    #[test]
-    fn test_insufficient_data_returns_none() {
-        let mut pair = PairState::new("SOL", "JitoSOL");
-        for _ in 0..10 {
-            pair.push_ratio(1.0);
-        }
-        assert!(pair.z_score().is_none()); // Need at least 20
-    }
-
-    #[test]
-    fn test_parse_pair_direction() {
-        // Standard route format from evaluate()
-        let route = "SOL/JitoSOL long JitoSOL / short SOL (z=-2.45)";
-        let (long_tok, short_tok) = StatisticalStrategy::parse_pair_direction(route).unwrap();
-        assert_eq!(long_tok, "JitoSOL");
-        assert_eq!(short_tok, "SOL");
-
-        // Reverse direction
-        let route2 = "SOL/mSOL long SOL / short mSOL (z=2.80)";
-        let (long_tok2, short_tok2) = StatisticalStrategy::parse_pair_direction(route2).unwrap();
-        assert_eq!(long_tok2, "SOL");
-        assert_eq!(short_tok2, "mSOL");
-    }
-
-    #[test]
-    fn test_parse_pair_direction_missing_long() {
-        let route = "SOL/JitoSOL short SOL (z=-2.45)";
-        assert!(StatisticalStrategy::parse_pair_direction(route).is_err());
-    }
-
-    #[test]
-    fn test_parse_pair_direction_missing_short() {
-        let route = "SOL/JitoSOL long JitoSOL (z=-2.45)";
-        assert!(StatisticalStrategy::parse_pair_direction(route).is_err());
-    }
 
     #[test]
     fn test_resolve_mint() {
@@ -493,5 +423,30 @@ mod tests {
         // 500 USDC worth of JitoSOL at ~165 = ~3.03 JitoSOL
         let units = StatisticalStrategy::usdc_to_base_units("JitoSOL", 500.0);
         assert!(units > 2_500_000_000 && units < 4_000_000_000, "JitoSOL base units: {}", units);
+    }
+
+    #[test]
+    fn test_parse_round_trip_route() {
+        let route = "SOL -> JitoSOL -> SOL (round-trip arb, net 0.15%)";
+        let (a, b) = StatisticalStrategy::parse_round_trip_route(route).unwrap();
+        assert_eq!(a, "SOL");
+        assert_eq!(b, "JitoSOL");
+
+        let route2 = "SOL -> mSOL -> SOL (round-trip arb, net 0.42%)";
+        let (a2, b2) = StatisticalStrategy::parse_round_trip_route(route2).unwrap();
+        assert_eq!(a2, "SOL");
+        assert_eq!(b2, "mSOL");
+    }
+
+    #[test]
+    fn test_parse_round_trip_route_invalid() {
+        let route = "SOL -> JitoSOL";
+        assert!(StatisticalStrategy::parse_round_trip_route(route).is_err());
+    }
+
+    #[test]
+    fn test_default_threshold() {
+        let strat = StatisticalStrategy::new(0.05);
+        assert_eq!(strat.threshold, Decimal::from_f64(0.05).unwrap());
     }
 }
