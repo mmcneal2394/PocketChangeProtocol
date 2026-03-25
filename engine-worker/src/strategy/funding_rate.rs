@@ -11,8 +11,11 @@ use tracing::{info, warn, debug};
 use uuid::Uuid;
 use crate::types::*;
 use crate::price::PriceCache;
-use crate::strategy::Strategy;
+use crate::strategy::{Strategy, execution_cost_pct};
 use crate::engine::drift::{self, OrderParams, PositionDirection};
+
+/// Drift taker fee per trade (0.1%).
+const DRIFT_TAKER_FEE_PCT: f64 = 0.1;
 
 /// Drift Protocol markets to monitor for funding rate arbitrage.
 const DRIFT_MARKETS: &[(&str, u32)] = &[
@@ -442,7 +445,7 @@ impl Strategy for FundingRateStrategy {
     fn name(&self) -> &str { "Funding Rate" }
     fn kind(&self) -> StrategyKind { StrategyKind::FundingRate }
 
-    async fn evaluate(&self, _prices: &PriceCache) -> Vec<Opportunity> {
+    async fn evaluate(&self, prices: &PriceCache) -> Vec<Opportunity> {
         let mut opportunities = Vec::new();
 
         for (market_name, market_index) in DRIFT_MARKETS {
@@ -486,13 +489,23 @@ impl Strategy for FundingRateStrategy {
 
             let abs_rate = funding_rate_pct.abs();
 
+            // --- Accurate fee calculation ---
+            let sol_price = prices.get_price("SOL").unwrap_or(150.0);
+            let trade_size = DEFAULT_TRADE_SIZE_USDC as f64;
+            // 2 transactions: spot leg (Jupiter swap) + perp leg (Drift order)
+            let fixed_cost_pct = execution_cost_pct(sol_price, trade_size, 2);
+            // Drift taker fee on the perp side (0.1%)
+            let total_fees_pct = fixed_cost_pct + DRIFT_TAKER_FEE_PCT;
+            // Net rate after fees (per-period, not annualized)
+            let net_rate = abs_rate - total_fees_pct;
+
             // Annualize: daily rate * 365 (funding rates on Drift are per hour but
             // we treat the raw percentage as a periodic rate and annualize for comparison)
-            let annualized_pct = abs_rate * 365.0;
+            let annualized_pct = net_rate * 365.0;
 
             debug!(
-                "Drift {} funding rate: {:.6}% (annualized {:.2}%), threshold: {}%",
-                market_name, funding_rate_pct, annualized_pct, self.threshold
+                "Drift {} funding rate: {:.6}% fees={:.4}% net={:.6}% (annualized {:.2}%), threshold: {}%",
+                market_name, funding_rate_pct, total_fees_pct, net_rate, annualized_pct, self.threshold
             );
 
             let threshold_f64 = self.threshold.to_f64().unwrap_or(8.0);
@@ -505,15 +518,16 @@ impl Strategy for FundingRateStrategy {
                 };
 
                 info!(
-                    "Funding rate opportunity: {} rate={:.4}% annualized={:.2}% ({})",
-                    market_name, funding_rate_pct, annualized_pct, direction
+                    "Funding rate opportunity: {} rate={:.4}% fees={:.4}% net_annualized={:.2}% ({})",
+                    market_name, funding_rate_pct, total_fees_pct, annualized_pct, direction
                 );
 
                 opportunities.push(Opportunity {
                     id: Uuid::new_v4().to_string(),
                     strategy: StrategyKind::FundingRate,
                     route: format!("{} {} (rate {:.4}%)", market_name, direction, funding_rate_pct),
-                    expected_profit_pct: Decimal::from_f64(abs_rate).unwrap_or_default(),
+                    expected_profit_pct: Decimal::from_f64(net_rate).unwrap_or_default(),
+                    estimated_fees_pct: Decimal::from_f64(total_fees_pct).unwrap_or_default(),
                     trade_size_usdc: Decimal::new(DEFAULT_TRADE_SIZE_USDC, 0),
                     instructions: vec![],
                     detected_at: Instant::now(),
@@ -572,6 +586,7 @@ mod tests {
             strategy: StrategyKind::FundingRate,
             route: "SOL-PERP".into(),
             expected_profit_pct: Decimal::from_f64(0.1).unwrap(),
+            estimated_fees_pct: Decimal::ZERO,
             trade_size_usdc: Decimal::new(100, 0),
             instructions: vec![],
             detected_at: Instant::now(),

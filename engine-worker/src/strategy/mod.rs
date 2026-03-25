@@ -13,6 +13,40 @@ use tokio::sync::{broadcast, mpsc, RwLock};
 use crate::types::*;
 use crate::price::PriceCache;
 
+// ---------------------------------------------------------------------------
+// Shared fee-estimation helpers
+// ---------------------------------------------------------------------------
+
+/// Jito tip per bundle (~5000 lamports).
+const JITO_TIP_SOL: f64 = 0.000005;
+/// Priority fee per transaction (~10000 lamports).
+const PRIORITY_FEE_SOL: f64 = 0.00001;
+
+/// Calculate real execution costs in USDC for `num_transactions` on-chain txs.
+pub fn estimate_execution_cost_usdc(sol_price: f64, num_transactions: u32) -> f64 {
+    let per_tx_cost_sol = JITO_TIP_SOL + PRIORITY_FEE_SOL;
+    let total_sol = per_tx_cost_sol * num_transactions as f64;
+    total_sol * sol_price
+}
+
+/// Calculate execution cost as a percentage of `trade_size_usdc`.
+pub fn execution_cost_pct(sol_price: f64, trade_size_usdc: f64, num_transactions: u32) -> f64 {
+    if trade_size_usdc <= 0.0 {
+        return 0.0;
+    }
+    let cost_usdc = estimate_execution_cost_usdc(sol_price, num_transactions);
+    (cost_usdc / trade_size_usdc) * 100.0
+}
+
+/// Extract `priceImpactPct` from a Jupiter quote JSON response (returns 0.0 on missing/invalid).
+pub fn extract_price_impact_pct(quote: &serde_json::Value) -> f64 {
+    quote["priceImpactPct"]
+        .as_str()
+        .and_then(|s| s.parse::<f64>().ok())
+        .unwrap_or(0.0)
+        .abs()
+}
+
 #[async_trait]
 pub trait Strategy: Send + Sync {
     fn name(&self) -> &str;

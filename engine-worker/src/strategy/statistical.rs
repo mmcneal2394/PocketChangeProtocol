@@ -12,7 +12,7 @@ use tokio::sync::Mutex;
 use tracing::{debug, info, warn};
 use crate::types::*;
 use crate::price::PriceCache;
-use crate::strategy::Strategy;
+use crate::strategy::{Strategy, execution_cost_pct};
 
 const WINDOW_SIZE: usize = 100;
 const HISTORICAL_PCT_PER_Z: f64 = 0.5; // Expected % return per z-score unit
@@ -357,14 +357,31 @@ impl Strategy for StatisticalStrategy {
                         format!("long {} / short {}", pair.token_a, pair.token_b)
                     };
 
-                    debug!("Stat arb: {}/{} z={:.2} -> {}", pair.token_a, pair.token_b, z, direction);
+                    // --- Accurate fee calculation ---
+                    let sol_price = prices.get_price("SOL").unwrap_or(150.0);
+                    let trade_size = 100.0_f64; // USDC
+                    // 2 legs (buy + sell), each is 1 transaction = 2 txs total
+                    let fees_pct = execution_cost_pct(sol_price, trade_size, 2);
+                    let gross_profit = z_abs * HISTORICAL_PCT_PER_Z;
+                    let net_profit = gross_profit - fees_pct;
+
+                    debug!(
+                        "Stat arb: {}/{} z={:.2} gross={:.4}% fees={:.4}% net={:.4}% -> {}",
+                        pair.token_a, pair.token_b, z, gross_profit, fees_pct, net_profit, direction
+                    );
+
+                    if net_profit <= 0.0 {
+                        debug!("Stat arb {}/{} z={:.2}: fees exceed expected profit, skipping", pair.token_a, pair.token_b, z);
+                        continue;
+                    }
 
                     opportunities.push(Opportunity {
                         id: Uuid::new_v4().to_string(),
                         strategy: StrategyKind::Statistical,
                         route: format!("{}/{} {} (z={:.2})", pair.token_a, pair.token_b, direction, z),
-                        expected_profit_pct: Decimal::from_f64(z_abs * HISTORICAL_PCT_PER_Z)
+                        expected_profit_pct: Decimal::from_f64(net_profit)
                             .unwrap_or_default(),
+                        estimated_fees_pct: Decimal::from_f64(fees_pct).unwrap_or_default(),
                         trade_size_usdc: Decimal::new(100, 0),
                         instructions: vec![],
                         detected_at: Instant::now(),
