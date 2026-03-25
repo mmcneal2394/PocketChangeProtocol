@@ -44,7 +44,11 @@ function run() {
             switch (_a.label) {
                 case 0:
                     console.log("Starting Geyser Test...");
+<<<<<<< HEAD
                     client = new yellowstone_grpc_1.default("https://yellowstone-solana-mainnet.core.chainstack.com:443", "YOUR_CHAINSTACK_KEY", undefined);
+=======
+                    client = new yellowstone_grpc_1.default("https://yellowstone-solana-mainnet.core.chainstack.com/YOUR_CHAINSTACK_ENDPOINT", "YOUR_CHAINSTACK_KEY", undefined);
+>>>>>>> b98063db64e327d63401fc99bce9fd880aa4d97f
                     _a.label = 1;
                 case 1:
                     _a.trys.push([1, 3, , 4]);

@@ -1,0 +1,3 @@
+{"ts": 1774227466.1284652, "agent": "agent", "event": "spawned", "detail": "Task: Read src/discovery/route_manager.ts and src/security/contract_screener.ts. Then write a concise find", "meta": {"model": "auto-gemini-3"}}
+{"ts": 1774227466.1290824, "agent": "agent", "event": "status_change", "detail": "running", "meta": {}}
+{"ts": 1774227488.8972151, "agent": "agent", "event": "error", "detail": "dispatcher_interrupted", "meta": {"signal": 2, "failure_class": "interrupted"}}

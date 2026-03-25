@@ -23,6 +23,7 @@ use strategy::Strategy;
 use types::*;
 
 #[tokio::main]
+<<<<<<< HEAD
 async fn main() -> anyhow::Result<()> {
     // 1. Load config
     let config = Arc::new(EngineConfig::load("engine.toml").unwrap_or_else(|e| {
@@ -65,6 +66,44 @@ async fn main() -> anyhow::Result<()> {
     let rpc_url = config.rpc_url();
     info!(rpc = %rpc_url, "Connecting to Solana RPC");
     let rpc = Arc::new(solana_client::rpc_client::RpcClient::new(rpc_url));
+=======
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    env_logger::init();
+    println!("🚀 Starting ArbitraSaaS Multi-Tenant Worker...");
+
+    // 1. Initialize Log Telemetry
+    let db_client = db::DbClient::new().await;
+    
+    // Test Injecting an audit log manually before booting
+    db_client.inject_audit_log(db::TradeLogEvent {
+        execution_time_ms: 120,
+        timestamp_sec: 0,
+        route: "USDC -> WIF -> USDC".to_string(),
+        tenant_id: "system-1".to_string(),
+        tx_signature: "5xyz...mock".to_string(),
+        profit_sol: 0.150,
+        status: "EXEC_SUCCESS".to_string(),
+        success: true,
+        error_msg: None
+    }).await.unwrap();
+
+    // 2. Connect to Central Message Bus
+    let nats_url = env::var("NATS_URL").unwrap_or_else(|_| "nats://localhost:4222".to_string());
+    println!("📡 Connecting to Core Messaging Bus at: {}", nats_url);
+    
+    // 3. Load Assigned Tenants configuration
+    println!("🔐 Authenticating with KMS. Requesting Assigned Wallets...");
+    let kms_client = kms::KMSClient::new();
+    let secret = kms_client.decrypt_tenant_key("tenant_1_e883_enc", "nonce").unwrap();
+    let wallet = Keypair::from_base58_string(&secret);
+    println!("🔑 Successfully loaded E883 Wallet: {}", wallet.pubkey());
+
+    // 4. Test Engine Network Connection
+    println!("⚡ Initializing Solana RPC Connection (Devnet)...");
+    let rpc_client = solana_client::rpc_client::RpcClient::new("https://api.devnet.solana.com");
+    let balance = rpc_client.get_balance(&wallet.pubkey()).unwrap_or(0);
+    println!("💰 Devnet Balance for {}: {} SOL", wallet.pubkey(), balance as f64 / 1e9);
+>>>>>>> b98063db64e327d63401fc99bce9fd880aa4d97f
 
     // 5. Check vault program
     let vault_program_id = solana_sdk::pubkey::Pubkey::from_str(

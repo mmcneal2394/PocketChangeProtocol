@@ -1,0 +1,76 @@
+name: stress_test_scenarios
+version: "1.0"
+description: |
+  Run these simulations before deploying with real capital.
+  Each scenario defines the market shock and expected swarm behavior.
+  Resilience score below 70/100 → DO NOT GO LIVE.
+
+scenarios:
+  A_flash_crash:
+    name: "Flash Crash on Raydium"
+    setup:
+      - "Inject SOL/USDC price drop: -30% in 10 seconds"
+      - "Simulate recovery to -5% at t+60s"
+    expected_behavior:
+      - "L1 circuit breaker triggers within 15 seconds"
+      - "All in-flight SOL/USDC trades aborted"
+      - "No new trades submitted during pause period"
+      - "L1 auto-resets after 5 minutes"
+    resilience_check:
+      - "Did the swarm lose >1% of AUM? (fail if yes)"
+      - "Did the L1 breaker fire? (fail if no)"
+    weight: 30
+
+  B_gas_spike:
+    name: "Gas Price Spike 10x"
+    setup:
+      - "Simulate priorityFee: 10_000_000 micro-lamports per CU"
+      - "Network congestion: block inclusion taking 5-10 slots"
+    expected_behavior:
+      - "Jito tip calculation adjusts: net_bps recalculated with 10x higher gas"
+      - "Opportunities that become unprofitable after gas adjustment are discarded"
+      - "Only opportunities with >20 net_bps still execute"
+    resilience_check:
+      - "Did any unprofitable trades execute? (fail if yes)"
+      - "Did the gas model correctly block low-margin trades? (pass if yes)"
+    weight: 20
+
+  C_oracle_failure:
+    name: "Price Feed Goes Stale"
+    setup:
+      - "Simulate Jupiter API returning HTTP 503 for 60 seconds"
+    expected_behavior:
+      - "Scanner agent flags health_status=stale within 2 seconds"
+      - "Analyst agent stops publishing opportunities"
+      - "L2 RPC breaker fires after 10% error rate"
+      - "System falls back to DexScreener"
+    resilience_check:
+      - "Were any trades placed on stale data? (fail if yes)"
+      - "Did fallback activate? (pass if yes)"
+    weight: 25
+
+  D_compromised_agent:
+    name: "Malicious Executor Simulation"
+    setup:
+      - "Simulate executor_id=FAKE sending an unsigned proposal to /opportunities"
+      - "Attempt an execution with trade_size > 5x max limit"
+    expected_behavior:
+      - "Coordinator rejects unsigned proposal (no coordinator signature)"
+      - "Risk manager flags executor_id=FAKE and quarantines it"
+      - "Risk event logged: unauthorized_execution_attempt"
+    resilience_check:
+      - "Did any funds move? (fail if yes)"
+      - "Was FAKE quarantined? (pass if yes)"
+    weight: 25
+
+scoring:
+  100: "Full resilience — all scenarios passed"
+  70-99: "Go-live approved with monitoring"
+  50-69: "Fix failing scenarios before live"
+  0-49: "Do not deploy — fundamental risk issues"
+
+run_command: |
+  python antigravy/scripts/run_stress_tests.py \
+    --scenarios all \
+    --capital 0.2 \
+    --output .tmp/stress_test_results.json

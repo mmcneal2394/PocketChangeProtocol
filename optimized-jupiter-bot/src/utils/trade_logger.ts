@@ -12,8 +12,17 @@ export interface ArbitrageMetrics {
     tradeSizeSOL: number;
     expectedProfitSOL: number;
     expectedProfitBps: number;
+<<<<<<< HEAD
     signature?: string | null;
     success: boolean;
+=======
+    jitoTipLamports?: number;   // dynamic Jito tip paid (lamports)
+    signature?: string | null;
+    success: boolean;
+    // [8] Telemetry
+    quoteAgeMs?: number;        // ms to fetch both legs
+    signalToExecMs?: number;    // ms from quote start to on-chain landing
+>>>>>>> b98063db64e327d63401fc99bce9fd880aa4d97f
 }
 
 export function cacheTradeMetrics(metrics: ArbitrageMetrics) {

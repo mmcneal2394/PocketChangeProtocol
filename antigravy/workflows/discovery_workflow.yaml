@@ -1,0 +1,42 @@
+name: "Discovery Workflow"
+description: "Scanner → Analyst → Risk Pre-check → Opportunity Publication"
+version: "1.0"
+trigger: continuous
+
+steps:
+  - name: "Market Scan"
+    agent: scanner_agent
+    action: emit_price_events
+    config:
+      interval_ms: 500
+      venues: [jupiter, dexscreener]
+      pairs: [SOL/USDC, SOL/USDT, SOL/MSOL, SOL/jitoSOL, SOL/BONK, SOL/WIF, SOL/JUP]
+    output_channel: /price_feed
+    health_check:
+      timeout_ms: 2000
+      fallback: switch_to_dexscreener
+
+  - name: "Opportunity Detection"
+    agent: analyst_agent
+    action: validate_arbitrage
+    subscribe: /price_feed
+    config:
+      min_net_bps: 3
+      min_confidence: 60
+      max_risk_score: 80
+    output_channel: /opportunities
+
+  - name: "Risk Pre-Check"
+    agent: risk_manager
+    action: validate_opportunity
+    subscribe: /opportunities
+    blocks_on: true  # synchronous — must approve before coordinator sees it
+    checks:
+      - circuit_breakers_clear
+      - asset_not_blacklisted
+      - portfolio_exposure_within_limits
+
+  - name: "Publish Opportunity"
+    action: emit_to_channel
+    channel: /coordinator_queue
+    condition: risk_manager.approved == true

@@ -13,7 +13,7 @@ const LIVE_PRV_KEYS = [
 ];
 
 // Extracted from user's arbitrabot_config.json
-const RPC_ENDPOINT = "https://beta.helius-rpc.com/?api-key=df082a16-aebf-4ec4-8ad6-86abfa06c8fc";
+const RPC_ENDPOINT = "https://beta.helius-rpc.com/?api-key=YOUR_HELIUS_API_KEY";
 
 console.log(`\n🚀 ArbitraSaaS Live API & Wallet Integration Test`);
 console.log(`=================================================`);

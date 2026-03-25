@@ -1,0 +1,41 @@
+{
+  "agent_id": "REPLACE_WITH_UNIQUE_ID",
+  "role": "REPLACE_WITH_ROLE",
+  "version": "1.0",
+  "chain": "solana-mainnet-beta",
+  "prompt_file": "prompts/swarm_skills/ROLE_agent.prompt",
+
+  "channels": {
+    "subscribe": [],
+    "publish": []
+  },
+
+  "risk_policy": "templates/risk_policy.yaml",
+
+  "execution": {
+    "rpc_endpoint": "${RPC_ENDPOINT}",
+    "wallet_keypair_path": "${WALLET_KEYPAIR_PATH}",
+    "jito_block_engine": "${JITO_BLOCK_ENGINE}",
+    "jito_tip_amount": "${JITO_TIP_AMOUNT}",
+    "simulation_required": true,
+    "max_retries": 2
+  },
+
+  "health": {
+    "ping_interval_s": 10,
+    "report_port": 8080,
+    "endpoint": "/health"
+  },
+
+  "logging": {
+    "trade_log": "optimized-jupiter-bot/trade_log.jsonl",
+    "audit_log": "antigravy/.tmp/audit.jsonl",
+    "level": "info"
+  },
+
+  "limits": {
+    "__comment": "These are read from risk_policy.yaml at runtime — edit THERE not here",
+    "max_trade_sol": null,
+    "max_concurrent": null
+  }
+}

@@ -1,0 +1,52 @@
+name: "Normal Operation Workflow"
+description: "Coordinator assigns → Executor trades → Reconciliation → Risk loop"
+version: "1.0"
+trigger: continuous
+loop_interval_ms: 1000
+
+steps:
+  - name: "Coordinator Aggregation"
+    agent: coordinator_agent
+    action: collect_and_prioritize_opportunities
+    subscribe: /coordinator_queue
+    config:
+      max_queue_age_ms: 3000  # Discard opportunities older than 3 seconds
+
+  - name: "Capital Allocation"
+    agent: coordinator_agent
+    action: assign_to_executor
+    config:
+      selection: performance_weighted
+      min_executor_win_rate: 0.5
+      prefer_idle_executors: true
+    output_channel: /execution
+
+  - name: "Execute Trades"
+    agent: executor_agent
+    subscribe: /execution
+    action: submit_jito_bundle
+    config:
+      max_retries: 2
+      retry_delay_ms: 500
+      simulation_required: true
+    output_channel: /execution_results
+
+  - name: "Post-Trade Reconciliation"
+    agent: coordinator_agent
+    subscribe: /execution_results
+    action: update_state
+    tasks:
+      - update_active_positions
+      - update_executor_reputation
+      - update_available_capital
+      - write_to_trade_log  # → optimized-jupiter-bot/trade_log.jsonl
+
+  - name: "Risk Monitoring"
+    agent: risk_manager
+    action: evaluate_exposure
+    frequency_s: 5
+    tasks:
+      - check_all_circuit_breakers
+      - ping_all_agents
+      - update_exposure_metrics
+    output_channel: /risk_events

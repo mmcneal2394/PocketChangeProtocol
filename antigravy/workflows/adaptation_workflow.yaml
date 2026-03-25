@@ -1,0 +1,51 @@
+name: "Swarm Adaptation Workflow"
+description: "Every 6 hours: collect performance, prune losing strategies, rebalance capital"
+version: "1.0"
+trigger:
+  schedule: "0 */6 * * *"  # Every 6 hours
+
+steps:
+  - name: "Collect Performance Data"
+    action: query_agent_metrics
+    source: "optimized-jupiter-bot/trade_log.jsonl"
+    window: last_24h
+    metrics:
+      - per_token: {win_rate, avg_net_bps, trade_count, total_pnl_sol}
+      - per_executor: {success_rate, avg_latency_ms, consecutive_failures}
+      - swarm_wide: {sharpe_ratio, max_drawdown, total_volume_sol}
+
+  - name: "Identify Underperformers"
+    action: flag_low_performers
+    thresholds:
+      token_win_rate_below: 0.40       # Token winning <40% → reduce allocation
+      token_zero_trades_24h: true      # Token never traded → remove from active list
+      executor_failure_rate_above: 0.30 # Executor failing >30% → quarantine review
+
+  - name: "Capital Rebalancing"
+    agent: coordinator_agent
+    action: update_allocation_weights
+    rules:
+      - "Increase weight by 10% for tokens with win_rate > 0.65 and avg_net_bps > 5"
+      - "Decrease weight by 20% for tokens with win_rate < 0.40"
+      - "Remove token from rotation if win_rate < 0.30 and trade_count > 10"
+      - "Always keep gas_reserve >= 0.05 SOL unallocatable"
+
+  - name: "Update Risk Parameters"
+    agent: risk_manager
+    action: adjust_limits_for_volatility
+    logic:
+      - "If 24h realized volatility > 50% → reduce max_pct_of_aum from 10% to 5%"
+      - "If 7d Sharpe > 1.5 AND no L3 breakers in 7d → graduate to next phase"
+      - "If 3 consecutive L2 breakers in 24h → increase monitoring frequency to 1s"
+
+  - name: "Prune Skill Library"
+    action: deactivate_underperforming_skills
+    affected:
+      - token_scout: remove tokens with 0 signals in 48h
+      - arb_hunter: remove routes with 0 profitable windows in 24h
+    output: ".tmp/adaptation_log_TIMESTAMP.json"
+
+  - name: "Run Stress Test"
+    action: run_scenarios
+    scenarios: [A_flash_crash, C_oracle_failure]
+    on_score_below_70: prevent_live_trading

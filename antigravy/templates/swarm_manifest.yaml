@@ -1,0 +1,79 @@
+name: swarm_manifest
+version: "1.0"
+description: "PocketChange Protocol Arbitrage Swarm — Solana Mainnet-Beta"
+created: "2026-03-23"
+
+swarm:
+  id: "pcp-swarm-v1"
+  chain: "solana-mainnet-beta"
+  engine: "optimized-jupiter-bot"
+  rpc:
+    primary: "${RPC_ENDPOINT}"         # Helius
+    fallback: "${PUBLIC_RPC}"          # public.rpc.helius.xyz
+    geyser: "${GEYSER_RPC}"            # Chainstack Yellowstone
+
+agents:
+  - id: scanner-001
+    role: scanner_agent
+    prompt: prompts/swarm_skills/scanner_agent.prompt
+    replicas: 1
+    restart_on_failure: true
+
+  - id: analyst-001
+    role: analyst_agent
+    prompt: prompts/swarm_skills/analyst_agent.prompt
+    replicas: 1
+    restart_on_failure: true
+
+  - id: coordinator-001
+    role: coordinator_agent
+    prompt: prompts/swarm_skills/coordinator_agent.prompt
+    replicas: 1
+    restart_on_failure: true
+
+  - id: risk-manager-001
+    role: risk_manager_agent
+    prompt: prompts/swarm_skills/risk_manager_agent.prompt
+    replicas: 1
+    restart_on_failure: true
+    priority: highest   # Risk manager gets preference for CPU/mem
+
+  - id: executor-001
+    role: executor_agent
+    prompt: prompts/swarm_skills/executor_agent.prompt
+    replicas: 1
+    restart_on_failure: true
+
+channels:
+  - /price_feed
+  - /opportunities
+  - /coordinator_queue
+  - /execution
+  - /execution_results
+  - /risk_events
+  - /reports
+
+risk_policy: templates/risk_policy.yaml
+
+workflows:
+  active:
+    - workflows/discovery_workflow.yaml
+    - workflows/operation_workflow.yaml
+    - workflows/risk_monitoring_workflow.yaml
+  scheduled:
+    - workflows/adaptation_workflow.yaml
+
+skills:
+  active:
+    - antigravity-swarm/skills/arb_hunter
+    - antigravity-swarm/skills/token_scout
+    - antigravity-swarm/skills/ct_sentiment
+    - antigravity-swarm/skills/alpha_scraper
+  inactive:
+    - antigravity-swarm/skills/marketplace_scout   # Run daily only
+    - antigravity-swarm/skills/performance_reporter # Run on demand
+
+output:
+  trade_log: "optimized-jupiter-bot/trade_log.jsonl"
+  audit_log:  "antigravy/.tmp/audit.jsonl"
+  findings:   "antigravity-swarm/findings.md"

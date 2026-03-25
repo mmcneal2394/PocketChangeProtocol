@@ -5,9 +5,18 @@ Here are several angles and hooks to use on X (Twitter), Discord, and Telegram t
 ## Angle 1: The "Institutional Alpha" Hook
 *Targeting the retail trader who feels left behind by Wall Street/VCs.*
 
-*   "Wall Street has been front-running you for decades. MEV bots are doing it to you on Solana. Let’s change the game. $PCP is a community-owned arbitrage fund. We pool, we arb, we share the profits. 50% straight to you. 🧵 👇\n    CA: `4yfwG2VqohXCMpX7SKz3uy7CKzujL4SkhjJMkgKvBAGS`\n    #Solana #DeFi #Crypto #Arbitrage #Web3"
-*   "Ever wonder how the whales keep getting richer during crab markets? They aren't trading memecoins. They are running automated arbitrage infrastructure. PocketChange ($PCP) just open-sourced the strategy. Earn like a VC, start with $10. 🐋💼\n    CA: `4yfwG2VqohXCMpX7SKz3uy7CKzujL4SkhjJMkgKvBAGS`\n    #PassiveIncome #Solana #CryptoInvesting #DeFi"
-*   "Stop trying to out-trade the bots. **Join them**. $PCP deployed an institutional-grade multi-DEX arbitrage fleet on Solana, and 50% of the yield goes directly to stakers. Don't fight the algorithm. Own it. 🤖💸\n    CA: `4yfwG2VqohXCMpX7SKz3uy7CKzujL4SkhjJMkgKvBAGS`\n    #Solana #AlgorithmicTrading #DeFi #CryptoBots"
+*   "Wall Street has been front-running you for decades. MEV bots are doing it to you on Solana. Let’s change the game. $PCP is a community-owned arbitrage fund. We pool, we arb, we share the profits. 50% straight to you. 🧵 👇
+    CA: `4yfwG2VqohXCMpX7SKz3uy7CKzujL4SkhjJMkgKvBAGS`
+    #Solana #DeFi #Crypto #Arbitrage #Web3"
+*   "Ever wonder how the whales keep getting richer during crab markets? They aren't trading memecoins. They are running automated arbitrage infrastructure. PocketChange ($PCP) just open-sourced the strategy. Earn like a VC, start with $10. 🐋💼
+    CA: `4yfwG2VqohXCMpX7SKz3uy7CKzujL4SkhjJMkgKvBAGS`
+    #PassiveIncome #Solana #CryptoInvesting #DeFi"
+*   "Stop trying to out-trade the bots. **Join them**. $PCP deployed an institutional-grade multi-DEX arbitrage fleet on Solana, and 50% of the yield goes directly to stakers. Powered by **Geyser gRPC** for sub-10ms execution, we catch the gaps before the rest of the network even sees the block. 🤖💸
+    CA: `4yfwG2VqohXCMpX7SKz3uy7CKzujL4SkhjJMkgKvBAGS`
+    #Solana #AlgorithmicTrading #DeFi #CryptoBots"
+*   "Institutional alpha isn't just about speed; it's about adaptation. $PCP's **Strategy Tuner** auto-calibrates our arbitrage thresholds every 15 minutes, using a **Kelly Criterion** engine to ensure we only bet on winning spreads. We've brought Quant-level tech to the community. 📊⚡
+    CA: `4yfwG2VqohXCMpX7SKz3uy7CKzujL4SkhjJMkgKvBAGS`
+    #Quant #Solana #DeFiYield"
 
 ## Angle 2: The "Passive Income / Yield" Hook
 *Targeting DeFi degens looking for consistent, real yield.*
@@ -71,16 +80,38 @@ Here are several angles and hooks to use on X (Twitter), Discord, and Telegram t
 *Targeting technical traders, devs, and yield maxis who understand capital efficiency and MEV.*
 
 *   "Zero dust. Zero slippage leaks. Pure mathematical extraction. 🧮 
-    The PocketChange ($PCP) ArbitraSaaS engine just deployed our Dynamic Slippage MEV Guard. The bot now pre-calculates the exact execution buffer and deducts network gas *before* confirming a profitable spread. If the DEX AMM moves against us in transit? The transaction gracefully reverts. No capital bleed. Just pure yield. 🛡️🔥
+    The PocketChange ($PCP) ArbitraSaaS engine just deployed our **Dynamic Priority Fee engine**. No more overpaying for gas during low-congestion. The bot now pre-calculates the exact micro-lamport fee needed for instant inclusion, and deducts network gas *before* confirming a profitable spread. No capital bleed. Just pure yield. 🛡️🔥
     CA: `4yfwG2VqohXCMpX7SKz3uy7CKzujL4SkhjJMkgKvBAGS`
     #Solana #MEV #DeFi #AlgorithmicTrading"
 *   "Most arbitrage bots bleed their profits to priority fees and MEV sandwiching. Not $PCP. 
-    Our latest update mathematically constrains Jupiter execution bundles to your exact breakeven ROI spread. We literally force the network to either give us the profit, or drop the transaction. Risk-free execution is here. ⚡🤖
+    Our latest update uses **Jito-Helius Racing** logic to transmit MEV bundles through multiple high-speed physical sockets simultaneously. We literally force the network to either give us the profit, or drop the transaction. Risk-free execution is here. ⚡🤖
     CA: `4yfwG2VqohXCMpX7SKz3uy7CKzujL4SkhjJMkgKvBAGS`
     #SolanaSummer #CryptoYield #Arbitrage #Web3"
-*   "If your bot isn't calculating Jito tip costs and priority gas into its spread validations *before* signing the tx, you're just paying Solana validators to lose money. $PCP just locked down the math. 100% capital preservation on every trade. Stake and watch the real yield roll in. 💰
+*   "If your bot isn't calculating **Dynamic Jito tips** into its spread validations *before* signing the tx, you're just paying Solana validators to lose money. $PCP just locked down the math. 100% capital preservation on every trade. Stake and watch the real yield roll in. 💰
     CA: `4yfwG2VqohXCMpX7SKz3uy7CKzujL4SkhjJMkgKvBAGS`
     #RealYield #Solana #MEVBots #Crypto"
+
+## Angle 7: The "Dynamic Tip Engine" Hook
+*Targeting technical traders, yield maxis, and MEV-aware Solana degens who understand fee mechanics.*
+
+*   "Most arb bots pay a flat Jito tip whether they win or lose. $PCP doesn't.
+    We just shipped our **Dynamic Tip Engine**: the bot calculates the exact tip as a % of the net spread, with a 5000 lamport floor on losing scans. On a dead block? Pay the floor. On a fat spread? Pay proportional — and keep the rest.
+    Zero-overhead execution. All profit goes to stakers. ⚙️🔒
+    CA: `4yfwG2VqohXCMpX7SKz3uy7CKzujL4SkhjJMkgKvBAGS`
+    #Solana #MEV #JitoTips #DeFi"
+*   "There are two ways to run an arb bot on Solana:
+    1. Pay a flat priority fee every scan → bleed capital slowly
+    2. Pay exactly what the trade is worth, every time → keep the spread
+    $PCP chose option 2. Our **EMA fast-fail** engine skips Jupiter quote calls entirely on routes the model predicts are losing. Less API noise. More signal. More net yield for stakers. 📊
+    CA: `4yfwG2VqohXCMpX7SKz3uy7CKzujL4SkhjJMkgKvBAGS`
+    #AlgorithmicTrading #Solana #RealYield"
+*   "$PCP fee stack breakdown per trade:
+    🟢 ATA pre-created routes: **5,000 lamports** gas floor (down from 2,039,280)
+    🟢 Jito tip: **dynamic** — % of net profit, never flat-fee overcharge
+    🔴 Other arb bots: flat tip + ATA rent = ~0.02 SOL bled per scan
+    That's why our stakers see cleaner yield curves. Math doesn't lie. 🧮💸
+    CA: `4yfwG2VqohXCMpX7SKz3uy7CKzujL4SkhjJMkgKvBAGS`
+    #ZeroLeak #Solana #DeFiYield #MEV"
 
 ## Call-to-Action (CTA) Templates
 *Always include a CTA at the end of your posts.*

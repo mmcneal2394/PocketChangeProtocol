@@ -1,7 +1,7 @@
 import { Connection, PublicKey, Keypair, VersionedTransaction, TransactionMessage, SystemProgram } from '@solana/web3.js';
 // In-memory inventory state block
 const activePositions = [];
-const connection = new Connection("https://mainnet.helius-rpc.com/?api-key=df082a16-aebf-4ec4-8ad6-86abfa06c8fc&rebate-address=E883BMMcPDgYbarxZp7Qf3Kz8xBw7ZkdDSJkYT9nqJxP", { commitment: 'confirmed' });
+const connection = new Connection("https://mainnet.helius-rpc.com/?api-key=YOUR_HELIUS_API_KEY&rebate-address=E883BMMcPDgYbarxZp7Qf3Kz8xBw7ZkdDSJkYT9nqJxP", { commitment: 'confirmed' });
 
 async function checkStatisticalArbitrage(wallet) {
     console.log(`\n🔎 [STATISTICAL ARB] Evaluating LST Mean Reversion (JitoSOL)`);

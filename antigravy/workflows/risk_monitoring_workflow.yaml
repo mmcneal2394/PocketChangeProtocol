@@ -1,0 +1,62 @@
+name: "Risk Monitoring Workflow"
+description: "Continuous 5-second risk evaluation with circuit breaker enforcement"
+version: "1.0"
+trigger:
+  - type: time
+    interval_s: 5
+  - type: event
+    source: /price_feed
+    filter: "price_change_pct_1min > 3"
+  - type: event
+    source: /execution_results
+    filter: "status == failure"
+
+steps:
+  - name: "Update Exposure Metrics"
+    agent: risk_manager
+    action: calculate_current_exposure
+    metrics:
+      - total_aum_sol
+      - allocated_sol
+      - unrealized_pnl_sol
+      - realized_pnl_24h_sol
+      - pct_loss_24h
+      - per_asset_exposure
+
+  - name: "Check Circuit Breakers"
+    agent: risk_manager
+    action: evaluate_all_breakers
+    breakers: [L1_asset, L1_consecutive_fail, L2_rpc, L2_jupiter, L3_portfolio]
+    on_trigger:
+      L1: log_and_pause_asset
+      L2: log_and_switch_fallback
+      L3:
+        - halt_all_trading
+        - write_emergency_file
+        - alert_human
+
+  - name: "Agent Health Check"
+    agent: risk_manager
+    action: ping_all_agents
+    agents: [scanner, analyst, executor, coordinator]
+    timeout_ms: 2000
+    on_failure:
+      - log_to_risk_events
+      - mark_agent_degraded
+      - if_unresponsive_for_30s: quarantine_agent
+
+  - name: "Apply Mitigation"
+    agent: risk_manager
+    condition: "any_breaker_triggered == true"
+    action: apply_mitigation
+    outputs:
+      - channel: /risk_events
+        payload: {breaker_level, asset_affected, action_taken, timestamp}
+
+  - name: "Generate Daily Report"
+    agent: risk_manager
+    schedule: "0 0 * * *"  # midnight UTC
+    action: generate_risk_report
+    output:
+      - file: ".tmp/reports/risk_report_YYYYMMDD.md"
+      - channel: /reports

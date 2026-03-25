@@ -24,13 +24,21 @@ export default function WalletsPage() {
   const [cooldownTime, setCooldownTime] = useState(0); // 0 means inactive
   const [isVaultPaused, setIsVaultPaused] = useState(false); // Admin Pause Auth
 
+<<<<<<< HEAD
   const PROGRAM_ID = new PublicKey("34sgN4q5CaaGCwqePU6d2y6xzBuY5ASA8E8LtXjfyN3c"); 
+=======
+  const PROGRAM_ID = new PublicKey("FSRUKKMxfWNDiVKKVyxiaaweZR8HZEMnsyHmb8caPjAy"); 
+>>>>>>> b98063db64e327d63401fc99bce9fd880aa4d97f
   const NETWORK = process.env.NEXT_PUBLIC_NETWORK || "localnet"; 
   const USDC_MINT = NETWORK === "devnet" 
       ? new PublicKey("4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU")
       : new PublicKey("J86cnryv65eNYsgXx3KssYcEh34gkDwqwpVR4SYEEoAd"); 
   const PCP_MINT = NETWORK === "devnet"
+<<<<<<< HEAD
       ? new PublicKey("11111111111111111111111111111111")
+=======
+      ? new PublicKey("PCPxZ3m2v...mockdev")
+>>>>>>> b98063db64e327d63401fc99bce9fd880aa4d97f
       : new PublicKey("HnroupxERUkWZGzqcqWyXHbGF326rV2MkcT4RNcKY3Aw");
 
   useEffect(() => {
@@ -183,24 +191,41 @@ export default function WalletsPage() {
         )}
 
         {loading ? (
-             <p style={{ color: "var(--text-secondary)", textAlign: "center", padding: "40px 0" }}>Querying Blockchain & Decrypting KMS Keys...</p>
+          <div style={{ textAlign: "center", padding: "40px 0", color: "var(--text-secondary)" }}>
+            <Loop style={{ animation: "spin 1s linear infinite", fontSize: "2rem", marginBottom: "12px" }} />
+            <p>Loading vault data...</p>
+          </div>
+        ) : wallets.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "60px 0" }}>
+            <AccountBalanceWallet style={{ fontSize: "3rem", color: "var(--text-secondary)", marginBottom: "16px" }} />
+            <p style={{ fontSize: "1.1rem", fontWeight: 600, marginBottom: "8px" }}>No active stakers yet</p>
+            <p style={{ color: "var(--text-secondary)", marginBottom: "24px" }}>Be the first to deposit USDC and earn arbitrage yields.</p>
+            <button onClick={() => setIsDepositModalOpen(true)} style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.2), rgba(255,255,255,0.1))", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", padding: "12px 32px", borderRadius: "10px", fontWeight: 700, cursor: "pointer", fontSize: "1rem" }}>
+              + Deposit into Vault
+            </button>
+          </div>
         ) : (
         <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", whiteSpace: "nowrap" }}>
           <thead>
             <tr style={{ borderBottom: "1px solid var(--border)", color: "var(--text-secondary)" }}>
+<<<<<<< HEAD
               <th style={{ padding: "16px" }}>Staker Address</th>
               <th style={{ padding: "16px" }}>Total Deposited</th>
               <th style={{ padding: "16px" }}>Pool Share ($PCP)</th>
+=======
+              <th style={{ padding: "16px" }}>Operator Wallet</th>
+              <th style={{ padding: "16px" }}>Balance</th>
+              <th style={{ padding: "16px" }}>Configuration</th>
+>>>>>>> b98063db64e327d63401fc99bce9fd880aa4d97f
               <th style={{ padding: "16px" }}>Status</th>
-              <th style={{ padding: "16px", textAlign: "right" }}>Actions</th>
             </tr>
           </thead>
           <tbody>
             {wallets.map((w, idx) => (
-              <tr key={w.id} style={{ borderBottom: idx !== wallets.length -1 ? "1px solid var(--border)" : "none" }}>
-                <td style={{ padding: "16px", fontWeight: 500, fontFamily: "monospace", color: "var(--secondary)", fontSize: "0.95rem" }}>
-                  {w.pubkey}
-                  <ContentCopy style={{ fontSize: "1rem", color: "var(--text-secondary)", marginLeft: "8px", cursor: "pointer", verticalAlign: "middle" }} />
+              <tr key={w.id} style={{ borderBottom: idx !== wallets.length - 1 ? "1px solid var(--border)" : "none" }}>
+                <td style={{ padding: "16px", fontWeight: 500, fontFamily: "monospace", color: "var(--secondary)", fontSize: "0.9rem" }}>
+                  {w.pubkey?.slice(0,6)}...{w.pubkey?.slice(-4)}
+                  <ContentCopy onClick={() => navigator.clipboard.writeText(w.pubkey)} style={{ fontSize: "0.9rem", color: "var(--text-secondary)", marginLeft: "8px", cursor: "pointer", verticalAlign: "middle" }} />
                 </td>
                 <td style={{ padding: "16px", fontWeight: 700 }}>{w.balance}</td>
                 <td style={{ padding: "16px" }}>
@@ -210,21 +235,9 @@ export default function WalletsPage() {
                 </td>
                 <td style={{ padding: "16px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                    <div style={{
-                      width: "8px", height: "8px", borderRadius: "50%",
-                      background: w.status === "Active" ? "var(--success)" : "var(--error)",
-                      boxShadow: `0 0 8px ${w.status === "Active" ? "var(--success)" : "var(--error)"}`
-                    }}></div>
-                    <span style={{ fontSize: "0.9rem", color: w.status === "Active" ? "var(--success)" : "var(--error)" }}>
-                        {w.status === "Active" ? "Verified" : "Low Funds"}
-                    </span>
+                    <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: w.status === "Active" ? "var(--success)" : "var(--error)", boxShadow: `0 0 8px ${w.status === "Active" ? "var(--success)" : "var(--error)"}` }}></div>
+                    <span style={{ fontSize: "0.9rem", color: w.status === "Active" ? "var(--success)" : "var(--error)" }}>{w.status}</span>
                   </div>
-                </td>
-                <td style={{ padding: "16px", textAlign: "right", color: "var(--text-secondary)" }}>
-                  <button style={{ background: "transparent", border: "none", color: "var(--secondary)", cursor: "pointer", marginRight: "16px" }}>
-                    Configure
-                  </button>
-                  <DeleteOutline style={{ color: "var(--error)", cursor: "pointer", verticalAlign: "middle" }} />
                 </td>
               </tr>
             ))}
