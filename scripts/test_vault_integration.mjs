@@ -10,7 +10,7 @@ const authFile = fs.readFileSync('C:/Users/admin/.config/solana/id.json', 'utf8'
 const keypair = Keypair.fromSecretKey(new Uint8Array(JSON.parse(authFile)));
 
 // The simulated Program ID of our pocketchange_vault
-const PROGRAM_ID = new PublicKey("GKUwMKjS4UU5zFQXV83oNjm8DZmVpYzyiTGAhHEiCnLR");
+const PROGRAM_ID = new PublicKey("34sgN4q5CaaGCwqePU6d2y6xzBuY5ASA8E8LtXjfyN3c");
 
 function getDiscriminator(name) {
     return createHash('sha256').update(`global:${name}`).digest().slice(0, 8);

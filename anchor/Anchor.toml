@@ -3,10 +3,13 @@ seeds = false
 skip-lint = false
 
 [programs.localnet]
-pocketchange_vault = "GKUwMKjS4UU5zFQXV83oNjm8DZmVpYzyiTGAhHEiCnLR"
+pocketchange_vault = "34sgN4q5CaaGCwqePU6d2y6xzBuY5ASA8E8LtXjfyN3c"
 
 [programs.devnet]
-pocketchange_vault = "GKUwMKjS4UU5zFQXV83oNjm8DZmVpYzyiTGAhHEiCnLR"
+pocketchange_vault = "34sgN4q5CaaGCwqePU6d2y6xzBuY5ASA8E8LtXjfyN3c"
+
+[programs.mainnet]
+pocketchange_vault = "34sgN4q5CaaGCwqePU6d2y6xzBuY5ASA8E8LtXjfyN3c"
 
 [registry]
 url = "https://api.apr.dev"
