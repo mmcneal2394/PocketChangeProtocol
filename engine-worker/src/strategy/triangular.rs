@@ -12,14 +12,21 @@ use crate::types::*;
 use crate::price::PriceCache;
 use crate::strategy::Strategy;
 
-/// Predefined 3-hop routes for triangular arbitrage
-const ROUTES: &[(&str, &str, &str)] = &[
-    ("SOL", "RAY", "USDC"),
-    ("SOL", "BONK", "USDC"),
-    ("SOL", "WIF", "USDC"),
-    ("SOL", "mSOL", "USDC"),
-    ("SOL", "JitoSOL", "USDC"),
+/// Token pairs to scan for cross-DEX spread arbitrage.
+/// Each pair is checked across all DEXes — buy on the cheapest, sell on the most expensive.
+const ROUTES: &[(&str, &str)] = &[
+    ("SOL", "USDC"),
+    ("RAY", "USDC"),
+    ("BONK", "USDC"),
+    ("WIF", "USDC"),
+    ("mSOL", "USDC"),
+    ("JitoSOL", "USDC"),
+    ("mSOL", "SOL"),
+    ("JitoSOL", "SOL"),
 ];
+
+/// DEX backends to query via Jupiter's `dexes` filter parameter.
+const DEXES: &[&str] = &["Raydium", "Whirlpool", "Meteora"];
 
 const ESTIMATED_FEE_PCT: f64 = 0.3; // ~0.3% for fees + slippage + Jito tip
 
@@ -55,7 +62,7 @@ fn resolve_decimals(symbol: &str) -> u32 {
     DECIMALS_MAP.iter().find(|(s, _)| *s == symbol).map(|(_, d)| *d).unwrap_or(6)
 }
 
-/// Parse a route string like "SOL -> RAY -> USDC -> SOL" into a list of (from, to) hops.
+/// Parse a route string like "USDC -> SOL -> USDC" into a list of (from, to) hops.
 fn parse_route(route: &str) -> Vec<(String, String)> {
     let tokens: Vec<&str> = route.split("->").map(|s| s.trim()).collect();
     let mut hops = Vec::new();
@@ -63,6 +70,15 @@ fn parse_route(route: &str) -> Vec<(String, String)> {
         hops.push((tokens[i].to_string(), tokens[i + 1].to_string()));
     }
     hops
+}
+
+/// A single DEX quote result: how much output you get and which DEX provided it.
+#[derive(Debug, Clone)]
+struct DexQuote {
+    dex: String,
+    out_amount: u64,
+    /// The full Jupiter quote JSON, needed to build swap instructions later.
+    raw_quote: serde_json::Value,
 }
 
 pub struct TriangularStrategy {
@@ -78,17 +94,21 @@ impl TriangularStrategy {
         }
     }
 
-    /// Fetch a Jupiter V6 quote for a single swap leg.
+    /// Fetch a Jupiter V6 quote for a single swap leg, optionally restricted to a single DEX.
     async fn fetch_quote(
         &self,
         input_mint: &str,
         output_mint: &str,
         amount: u64,
+        dex: Option<&str>,
     ) -> anyhow::Result<serde_json::Value> {
-        let url = format!(
+        let mut url = format!(
             "{}/quote?inputMint={}&outputMint={}&amount={}&slippageBps=50",
             JUPITER_API, input_mint, output_mint, amount
         );
+        if let Some(dex_name) = dex {
+            url.push_str(&format!("&dexes={}", dex_name));
+        }
 
         let mut req = self.client.get(&url)
             .header("User-Agent", "ArbitraSaaS-Engine/0.1");
@@ -111,6 +131,41 @@ impl TriangularStrategy {
         Ok(json)
     }
 
+    /// Query all configured DEXes for a single pair direction and return per-DEX quotes.
+    async fn fetch_quotes_all_dexes(
+        &self,
+        input_mint: &str,
+        output_mint: &str,
+        amount: u64,
+        from_sym: &str,
+        to_sym: &str,
+    ) -> Vec<DexQuote> {
+        let mut quotes = Vec::new();
+        for dex in DEXES {
+            match self.fetch_quote(input_mint, output_mint, amount, Some(dex)).await {
+                Ok(json) => {
+                    if let Some(out_str) = json["outAmount"].as_str() {
+                        if let Ok(out_amount) = out_str.parse::<u64>() {
+                            debug!(
+                                "{}: {} -> {} | in={} out={} via {}",
+                                dex, from_sym, to_sym, amount, out_amount, dex
+                            );
+                            quotes.push(DexQuote {
+                                dex: dex.to_string(),
+                                out_amount,
+                                raw_quote: json,
+                            });
+                        }
+                    }
+                }
+                Err(e) => {
+                    debug!("Quote {}->{} via {} failed: {}", from_sym, to_sym, dex, e);
+                }
+            }
+        }
+        quotes
+    }
+
     /// Fetch swap instructions from Jupiter V6 for a given quote response.
     async fn fetch_swap_instructions(
         &self,
@@ -123,9 +178,13 @@ impl TriangularStrategy {
             "wrapAndUnwrapSol": true,
         });
 
-        let resp = self.client.post(&format!("{}/swap-instructions", JUPITER_API))
+        let mut req = self.client.post(&format!("{}/swap-instructions", JUPITER_API))
             .header("User-Agent", "ArbitraSaaS-Engine/0.1")
-            .header("Content-Type", "application/json")
+            .header("Content-Type", "application/json");
+        if let Ok(key) = std::env::var("JUPITER_API_KEY") {
+            req = req.header("x-api-key", key);
+        }
+        let resp = req
             .json(&payload)
             .send()
             .await?;
@@ -201,7 +260,8 @@ impl TriangularStrategy {
         Ok(Instruction { program_id, accounts, data })
     }
 
-    /// Build real Jupiter swap instructions for all legs of a triangular route.
+    /// Build real Jupiter swap instructions for both legs of a cross-DEX arb.
+    /// Route format: "USDC -[Raydium]-> SOL -[Whirlpool]-> USDC"
     /// This is the async core called by `build_instructions` via `block_in_place`.
     async fn build_instructions_async(
         &self,
@@ -209,67 +269,67 @@ impl TriangularStrategy {
         wallet: &Keypair,
     ) -> anyhow::Result<Vec<Instruction>> {
         let hops = parse_route(&opp.route);
-        if hops.is_empty() {
-            anyhow::bail!("No hops parsed from route: {}", opp.route);
+        if hops.len() != 2 {
+            anyhow::bail!("Cross-DEX arb requires exactly 2 hops, got {}: {}", hops.len(), opp.route);
         }
 
         let user_pubkey = wallet.pubkey().to_string();
         let mut all_instructions: Vec<Instruction> = Vec::new();
 
-        // Start with the trade size converted to the first token's lamport amount.
-        // trade_size_usdc is in USDC terms; convert to first token's base units.
         let first_symbol = &hops[0].0;
         let first_decimals = resolve_decimals(first_symbol);
-        // For the initial amount we use the USDC trade size scaled to the first token.
-        // If starting with SOL, we'd need a price conversion. For simplicity and accuracy,
-        // we use USDC as the reference: trade_size_usdc * 10^first_decimals.
-        // But if first token != USDC, Jupiter will handle the conversion via the quote.
-        // We'll pass the raw amount in the first token's smallest unit.
-        let initial_amount = if first_symbol == "USDC" {
-            opp.trade_size_usdc.to_u64().unwrap_or(5000) * 10u64.pow(first_decimals)
-        } else {
-            // For non-USDC starts, use a reasonable default in that token's base units.
-            // The quote API handles sizing; we just need a starting amount.
-            // Use trade_size_usdc as a proxy (e.g., 5000 units of SOL = 5000 * 10^9 lamports).
-            // In practice the caller should set trade_size appropriately per token.
-            opp.trade_size_usdc.to_u64().unwrap_or(5000) * 10u64.pow(first_decimals)
-        };
-
+        let initial_amount = opp.trade_size_usdc.to_u64().unwrap_or(5000) * 10u64.pow(first_decimals);
         let mut carry_amount = initial_amount;
 
+        // Parse DEX info from the route: "USDC -[Raydium]-> SOL -[Whirlpool]-> USDC"
+        // Split by "->" and look for [DexName] patterns in the segments
+        let route_str = &opp.route;
+        let mut leg_dexes: Vec<Option<String>> = Vec::new();
+        for part in route_str.split("->") {
+            let trimmed = part.trim();
+            if trimmed.contains('[') && trimmed.contains(']') {
+                let start = trimmed.find('[').unwrap();
+                let end = trimmed.find(']').unwrap();
+                let dex_name = &trimmed[start + 1..end];
+                leg_dexes.push(Some(dex_name.to_string()));
+            }
+        }
+
         for (i, (from_sym, to_sym)) in hops.iter().enumerate() {
-            let input_mint = resolve_mint(from_sym)
-                .ok_or_else(|| anyhow::anyhow!("Unknown token symbol: {}", from_sym))?;
-            let output_mint = resolve_mint(to_sym)
-                .ok_or_else(|| anyhow::anyhow!("Unknown token symbol: {}", to_sym))?;
+            // Strip any [DexName] annotation from the symbol
+            let clean_from = from_sym.split('[').next().unwrap_or(from_sym).trim();
+            let clean_to = to_sym.split('[').next().unwrap_or(to_sym).trim();
+
+            let input_mint = resolve_mint(clean_from)
+                .ok_or_else(|| anyhow::anyhow!("Unknown token symbol: {}", clean_from))?;
+            let output_mint = resolve_mint(clean_to)
+                .ok_or_else(|| anyhow::anyhow!("Unknown token symbol: {}", clean_to))?;
+
+            let dex_filter = leg_dexes.get(i).and_then(|d| d.as_deref());
 
             debug!(
-                "Leg {}/{}: {} ({}) -> {} ({}), amount={}",
-                i + 1, hops.len(), from_sym, input_mint, to_sym, output_mint, carry_amount
+                "Leg {}/{}: {} -> {} (dex={:?}), amount={}",
+                i + 1, hops.len(), clean_from, clean_to, dex_filter, carry_amount
             );
 
-            // 1. Get quote for this leg
-            let quote = self.fetch_quote(input_mint, output_mint, carry_amount).await
-                .map_err(|e| anyhow::anyhow!("Quote failed for leg {} ({} -> {}): {}", i + 1, from_sym, to_sym, e))?;
+            // Get quote restricted to the specific DEX for this leg
+            let quote = self.fetch_quote(input_mint, output_mint, carry_amount, dex_filter).await
+                .map_err(|e| anyhow::anyhow!("Quote failed for leg {} ({} -> {}): {}", i + 1, clean_from, clean_to, e))?;
 
-            // Extract outAmount for the next leg's input
             let out_amount_str = quote["outAmount"].as_str()
                 .ok_or_else(|| anyhow::anyhow!("Missing outAmount in quote for leg {}", i + 1))?;
             let out_amount: u64 = out_amount_str.parse()
                 .map_err(|_| anyhow::anyhow!("Invalid outAmount: {}", out_amount_str))?;
 
             info!(
-                "Leg {}: {} -> {} | in={} out={} (quote ok)",
-                i + 1, from_sym, to_sym, carry_amount, out_amount
+                "Leg {}: {} -> {} via {:?} | in={} out={}",
+                i + 1, clean_from, clean_to, dex_filter, carry_amount, out_amount
             );
 
-            // 2. Get swap instructions for this leg
             let leg_instructions = self.fetch_swap_instructions(&quote, &user_pubkey).await
                 .map_err(|e| anyhow::anyhow!("Swap instructions failed for leg {}: {}", i + 1, e))?;
 
             all_instructions.extend(leg_instructions);
-
-            // 3. Carry the output amount to the next leg
             carry_amount = out_amount;
         }
 
@@ -284,64 +344,100 @@ impl TriangularStrategy {
 
 #[async_trait]
 impl Strategy for TriangularStrategy {
-    fn name(&self) -> &str { "Triangular DEX" }
+    fn name(&self) -> &str { "Cross-DEX Spread" }
     fn kind(&self) -> StrategyKind { StrategyKind::Triangular }
 
     async fn evaluate(&self, prices: &PriceCache) -> Vec<Opportunity> {
         let mut opportunities = Vec::new();
 
-        for (a, b, c) in ROUTES {
-            if prices.get_price(a).is_none() || prices.get_price(b).is_none() {
+        for (token_a, token_b) in ROUTES {
+            // Skip pairs where we don't have a cached price for either token
+            if prices.get_price(token_a).is_none() && prices.get_price(token_b).is_none() {
                 continue;
             }
 
-            let mint_a = match resolve_mint(a) { Some(m) => m, None => continue };
-            let mint_b = match resolve_mint(b) { Some(m) => m, None => continue };
-            let mint_c = match resolve_mint(c) { Some(m) => m, None => continue };
+            let mint_a = match resolve_mint(token_a) { Some(m) => m, None => continue };
+            let mint_b = match resolve_mint(token_b) { Some(m) => m, None => continue };
 
-            let decimals_a = resolve_decimals(a);
+            let decimals_a = resolve_decimals(token_a);
             let start_amount: u64 = 10u64.pow(decimals_a); // 1 unit of token A
 
-            // Fetch real Jupiter quotes for each leg
-            let quote_ab = match self.fetch_quote(mint_a, mint_b, start_amount).await {
-                Ok(q) => q,
-                Err(e) => { debug!("Quote {}->{} failed: {}", a, b, e); continue; }
-            };
-            let amount_b: u64 = match quote_ab["outAmount"].as_str().and_then(|s| s.parse().ok()) {
-                Some(a) => a,
-                None => continue,
+            // --- Buy leg: A -> B on each DEX ---
+            let buy_quotes = self.fetch_quotes_all_dexes(
+                mint_a, mint_b, start_amount, token_a, token_b,
+            ).await;
+
+            if buy_quotes.len() < 2 {
+                debug!("{}/{}: fewer than 2 DEX quotes for buy leg, skipping", token_a, token_b);
+                continue;
+            }
+
+            // --- Sell leg: B -> A on each DEX ---
+            // To compare apples-to-apples, we use the median buy output as the sell input.
+            let median_buy_output = {
+                let mut amounts: Vec<u64> = buy_quotes.iter().map(|q| q.out_amount).collect();
+                amounts.sort();
+                amounts[amounts.len() / 2]
             };
 
-            let quote_bc = match self.fetch_quote(mint_b, mint_c, amount_b).await {
-                Ok(q) => q,
-                Err(e) => { debug!("Quote {}->{} failed: {}", b, c, e); continue; }
-            };
-            let amount_c: u64 = match quote_bc["outAmount"].as_str().and_then(|s| s.parse().ok()) {
-                Some(a) => a,
-                None => continue,
+            let sell_quotes = self.fetch_quotes_all_dexes(
+                mint_b, mint_a, median_buy_output, token_b, token_a,
+            ).await;
+
+            if sell_quotes.len() < 2 {
+                debug!("{}/{}: fewer than 2 DEX quotes for sell leg, skipping", token_a, token_b);
+                continue;
+            }
+
+            // --- Find best cross-DEX combination ---
+            // Best buy = DEX that gives the MOST B for our A (highest out_amount on buy)
+            let best_buy = buy_quotes.iter().max_by_key(|q| q.out_amount).unwrap();
+
+            // Now get sell quotes using the best buy's actual output amount
+            let sell_quotes_precise = self.fetch_quotes_all_dexes(
+                mint_b, mint_a, best_buy.out_amount, token_b, token_a,
+            ).await;
+
+            // Best sell = DEX that gives the MOST A back for our B (highest out_amount on sell)
+            let best_sell = match sell_quotes_precise.iter()
+                .filter(|q| q.dex != best_buy.dex) // Must be a different DEX for cross-DEX arb
+                .max_by_key(|q| q.out_amount)
+            {
+                Some(s) => s,
+                None => {
+                    // Fallback: allow same DEX if it still shows profit (unlikely but possible)
+                    match sell_quotes_precise.iter().max_by_key(|q| q.out_amount) {
+                        Some(s) => s,
+                        None => continue,
+                    }
+                }
             };
 
-            let quote_ca = match self.fetch_quote(mint_c, mint_a, amount_c).await {
-                Ok(q) => q,
-                Err(e) => { debug!("Quote {}->{} failed: {}", c, a, e); continue; }
-            };
-            let amount_a_out: u64 = match quote_ca["outAmount"].as_str().and_then(|s| s.parse().ok()) {
-                Some(a) => a,
-                None => continue,
-            };
-
-            let profit_pct = ((amount_a_out as f64 / start_amount as f64) - 1.0) * 100.0;
+            // Profit: did we get more A back than we started with?
+            let profit_pct = ((best_sell.out_amount as f64 / start_amount as f64) - 1.0) * 100.0;
             let net_profit = profit_pct - ESTIMATED_FEE_PCT;
 
-            info!("{} -> {} -> {} -> {}: start={} end={} profit={:.4}% net={:.4}%",
-                a, b, c, a, start_amount, amount_a_out, profit_pct, net_profit);
+            info!(
+                "{}/{}: buy on {} (out={}), sell on {} (out={}) | gross={:.4}% net={:.4}%",
+                token_a, token_b,
+                best_buy.dex, best_buy.out_amount,
+                best_sell.dex, best_sell.out_amount,
+                profit_pct, net_profit
+            );
 
             if net_profit > self.threshold.to_f64().unwrap_or(0.3) {
-                info!("TRIANGULAR ARB FOUND: {} -> {} -> {} -> {}: {:.4}%", a, b, c, a, net_profit);
+                info!(
+                    "CROSS-DEX ARB FOUND: {} buy-on-{} sell-on-{}: {:.4}% net",
+                    token_a, best_buy.dex, best_sell.dex, net_profit
+                );
+                let route = format!(
+                    "{} -[{}]-> {} -[{}]-> {}",
+                    token_a, best_buy.dex, token_b, best_sell.dex, token_a
+                );
                 opportunities.push(Opportunity {
                     id: Uuid::new_v4().to_string(),
                     strategy: StrategyKind::Triangular,
-                    route: format!("{} -> {} -> {} -> {}", a, b, c, a),
+                    route,
                     expected_profit_pct: Decimal::from_f64(net_profit).unwrap_or_default(),
                     trade_size_usdc: Decimal::new(5000, 0),
                     instructions: vec![],
@@ -354,7 +450,7 @@ impl Strategy for TriangularStrategy {
     }
 
     fn build_instructions(&self, opp: &Opportunity, wallet: &Keypair) -> anyhow::Result<Vec<Instruction>> {
-        info!("Building triangular instructions for {}", opp.route);
+        info!("Building cross-DEX instructions for {}", opp.route);
 
         // Use block_in_place + block_on to call async Jupiter APIs from the sync trait method.
         // This is safe because build_instructions is called infrequently (only on approved opps)
@@ -383,30 +479,37 @@ mod tests {
 
         let strategy = TriangularStrategy::new(0.3);
         let opps = strategy.evaluate(&cache).await;
-        // Balanced prices should produce no opportunities (cross-rate = 1.0)
+        // Balanced prices should produce no opportunities (cross-DEX spreads are tiny)
         assert!(opps.is_empty());
     }
 
     #[test]
     fn test_profit_calculation() {
-        // If SOL=150, RAY=2, USDC=1
-        // Cross rate = 150/2 * 2/1 * 1/150 = 1.0 exactly
-        // No profit
-        let cross = 150.0 / 2.0 * 2.0 / 1.0 * 1.0 / 150.0;
-        assert!((cross - 1.0).abs() < 0.0001);
+        // Cross-DEX spread: buy 1 SOL on Raydium for 150 USDC, sell on Orca for 150.6 USDC
+        // Gross profit = (150.6 - 150.0) / 150.0 * 100 = 0.4%
+        // Net = 0.4% - 0.3% fee = 0.1% profit
+        let buy_cost = 150.0_f64;
+        let sell_revenue = 150.6_f64;
+        let gross = (sell_revenue / buy_cost - 1.0) * 100.0;
+        let net = gross - ESTIMATED_FEE_PCT;
+        assert!(gross > 0.3);
+        assert!(net > 0.0);
     }
 
     #[test]
-    fn test_parse_route_basic() {
-        let hops = parse_route("SOL -> RAY -> USDC -> SOL");
-        assert_eq!(hops.len(), 3);
-        assert_eq!(hops[0], ("SOL".to_string(), "RAY".to_string()));
-        assert_eq!(hops[1], ("RAY".to_string(), "USDC".to_string()));
-        assert_eq!(hops[2], ("USDC".to_string(), "SOL".to_string()));
+    fn test_parse_route_cross_dex() {
+        let hops = parse_route("USDC -[Raydium]-> SOL -[Whirlpool]-> USDC");
+        assert_eq!(hops.len(), 2);
+        // Note: the DEX annotations are part of the token strings from naive splitting;
+        // build_instructions_async handles stripping them.
+        assert_eq!(hops[0].0, "USDC -[Raydium]");
+        assert_eq!(hops[0].1, "SOL -[Whirlpool]");
+        assert_eq!(hops[1].0, "SOL -[Whirlpool]");
+        assert_eq!(hops[1].1, "USDC");
     }
 
     #[test]
-    fn test_parse_route_two_hops() {
+    fn test_parse_route_simple_two_hops() {
         let hops = parse_route("USDC -> SOL -> USDC");
         assert_eq!(hops.len(), 2);
         assert_eq!(hops[0], ("USDC".to_string(), "SOL".to_string()));
@@ -438,10 +541,27 @@ mod tests {
 
     #[test]
     fn test_all_routes_have_known_mints() {
-        for (a, b, c) in ROUTES {
+        for (a, b) in ROUTES {
             assert!(resolve_mint(a).is_some(), "Unknown mint for route token: {}", a);
             assert!(resolve_mint(b).is_some(), "Unknown mint for route token: {}", b);
-            assert!(resolve_mint(c).is_some(), "Unknown mint for route token: {}", c);
+        }
+    }
+
+    #[test]
+    fn test_dexes_list() {
+        assert_eq!(DEXES.len(), 3);
+        assert!(DEXES.contains(&"Raydium"));
+        assert!(DEXES.contains(&"Whirlpool"));
+        assert!(DEXES.contains(&"Meteora"));
+    }
+
+    #[test]
+    fn test_routes_are_pairs() {
+        // Ensure all routes are token pairs (not triples)
+        for (a, b) in ROUTES {
+            assert!(!a.is_empty());
+            assert!(!b.is_empty());
+            assert_ne!(a, b, "Route pair must have different tokens");
         }
     }
 }
