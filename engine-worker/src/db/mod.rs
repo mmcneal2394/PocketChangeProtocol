@@ -9,30 +9,10 @@ pub struct TelemetryWriter {
     file_path: PathBuf,
 }
 
-<<<<<<< HEAD
 impl TelemetryWriter {
     pub fn new(file_path: &str) -> Self {
         Self {
             file_path: PathBuf::from(file_path),
-=======
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TradeLogEvent {
-    pub execution_time_ms: u64,
-    pub timestamp_sec: u64,
-    pub route: String,
-    pub tenant_id: String,
-    pub tx_signature: String,
-    pub profit_sol: f64,
-    pub status: String,
-    pub success: bool,
-    pub error_msg: Option<String>
-}
-
-impl DbClient {
-    pub async fn new() -> Self {
-        DbClient {
-            file_path: "telemetry.jsonl".to_string()
->>>>>>> b98063db64e327d63401fc99bce9fd880aa4d97f
         }
     }
 
@@ -64,7 +44,6 @@ pub struct ApiClient {
     client: reqwest::Client,
 }
 
-<<<<<<< HEAD
 impl ApiClient {
     pub fn new(base_url: &str, auth_token: &str) -> Self {
         Self {
@@ -110,8 +89,6 @@ impl ApiClient {
         if !resp.status().is_success() {
             tracing::warn!("Failed to patch opportunity {}: {}", id, resp.status());
         }
-=======
->>>>>>> b98063db64e327d63401fc99bce9fd880aa4d97f
         Ok(())
     }
 }

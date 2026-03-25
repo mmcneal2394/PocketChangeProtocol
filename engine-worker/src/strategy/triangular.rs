@@ -289,31 +289,60 @@ impl Strategy for TriangularStrategy {
         let mut opportunities = Vec::new();
 
         for (a, b, c) in ROUTES {
-            let price_a = match prices.get_price(a) { Some(p) => p, None => continue };
-            let price_b = match prices.get_price(b) { Some(p) => p, None => continue };
-            let price_c = match prices.get_price(c) { Some(p) if p > 0.0 => p, _ => continue };
+            if prices.get_price(a).is_none() || prices.get_price(b).is_none() {
+                continue;
+            }
 
-            // Simulate: 1 A -> B -> C -> A
-            // Start with 1 unit of A (valued at price_a USDC)
-            // Buy B: amount_b = price_a / price_b
-            // Buy C: amount_c = amount_b * price_b (= price_a in USDC terms)
-            // Buy A back: amount_a_out = amount_c / price_a
-            // Round-trip return = (amount_a_out - 1.0) / 1.0
-            //
-            // Simplified: check if cross-rate differs from direct rate
-            let cross_rate = price_a / price_b * price_b / price_c * price_c / price_a;
-            let profit_pct = (cross_rate - 1.0) * 100.0;
+            let mint_a = match resolve_mint(a) { Some(m) => m, None => continue };
+            let mint_b = match resolve_mint(b) { Some(m) => m, None => continue };
+            let mint_c = match resolve_mint(c) { Some(m) => m, None => continue };
+
+            let decimals_a = resolve_decimals(a);
+            let start_amount: u64 = 10u64.pow(decimals_a); // 1 unit of token A
+
+            // Fetch real Jupiter quotes for each leg
+            let quote_ab = match self.fetch_quote(mint_a, mint_b, start_amount).await {
+                Ok(q) => q,
+                Err(e) => { debug!("Quote {}->{} failed: {}", a, b, e); continue; }
+            };
+            let amount_b: u64 = match quote_ab["outAmount"].as_str().and_then(|s| s.parse().ok()) {
+                Some(a) => a,
+                None => continue,
+            };
+
+            let quote_bc = match self.fetch_quote(mint_b, mint_c, amount_b).await {
+                Ok(q) => q,
+                Err(e) => { debug!("Quote {}->{} failed: {}", b, c, e); continue; }
+            };
+            let amount_c: u64 = match quote_bc["outAmount"].as_str().and_then(|s| s.parse().ok()) {
+                Some(a) => a,
+                None => continue,
+            };
+
+            let quote_ca = match self.fetch_quote(mint_c, mint_a, amount_c).await {
+                Ok(q) => q,
+                Err(e) => { debug!("Quote {}->{} failed: {}", c, a, e); continue; }
+            };
+            let amount_a_out: u64 = match quote_ca["outAmount"].as_str().and_then(|s| s.parse().ok()) {
+                Some(a) => a,
+                None => continue,
+            };
+
+            let profit_pct = ((amount_a_out as f64 / start_amount as f64) - 1.0) * 100.0;
             let net_profit = profit_pct - ESTIMATED_FEE_PCT;
 
+            info!("{} -> {} -> {} -> {}: start={} end={} profit={:.4}% net={:.4}%",
+                a, b, c, a, start_amount, amount_a_out, profit_pct, net_profit);
+
             if net_profit > self.threshold.to_f64().unwrap_or(0.3) {
-                debug!("Triangular opportunity: {} -> {} -> {} -> {}: {:.4}%", a, b, c, a, net_profit);
+                info!("TRIANGULAR ARB FOUND: {} -> {} -> {} -> {}: {:.4}%", a, b, c, a, net_profit);
                 opportunities.push(Opportunity {
                     id: Uuid::new_v4().to_string(),
                     strategy: StrategyKind::Triangular,
                     route: format!("{} -> {} -> {} -> {}", a, b, c, a),
                     expected_profit_pct: Decimal::from_f64(net_profit).unwrap_or_default(),
-                    trade_size_usdc: Decimal::new(5000, 0), // 5000 USDC default
-                    instructions: vec![], // Filled by build_instructions
+                    trade_size_usdc: Decimal::new(5000, 0),
+                    instructions: vec![],
                     detected_at: Instant::now(),
                 });
             }
