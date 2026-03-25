@@ -51,7 +51,7 @@ enabled = true\n\
 \n\
 [strategy.funding_rate]\n\
 auto_execute_threshold = 0.05\n\
-enabled = true\n\
+enabled = false\n\
 \n\
 [strategy.statistical]\n\
 auto_execute_threshold = 3.0\n\

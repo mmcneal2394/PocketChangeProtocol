@@ -141,7 +141,7 @@ async fn main() -> anyhow::Result<()> {
     // Price feed: Jupiter
     {
         let poller = price::jupiter::JupiterPoller::new(price_cache.clone(), price_tx.clone(), token_registry.clone());
-        tasks.spawn(async move { poller.run(500).await; });
+        tasks.spawn(async move { poller.run(3000).await; }); // 3s between cycles to stay within rate limits
     }
 
     // Price feed: Multi-CEX (MEXC, Gate.io, KuCoin) — if CEX-DEX enabled
