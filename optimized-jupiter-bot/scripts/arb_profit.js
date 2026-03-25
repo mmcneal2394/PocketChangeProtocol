@@ -35,21 +35,12 @@ const USDC       = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 const LOG_FILE   = './arb_profit_trades.json';
 
 const BAGS_KEYS = [
-<<<<<<< HEAD
-  process.env.BAGS_API_KEY   || 'bags_prod_bhNWKWR4_HAseNYlrmgpJX4NklFdCzAbDdYpx9UIIgg',
-  process.env.BAGS_API_KEY_2 || 'bags_prod_kfsnkMqQ4NJW16_BknWl1ox31Ysr1kZL1MA2mGSlt5c',
-  process.env.BAGS_API_KEY_3 || 'bags_prod_QJ3a_QsV3R8FEg9kbxWZ7yMOqVD7OnAu2mxLHNfkia8',
-  process.env.BAGS_API_KEY_4 || 'bags_prod_a64DNgP7fs2O9DcqT0JIIva4Qsy_XEPmdgLtP67jbSU',
-  process.env.BAGS_API_KEY_5 || 'bags_prod_pIHo6k8F6k7W_5q0N4kVCzodVgPqMBQ_tj0G0S2Mn9o',
-  process.env.BAGS_API_KEY_6 || 'bags_prod_b5Aeygaqa1vb5JGdwm5hsRoBCyVKMBCK12p-DCIodlU',
-=======
   process.env.BAGS_API_KEY   || 'process.env.BAGS_API_KEY',
   process.env.BAGS_API_KEY_2 || 'process.env.BAGS_API_KEY_2',
   process.env.BAGS_API_KEY_3 || 'process.env.BAGS_API_KEY_3',
   process.env.BAGS_API_KEY_4 || 'process.env.BAGS_API_KEY_4',
   process.env.BAGS_API_KEY_5 || 'process.env.BAGS_API_KEY_5',
   process.env.BAGS_API_KEY_6 || 'process.env.BAGS_API_KEY_6',
->>>>>>> b98063db64e327d63401fc99bce9fd880aa4d97f
 ];
 
 // ── Rate-safe timing ─────────────────────────────────────────────────────────

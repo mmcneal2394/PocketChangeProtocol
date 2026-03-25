@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import { NextRequest, NextResponse } from 'next/server';
 
 const ENGINE_BASE = process.env.ENGINE_API_URL || 'http://localhost:3002/api';
@@ -18,15 +17,6 @@ export async function GET(req: NextRequest) {
     if (secret) headers['Authorization'] = `Bearer ${secret}`;
 
     const res = await fetch(url, { cache: 'no-store', headers });
-=======
-import { NextResponse } from 'next/server';
-
-const ENGINE_URL = process.env.ENGINE_API_URL || 'http://localhost:3002/api/status';
-
-export async function GET() {
-  try {
-    const res = await fetch(ENGINE_URL, { next: { revalidate: 0 }, cache: 'no-store' });
->>>>>>> b98063db64e327d63401fc99bce9fd880aa4d97f
     if (!res.ok) throw new Error(`engine ${res.status}`);
     const data = await res.json();
     return NextResponse.json(data);
@@ -41,7 +31,6 @@ export async function GET() {
     }, { status: 200 });
   }
 }
-<<<<<<< HEAD
 
 export async function POST(req: NextRequest) {
   try {
@@ -68,5 +57,3 @@ export async function POST(req: NextRequest) {
     }, { status: 502 });
   }
 }
-=======
->>>>>>> b98063db64e327d63401fc99bce9fd880aa4d97f

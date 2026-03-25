@@ -56,8 +56,6 @@ db.exec(`
     )
 `);
 
-<<<<<<< HEAD
-=======
 // ── Fix 4: SQLite log rotation (30-day retention) ─────────────────────────────
 // Prevents unbounded row growth after weeks of live trading.
 // Runs once at startup (clears any backlog) then every 24h.
@@ -79,7 +77,6 @@ function rotateLogs() {
 rotateLogs();                                          // startup sweep
 setInterval(rotateLogs, 24 * 60 * 60 * 1000);         // daily thereafter
 
->>>>>>> b98063db64e327d63401fc99bce9fd880aa4d97f
 db.exec(`
     CREATE TABLE IF NOT EXISTS test_trades (
         id INTEGER PRIMARY KEY AUTOINCREMENT,

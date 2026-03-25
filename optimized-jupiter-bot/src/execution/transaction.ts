@@ -1,9 +1,6 @@
 import { Connection, PublicKey, TransactionInstruction, VersionedTransaction, TransactionMessage, Keypair, SystemProgram, AddressLookupTableAccount } from '@solana/web3.js';
 import * as fs from 'fs';
-<<<<<<< HEAD
-=======
 import * as path from 'path';
->>>>>>> b98063db64e327d63401fc99bce9fd880aa4d97f
 import { getAddressLookupTable, getCachedBlockhash } from '../jupiter/cache';
 import { config } from '../utils/config';
 import { logger } from '../utils/logger';
@@ -79,9 +76,6 @@ export async function buildVersionedTransaction(ix1Response: any, ix2Response: a
 
     // Calculate baseline priority gas securely instead of relying on MEV auction padding
     // We are operating sub-10ms via Geyser, removing the need to fight block wars heavily.
-<<<<<<< HEAD
-    const dynamicMicroLamports = 250000; // Extremely high strictly prioritized fee!
-=======
     let dynamicMicroLamports = config.PRIORITY_MICRO_LAMPORTS || 250000;
     try {
         const paramsPath = path.join(process.cwd(), 'strategy_params.json');
@@ -94,17 +88,12 @@ export async function buildVersionedTransaction(ix1Response: any, ix2Response: a
     } catch (e) {
         logger.debug("Could not read strategy_params.json, using default priority.");
     }
->>>>>>> b98063db64e327d63401fc99bce9fd880aa4d97f
     
     const { ComputeBudgetProgram } = require("@solana/web3.js");
     validInstructions.unshift(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: dynamicMicroLamports }));
     validInstructions.unshift(ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }));
     
-<<<<<<< HEAD
-    logger.info(`🔥 Attached Strict Baseline Gas Priority: ${dynamicMicroLamports} microLamports (Bypassing Priority Auctions!)`);
-=======
     logger.info(`🔥 Attached Dynamic Priority Gas: ${dynamicMicroLamports} microLamports`);
->>>>>>> b98063db64e327d63401fc99bce9fd880aa4d97f
 
     if (jitoTipLamports > 0) {
         let jitoTipAccounts = [

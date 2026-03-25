@@ -26,10 +26,6 @@ export async function submitTransactionWithRacing(transaction: VersionedTransact
 
   const startMs = Date.now();
 
-<<<<<<< HEAD
-  logger.info("Transmitting MEV traces recursively scaling alongside direct Helius RPC bypasses...");
-=======
->>>>>>> b98063db64e327d63401fc99bce9fd880aa4d97f
   const bundlePayload = { jsonrpc: "2.0", id: 1, method: "sendBundle", params: [[txBase58]] };
   
   const submitJito = async (url: string) => {
@@ -42,54 +38,27 @@ export async function submitTransactionWithRacing(transaction: VersionedTransact
           });
           clearTimeout(id);
           const text = await response.text();
-<<<<<<< HEAD
-          logger.info(`[${url}] BUNDLE RESPONSE: ` + text);
-          if (text.includes("error")) throw new Error(text);
-          return { success: true, provider: url, signature: text, latency: Date.now() - startMs };
-      } catch (e: any) {
-          clearTimeout(id);
-=======
           logger.info(`[JITO] [${url}] BUNDLE RESPONSE: ` + text);
           return { success: true, provider: url, signature: text, latency: Date.now() - startMs };
       } catch (e: any) {
           clearTimeout(id);
           logger.error(`[JITO] [${url}] BUNDLE FAILED: ${e.message}`);
->>>>>>> b98063db64e327d63401fc99bce9fd880aa4d97f
           throw e;
       }
   };
 
   const submitHelius = async () => {
       try {
-<<<<<<< HEAD
-          const sig = await connection.sendRawTransaction(rawTx, { skipPreflight: false, maxRetries: 3 });
-          logger.info(`[HELIUS] Physical RPC Transmit Hash: ` + sig);
-          return { success: true, provider: 'Helius', signature: sig, latency: Date.now() - startMs };
-      } catch (e: any) {
-          console.error("[HELIUS RAW EXCEPTION DUMP]:", e);
-          if (e && e.logs) console.error("[HELIUS RAW LOGS]:", JSON.stringify(e.logs));
-          logger.error(`[HELIUS] Preflight Simulation Exception: ${e ? (e.message || String(e)) : 'Unknown'}`);
-=======
           const sig = await connection.sendRawTransaction(rawTx, { skipPreflight: true, maxRetries: 3 });
           logger.info(`[HELIUS] Physical RPC Transmit Hash: ` + sig);
           return { success: true, provider: 'Helius', signature: sig, latency: Date.now() - startMs };
       } catch (e: any) {
           logger.error(`[HELIUS] Physical RPC Transmit FAILED: ${e.message}`);
->>>>>>> b98063db64e327d63401fc99bce9fd880aa4d97f
           throw e;
       }
   };
 
   try {
-<<<<<<< HEAD
-      // Direct Helius Native Execution (Bypassing Jito Network Congestion Completely)
-      // Heavily optimized using Jupiter Ultra auto-priority fees
-      const results = await Promise.allSettled([
-          submitHelius()
-      ]);
-      
-      const successful = results.find(r => r.status === 'fulfilled' && r.value.success);
-=======
       const targets: Promise<any>[] = [submitHelius()];
       if (config.JITO_BLOCK_ENGINE) {
           targets.push(submitJito(config.JITO_BLOCK_ENGINE));
@@ -98,7 +67,6 @@ export async function submitTransactionWithRacing(transaction: VersionedTransact
       const results = await Promise.allSettled(targets);
       
       const successful = results.find(r => r.status === 'fulfilled' && (r.value as any).success);
->>>>>>> b98063db64e327d63401fc99bce9fd880aa4d97f
       if (successful && successful.status === 'fulfilled') {
           return successful.value;
       } else {

@@ -2,11 +2,7 @@
  * Deep probe api.bags.fm — try all plausible route patterns
  */
 const f = require('node-fetch');
-<<<<<<< HEAD
-const KEY = 'bags_prod_bhNWKWR4_HAseNYlrmgpJX4NklFdCzAbDdYpx9UIIgg';
-=======
 const KEY = 'process.env.BAGS_API_KEY';
->>>>>>> b98063db64e327d63401fc99bce9fd880aa4d97f
 const SOL  = 'So11111111111111111111111111111111111111112';
 const USDC = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 const WALLET = 'DnQhJawMXW7ZWA19XbzrV1q3KWZvMnpfyrxe4f74FHVj';
