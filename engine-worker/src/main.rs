@@ -139,12 +139,13 @@ async fn main() -> anyhow::Result<()> {
         tasks.spawn(async move { poller.run(500).await; });
     }
 
-    // Price feed: Bitget (if CEX-DEX enabled)
+    // Price feed: Multi-CEX (MEXC, Gate.io, KuCoin) — if CEX-DEX enabled
     if config.strategy_enabled("cex_dex") {
-        if let Some(poller) = price::cex::BitgetPoller::from_env(price_cache.clone(), price_tx.clone()) {
+        let poller = price::cex::MultiCexPoller::new(price_cache.clone(), price_tx.clone());
+        if poller.has_feeds() {
             tasks.spawn(async move { poller.run(2000).await; });
         } else {
-            warn!("CEX-DEX enabled but BITGET_API_KEY not set — skipping CEX feed");
+            warn!("CEX-DEX enabled but all CEX price feeds disabled — skipping CEX feed");
         }
     }
 

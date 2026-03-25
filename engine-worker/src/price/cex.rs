@@ -1,15 +1,9 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::{broadcast, RwLock};
-use hmac::{Hmac, Mac};
-use sha2::Sha256;
-use tracing::warn;
-use base64::engine::general_purpose::STANDARD as B64;
-use base64::Engine;
+use tracing::{info, warn};
 use crate::types::PriceSnapshot;
 use crate::price::PriceCache;
-
-type HmacSha256 = Hmac<Sha256>;
 
 const PAIRS: &[(&str, &str)] = &[
     ("SOL", "SOLUSDT"),
@@ -18,121 +12,224 @@ const PAIRS: &[(&str, &str)] = &[
     ("WIF", "WIFUSDT"),
 ];
 
-pub struct BitgetPoller {
+// ---------------------------------------------------------------------------
+// Per-exchange configuration (public ticker endpoints — no API key needed)
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone)]
+enum ExchangeKind {
+    Mexc,
+    Gate,
+    KuCoin,
+}
+
+impl ExchangeKind {
+    fn source_id(&self) -> &'static str {
+        match self {
+            ExchangeKind::Mexc => "mexc",
+            ExchangeKind::Gate => "gate",
+            ExchangeKind::KuCoin => "kucoin",
+        }
+    }
+
+    fn label(&self) -> &'static str {
+        match self {
+            ExchangeKind::Mexc => "MEXC",
+            ExchangeKind::Gate => "Gate.io",
+            ExchangeKind::KuCoin => "KuCoin",
+        }
+    }
+}
+
+struct ExchangeFeed {
+    kind: ExchangeKind,
+    base_url: String,
+}
+
+// ---------------------------------------------------------------------------
+// MultiCexPoller — polls public ticker endpoints on all configured exchanges
+// ---------------------------------------------------------------------------
+
+pub struct MultiCexPoller {
     cache: Arc<RwLock<PriceCache>>,
     tx: broadcast::Sender<PriceSnapshot>,
     client: reqwest::Client,
-    api_key: String,
-    api_secret: String,
-    passphrase: String,
+    feeds: Vec<ExchangeFeed>,
 }
 
-impl BitgetPoller {
+impl MultiCexPoller {
+    /// Build the poller. Enables each exchange if the corresponding env var is
+    /// set (even if empty) OR unconditionally — public endpoints need no key.
+    /// We check env vars so operators can selectively disable an exchange by
+    /// *not* setting MEXC_ENABLED / GATE_ENABLED / KUCOIN_ENABLED.
+    /// Default: all three enabled.
     pub fn new(
         cache: Arc<RwLock<PriceCache>>,
         tx: broadcast::Sender<PriceSnapshot>,
-        api_key: String,
-        api_secret: String,
-        passphrase: String,
     ) -> Self {
+        let mut feeds = Vec::new();
+
+        let mexc_disabled = std::env::var("MEXC_DISABLED").map(|v| v == "1" || v == "true").unwrap_or(false);
+        let gate_disabled = std::env::var("GATE_DISABLED").map(|v| v == "1" || v == "true").unwrap_or(false);
+        let kucoin_disabled = std::env::var("KUCOIN_DISABLED").map(|v| v == "1" || v == "true").unwrap_or(false);
+
+        if !mexc_disabled {
+            feeds.push(ExchangeFeed {
+                kind: ExchangeKind::Mexc,
+                base_url: "https://api.mexc.com".to_string(),
+            });
+            info!("MEXC price feed enabled");
+        }
+        if !gate_disabled {
+            feeds.push(ExchangeFeed {
+                kind: ExchangeKind::Gate,
+                base_url: "https://api.gateio.ws".to_string(),
+            });
+            info!("Gate.io price feed enabled");
+        }
+        if !kucoin_disabled {
+            feeds.push(ExchangeFeed {
+                kind: ExchangeKind::KuCoin,
+                base_url: "https://api.kucoin.com".to_string(),
+            });
+            info!("KuCoin price feed enabled");
+        }
+
+        if feeds.is_empty() {
+            warn!("All CEX price feeds disabled");
+        }
+
         Self {
             cache,
             tx,
             client: reqwest::Client::new(),
-            api_key,
-            api_secret,
-            passphrase,
+            feeds,
         }
     }
 
-    pub fn from_env(cache: Arc<RwLock<PriceCache>>, tx: broadcast::Sender<PriceSnapshot>) -> Option<Self> {
-        let api_key = std::env::var("BITGET_API_KEY").ok()?;
-        let api_secret = std::env::var("BITGET_API_SECRET").ok()?;
-        let passphrase = std::env::var("BITGET_PASSPHRASE").ok()?;
-        Some(Self::new(cache, tx, api_key, api_secret, passphrase))
-    }
-
-    pub fn sign(timestamp: &str, method: &str, path: &str, body: &str, secret: &str) -> String {
-        let message = format!("{}{}{}{}", timestamp, method, path, body);
-        let mut mac = HmacSha256::new_from_slice(secret.as_bytes())
-            .expect("HMAC key length");
-        mac.update(message.as_bytes());
-        B64.encode(mac.finalize().into_bytes())
+    pub fn has_feeds(&self) -> bool {
+        !self.feeds.is_empty()
     }
 
     pub async fn run(self, interval_ms: u64) {
-        let mut backoff_ms: u64 = 0;
+        let mut backoffs: Vec<u64> = vec![0; self.feeds.len()];
 
         loop {
-            if backoff_ms > 0 {
-                tokio::time::sleep(Duration::from_millis(backoff_ms)).await;
-            }
+            for (i, feed) in self.feeds.iter().enumerate() {
+                if backoffs[i] > 0 {
+                    // Skip this feed until backoff expires (checked per-tick)
+                    backoffs[i] = backoffs[i].saturating_sub(interval_ms);
+                    continue;
+                }
 
-            match self.fetch_tickers().await {
-                Ok(prices) => {
-                    backoff_ms = 0;
-                    for (name, price) in prices {
-                        let snapshot = PriceSnapshot {
-                            mint: name,
-                            price_usdc: price,
-                            source: "bitget".to_string(),
-                            timestamp: Instant::now(),
-                        };
-                        self.cache.write().await.update(&snapshot);
-                        let _ = self.tx.send(snapshot);
+                match self.fetch_tickers(feed).await {
+                    Ok(prices) => {
+                        backoffs[i] = 0;
+                        for (name, price) in prices {
+                            let snapshot = PriceSnapshot {
+                                mint: name,
+                                price_usdc: price,
+                                source: feed.kind.source_id().to_string(),
+                                timestamp: Instant::now(),
+                            };
+                            self.cache.write().await.update(&snapshot);
+                            let _ = self.tx.send(snapshot);
+                        }
+                    }
+                    Err(e) => {
+                        backoffs[i] = (backoffs[i] * 2).max(2000).min(30000);
+                        warn!(
+                            "{} fetch failed, backing off {}ms: {}",
+                            feed.kind.label(),
+                            backoffs[i],
+                            e
+                        );
                     }
                 }
-                Err(e) => {
-                    backoff_ms = (backoff_ms * 2).max(2000).min(30000);
-                    warn!("Bitget fetch failed, backing off {}ms: {}", backoff_ms, e);
-                }
-            }
 
-            // Mark stale after 10s
-            {
-                let mut cache = self.cache.write().await;
-                cache.mark_stale("bitget", Duration::from_secs(10));
+                // Mark stale prices from this source after 10s
+                {
+                    let mut cache = self.cache.write().await;
+                    cache.mark_stale(feed.kind.source_id(), Duration::from_secs(10));
+                }
             }
 
             tokio::time::sleep(Duration::from_millis(interval_ms)).await;
         }
     }
 
-    async fn fetch_tickers(&self) -> anyhow::Result<Vec<(String, f64)>> {
-        let path = "/api/v2/spot/market/tickers";
-        let url = format!("https://api.bitget.com{}", path);
-        let timestamp = chrono::Utc::now().timestamp_millis().to_string();
-        let signature = Self::sign(&timestamp, "GET", path, "", &self.api_secret);
-
-        let resp = self.client.get(&url)
-            .header("ACCESS-KEY", &self.api_key)
-            .header("ACCESS-SIGN", &signature)
-            .header("ACCESS-TIMESTAMP", &timestamp)
-            .header("ACCESS-PASSPHRASE", &self.passphrase)
-            .header("Content-Type", "application/json")
-            .timeout(Duration::from_secs(5))
-            .send()
-            .await?;
-
-        if resp.status() == 429 {
-            return Err(anyhow::anyhow!("Rate limited"));
+    async fn fetch_tickers(&self, feed: &ExchangeFeed) -> anyhow::Result<Vec<(String, f64)>> {
+        match feed.kind {
+            ExchangeKind::Mexc => self.fetch_mexc(feed).await,
+            ExchangeKind::Gate => self.fetch_gate(feed).await,
+            ExchangeKind::KuCoin => self.fetch_kucoin(feed).await,
         }
+    }
 
-        let body: serde_json::Value = resp.json().await?;
-        let data = body["data"].as_array()
-            .ok_or_else(|| anyhow::anyhow!("Missing data array"))?;
+    // -----------------------------------------------------------------------
+    // MEXC — GET /api/v3/ticker/price (public, no auth)
+    // -----------------------------------------------------------------------
+    async fn fetch_mexc(&self, feed: &ExchangeFeed) -> anyhow::Result<Vec<(String, f64)>> {
+        let url = format!("{}/api/v3/ticker/price", feed.base_url);
+        let resp: Vec<serde_json::Value> = self.client.get(&url)
+            .timeout(Duration::from_secs(5))
+            .send().await?.json().await?;
 
         let mut results = Vec::new();
         for (token_name, pair_symbol) in PAIRS {
-            if let Some(ticker) = data.iter().find(|t| t["symbol"].as_str() == Some(pair_symbol)) {
-                if let Some(price_str) = ticker["lastPr"].as_str() {
-                    if let Ok(price) = price_str.parse::<f64>() {
-                        results.push((token_name.to_string(), price));
-                    }
+            if let Some(ticker) = resp.iter().find(|t| t["symbol"].as_str() == Some(pair_symbol)) {
+                if let Some(price) = ticker["price"].as_str().and_then(|p| p.parse::<f64>().ok()) {
+                    results.push((token_name.to_string(), price));
                 }
             }
         }
+        Ok(results)
+    }
 
+    // -----------------------------------------------------------------------
+    // Gate.io — GET /api/v4/spot/tickers (public, no auth)
+    // -----------------------------------------------------------------------
+    async fn fetch_gate(&self, feed: &ExchangeFeed) -> anyhow::Result<Vec<(String, f64)>> {
+        let url = format!("{}/api/v4/spot/tickers", feed.base_url);
+        let resp: Vec<serde_json::Value> = self.client.get(&url)
+            .timeout(Duration::from_secs(5))
+            .send().await?.json().await?;
+
+        let mut results = Vec::new();
+        for (token_name, pair_symbol) in PAIRS {
+            // Gate uses underscore separator: SOLUSDT -> SOL_USDT
+            let gate_symbol = pair_symbol.replace("USDT", "_USDT");
+            if let Some(ticker) = resp.iter().find(|t| t["currency_pair"].as_str() == Some(&gate_symbol)) {
+                if let Some(price) = ticker["last"].as_str().and_then(|p| p.parse::<f64>().ok()) {
+                    results.push((token_name.to_string(), price));
+                }
+            }
+        }
+        Ok(results)
+    }
+
+    // -----------------------------------------------------------------------
+    // KuCoin — GET /api/v1/market/allTickers (public, no auth)
+    // -----------------------------------------------------------------------
+    async fn fetch_kucoin(&self, feed: &ExchangeFeed) -> anyhow::Result<Vec<(String, f64)>> {
+        let url = format!("{}/api/v1/market/allTickers", feed.base_url);
+        let resp: serde_json::Value = self.client.get(&url)
+            .timeout(Duration::from_secs(5))
+            .send().await?.json().await?;
+
+        let tickers = resp["data"]["ticker"].as_array()
+            .ok_or_else(|| anyhow::anyhow!("KuCoin missing data.ticker array"))?;
+
+        let mut results = Vec::new();
+        for (token_name, pair_symbol) in PAIRS {
+            // KuCoin uses dash separator: SOLUSDT -> SOL-USDT
+            let kc_symbol = pair_symbol.replace("USDT", "-USDT");
+            if let Some(ticker) = tickers.iter().find(|t| t["symbol"].as_str() == Some(&kc_symbol)) {
+                if let Some(price) = ticker["last"].as_str().and_then(|p| p.parse::<f64>().ok()) {
+                    results.push((token_name.to_string(), price));
+                }
+            }
+        }
         Ok(results)
     }
 }
@@ -142,10 +239,23 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_bitget_hmac_signature() {
-        let sig = BitgetPoller::sign("1234567890", "GET", "/api/v2/spot/market/tickers", "", "test_secret");
-        assert!(!sig.is_empty());
-        // Verify it's valid base64
-        B64.decode(&sig).unwrap();
+    fn test_exchange_source_ids() {
+        assert_eq!(ExchangeKind::Mexc.source_id(), "mexc");
+        assert_eq!(ExchangeKind::Gate.source_id(), "gate");
+        assert_eq!(ExchangeKind::KuCoin.source_id(), "kucoin");
+    }
+
+    #[test]
+    fn test_gate_symbol_format() {
+        let pair = "SOLUSDT";
+        let gate = pair.replace("USDT", "_USDT");
+        assert_eq!(gate, "SOL_USDT");
+    }
+
+    #[test]
+    fn test_kucoin_symbol_format() {
+        let pair = "SOLUSDT";
+        let kc = pair.replace("USDT", "-USDT");
+        assert_eq!(kc, "SOL-USDT");
     }
 }
