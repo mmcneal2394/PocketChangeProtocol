@@ -25,5 +25,5 @@ auto_execute_threshold = 0.05
 enabled = true
 
 [strategy.statistical]
-auto_execute_threshold = 3.0
+auto_execute_threshold = 5.0
 enabled = true
