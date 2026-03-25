@@ -1,7 +1,6 @@
 use serde::Deserialize;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
-use tokio::sync::RwLock;
 use tracing::{info, warn};
 
 #[derive(Debug, Clone, Deserialize)]
@@ -31,7 +30,7 @@ impl TokenRegistry {
             tokens: RwLock::new(Vec::new()),
             api_base: api_base.to_string(),
             last_refresh: RwLock::new(Instant::now() - Duration::from_secs(9999)),
-            refresh_interval: Duration::from_secs(600), // 10 minutes
+            refresh_interval: Duration::from_secs(600),
         }
     }
 
@@ -41,15 +40,6 @@ impl TokenRegistry {
         registry
     }
 
-    /// Refresh token list from API if stale
-    async fn refresh_if_needed(&self) {
-        let last = *self.last_refresh.read().await;
-        if last.elapsed() >= self.refresh_interval {
-            self.refresh().await;
-        }
-    }
-
-    /// Force refresh from API
     pub async fn refresh(&self) {
         let url = format!("{}/api/watched-tokens", self.api_base);
         let client = reqwest::Client::new();
@@ -59,27 +49,26 @@ impl TokenRegistry {
                 match resp.json::<Vec<WatchedToken>>().await {
                     Ok(tokens) => {
                         info!("Refreshed token registry: {} tokens from DB", tokens.len());
-                        *self.tokens.write().await = tokens;
-                        *self.last_refresh.write().await = Instant::now();
+                        *self.tokens.write().unwrap() = tokens;
+                        *self.last_refresh.write().unwrap() = Instant::now();
                     }
                     Err(e) => {
                         warn!("Failed to parse token list: {}", e);
-                        self.ensure_defaults().await;
+                        self.ensure_defaults();
                     }
                 }
             }
             Err(e) => {
                 warn!("Failed to load tokens from API: {}", e);
-                self.ensure_defaults().await;
+                self.ensure_defaults();
             }
         }
     }
 
-    /// Only set defaults if we have zero tokens (don't overwrite a good list)
-    async fn ensure_defaults(&self) {
-        if self.tokens.read().await.is_empty() {
+    fn ensure_defaults(&self) {
+        if self.tokens.read().unwrap().is_empty() {
             warn!("Using fallback default token list");
-            *self.tokens.write().await = Self::default_tokens();
+            *self.tokens.write().unwrap() = Self::default_tokens();
         }
     }
 
@@ -97,19 +86,10 @@ impl TokenRegistry {
 
     pub fn new_with_defaults() -> Self {
         let registry = Self::new("http://localhost:3000");
-        // Bypass async — set defaults directly for tests
-        let tokens = Self::default_tokens();
-        let rt = tokio::runtime::Handle::try_current();
-        if let Ok(handle) = rt {
-            let t = registry.tokens.clone();
-            handle.spawn(async move {
-                *t.write().await = tokens;
-            });
-        }
+        *registry.tokens.write().unwrap() = Self::default_tokens();
         registry
     }
 
-    /// Spawn background refresh task
     pub fn spawn_refresh_task(self: &Arc<Self>) {
         let registry = self.clone();
         tokio::spawn(async move {
@@ -120,27 +100,27 @@ impl TokenRegistry {
         });
     }
 
-    pub async fn all(&self) -> Vec<WatchedToken> {
-        self.refresh_if_needed().await;
-        self.tokens.read().await.clone()
+    // --- Sync read methods (used by strategies on hot path) ---
+
+    pub fn all(&self) -> Vec<WatchedToken> {
+        self.tokens.read().unwrap().clone()
     }
 
-    pub async fn for_strategy(&self, strategy: &str) -> Vec<WatchedToken> {
-        self.refresh_if_needed().await;
-        self.tokens.read().await.iter()
+    pub fn for_strategy(&self, strategy: &str) -> Vec<WatchedToken> {
+        self.tokens.read().unwrap().iter()
             .filter(|t| t.supports_strategy(strategy))
             .cloned()
             .collect()
     }
 
-    pub async fn resolve_mint(&self, symbol: &str) -> Option<String> {
-        self.tokens.read().await.iter()
+    pub fn resolve_mint(&self, symbol: &str) -> Option<String> {
+        self.tokens.read().unwrap().iter()
             .find(|t| t.symbol == symbol)
             .map(|t| t.mint.clone())
     }
 
-    pub async fn resolve_decimals(&self, symbol: &str) -> u32 {
-        self.tokens.read().await.iter()
+    pub fn resolve_decimals(&self, symbol: &str) -> u32 {
+        self.tokens.read().unwrap().iter()
             .find(|t| t.symbol == symbol)
             .map(|t| t.decimals as u32)
             .unwrap_or(6)
