@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer, MintTo, Burn};
 
-declare_id!("GKUwMKjS4UU5zFQXV83oNjm8DZmVpYzyiTGAhHEiCnLR");
+declare_id!("34sgN4q5CaaGCwqePU6d2y6xzBuY5ASA8E8LtXjfyN3c");
 
 #[program]
 pub mod pocketchange_vault {

@@ -90,7 +90,7 @@
 
 ## Devnet Deployment & Infrastructure
 
-- [x] **Smart contract deployed to devnet** — Program ID: `GKUwMKjS4UU5zFQXV83oNjm8DZmVpYzyiTGAhHEiCnLR`, cost: 2.44 SOL, binary: 342 KB
+- [x] **Smart contract deployed to devnet** — Program ID: `34sgN4q5CaaGCwqePU6d2y6xzBuY5ASA8E8LtXjfyN3c`, cost: 2.44 SOL, binary: 342 KB
 - [x] **All program ID references updated** across 9 files (contract, engine, frontend, scripts, docs)
 - [x] **Dockerfile updated** — multi-stage build (builder + debian:bookworm-slim runtime), exposes port 3002
 - [x] **Integration tests added** — 8 tests covering config, PriceCache, circuit breaker, telemetry, KMS, strategies, approval router paper mode
@@ -106,7 +106,7 @@
 ## Infrastructure (PR #9)
 
 - [x] **PostgreSQL on Railway** — deployed, schema synced via `prisma db push`
-- [x] **Devnet contract deployed** — Program ID: `GKUwMKjS4UU5zFQXV83oNjm8DZmVpYzyiTGAhHEiCnLR`
+- [x] **Devnet contract deployed** — Program ID: `34sgN4q5CaaGCwqePU6d2y6xzBuY5ASA8E8LtXjfyN3c`
 - [x] **Dockerfile** — multi-stage build, port 3002
 - [x] **Integration tests** — 8 tests covering paper mode pipeline
 - [x] **docker-compose.yml** — updated for new architecture (engine + web, Railway Postgres)
