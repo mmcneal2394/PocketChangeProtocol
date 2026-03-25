@@ -41,12 +41,10 @@ impl ApprovalRouter {
         let threshold = self.config.get_strategy_threshold(&opp.strategy.to_string());
         let profit: f64 = opp.expected_profit_pct.to_f64().unwrap_or(0.0);
 
-        // Paper mode: always log, never execute
+        // Paper mode: log and send to executor for simulation (don't short-circuit)
         if self.config.mode == crate::config::EngineMode::Paper {
-            info!("[PAPER] Opportunity detected: {} {} ({}%)", opp.strategy, opp.route, profit);
-            if let Some(ref tg) = self.telegram {
-                let _ = tg.send_opportunity(&opp).await;
-            }
+            info!("[PAPER] Opportunity detected: {} {} ({}%) — sending to executor for simulation", opp.strategy, opp.route, profit);
+            let _ = self.executor_tx.send(opp).await;
             return;
         }
 

@@ -120,7 +120,6 @@ async fn main() -> anyhow::Result<()> {
             }
         }
     }
-    let has_telegram = telegram.is_some();
     let (exec_tx, mut exec_rx) = mpsc::channel::<Opportunity>(64);
 
     let router = Arc::new(approval::ApprovalRouter::new(
@@ -206,14 +205,37 @@ async fn main() -> anyhow::Result<()> {
     {
         let e = exec.clone();
         let w = wallet.clone();
+        let telegram_for_executor = telegram.clone();
         tasks.spawn(async move {
             while let Some(opp) = exec_rx.recv().await {
                 info!("Executing opportunity {} ({})", opp.id, opp.strategy);
+
+                // In paper mode, send opportunity alert before simulation
+                if let Some(ref tg) = telegram_for_executor {
+                    let _ = tg.send_opportunity(&opp).await;
+                }
+
                 let result = e.execute(&opp, &w).await;
                 if result.success {
                     info!("Trade succeeded: {} profit={:?}", opp.id, result.actual_profit_sol);
                 } else {
                     warn!("Trade failed: {} error={:?}", opp.id, result.error);
+                }
+
+                // Send simulation/execution result to Telegram
+                if let Some(ref tg) = telegram_for_executor {
+                    let sim_msg = if result.success {
+                        format!(
+                            "<b>Simulation PASSED</b>\nStrategy: <code>{}</code>\nRoute: <code>{}</code>\nSimulated in {}ms",
+                            opp.strategy, opp.route, result.execution_time_ms
+                        )
+                    } else {
+                        format!(
+                            "<b>Simulation FAILED</b>\nStrategy: <code>{}</code>\nError: <code>{}</code>",
+                            opp.strategy, result.error.as_deref().unwrap_or("unknown")
+                        )
+                    };
+                    let _ = tg.send_alert(&sim_msg).await;
                 }
             }
         });

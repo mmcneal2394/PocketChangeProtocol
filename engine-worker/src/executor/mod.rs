@@ -78,10 +78,26 @@ impl Executor {
             }
         }
 
-        // Write telemetry
+        // Write telemetry — distinguish simulation events from live trades
+        let (event_name, status_name) = match self.mode {
+            EngineMode::Paper => {
+                if result.success {
+                    ("simulation_passed".to_string(), "simulated".to_string())
+                } else {
+                    ("simulation_failed".to_string(), "simulated".to_string())
+                }
+            }
+            _ => {
+                if result.success {
+                    ("trade_executed".to_string(), "success".to_string())
+                } else {
+                    ("trade_failed".to_string(), "failed".to_string())
+                }
+            }
+        };
         let event = TelemetryEvent {
             timestamp: chrono::Utc::now().to_rfc3339(),
-            event: if result.success { "trade_executed".to_string() } else { "trade_failed".to_string() },
+            event: event_name,
             strategy: opp.strategy.to_string(),
             route: opp.route.clone(),
             expected_profit_pct: opp.expected_profit_pct.try_into().unwrap_or(0.0),
@@ -89,7 +105,7 @@ impl Executor {
             tx_hash: result.tx_hash.clone(),
             mode: format!("{:?}", self.mode).to_lowercase(),
             execution_time_ms: Some(result.execution_time_ms),
-            status: if result.success { "success".to_string() } else { "failed".to_string() },
+            status: status_name,
             error: result.error.clone(),
         };
         self.telemetry.write_event(&event);
