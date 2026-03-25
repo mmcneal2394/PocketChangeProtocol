@@ -207,7 +207,6 @@ async fn main() -> anyhow::Result<()> {
     // Telegram poller (create a second instance from env since TelegramBot is not Clone)
     if has_telegram {
         if let Some(bot) = approval::telegram::TelegramBot::from_env() {
-            let r = router.clone();
             let cb = circuit_breaker.clone();
             let cfg = config.clone();
             let start = std::time::Instant::now();
@@ -234,20 +233,6 @@ async fn main() -> anyhow::Result<()> {
                                 );
                                 drop(cb_state);
                                 let _ = bot.send_alert(&msg).await;
-                            }
-                            approval::telegram::TelegramCommand::Approve(id) => {
-                                match r.approve(&id).await {
-                                    Ok(_) => { let _ = bot.send_alert("✅ Approved").await; }
-                                    Err(e) => { let _ = bot.send_alert(&format!("❌ Approve failed: {}", e)).await; }
-                                }
-                            }
-                            approval::telegram::TelegramCommand::Reject(id) => {
-                                let _ = r.reject(&id).await;
-                                let _ = bot.send_alert("🚫 Rejected").await;
-                            }
-                            approval::telegram::TelegramCommand::Resume => {
-                                cb.write().await.resume();
-                                let _ = bot.send_alert("🔄 Circuit breaker resumed").await;
                             }
                         }
                     }
