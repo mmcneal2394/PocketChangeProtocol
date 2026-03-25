@@ -57,17 +57,31 @@ pub trait Strategy: Send + Sync {
     fn normalized_profit_pct(&self, opp: &Opportunity) -> Decimal;
 }
 
+/// Minimum seconds between strategy evaluations.
+/// Prevents hammering Jupiter API on every price tick.
+const MIN_EVAL_INTERVAL_SECS: u64 = 10;
+
 pub async fn run_detector(
     strategy: Arc<dyn Strategy>,
     mut price_rx: broadcast::Receiver<PriceSnapshot>,
     opportunity_tx: mpsc::Sender<Opportunity>,
     price_cache: Arc<RwLock<PriceCache>>,
 ) {
+    let mut last_eval = std::time::Instant::now() - std::time::Duration::from_secs(MIN_EVAL_INTERVAL_SECS + 1);
+
     loop {
+        // Wait for a price update
         if price_rx.recv().await.is_err() {
             tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
             continue;
         }
+
+        // Throttle: skip if we evaluated recently
+        if last_eval.elapsed().as_secs() < MIN_EVAL_INTERVAL_SECS {
+            continue;
+        }
+        last_eval = std::time::Instant::now();
+
         let cache = price_cache.read().await;
         let opps = strategy.evaluate(&cache).await;
         drop(cache);
