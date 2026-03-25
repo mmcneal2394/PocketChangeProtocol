@@ -110,12 +110,14 @@ impl FlashLoanStrategy {
             input_mint, output_mint, amount, SLIPPAGE_BPS
         );
 
-        let resp = self.http_client
+        let mut req = self.http_client
             .get(&url)
             .header("User-Agent", "Mozilla/5.0 ArbitraSaaS-Engine/0.1")
-            .timeout(std::time::Duration::from_secs(5))
-            .send()
-            .await?;
+            .timeout(std::time::Duration::from_secs(5));
+        if let Ok(key) = std::env::var("JUPITER_API_KEY") {
+            req = req.header("x-api-key", key);
+        }
+        let resp = req.send().await?;
 
         if !resp.status().is_success() {
             return Err(anyhow::anyhow!("Jupiter quote failed: HTTP {}", resp.status()));

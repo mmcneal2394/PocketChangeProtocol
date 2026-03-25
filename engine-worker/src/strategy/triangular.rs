@@ -90,10 +90,12 @@ impl TriangularStrategy {
             JUPITER_API, input_mint, output_mint, amount
         );
 
-        let resp = self.client.get(&url)
-            .header("User-Agent", "ArbitraSaaS-Engine/0.1")
-            .send()
-            .await?;
+        let mut req = self.client.get(&url)
+            .header("User-Agent", "ArbitraSaaS-Engine/0.1");
+        if let Ok(key) = std::env::var("JUPITER_API_KEY") {
+            req = req.header("x-api-key", key);
+        }
+        let resp = req.send().await?;
 
         if !resp.status().is_success() {
             let status = resp.status();
