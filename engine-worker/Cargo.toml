@@ -20,7 +20,6 @@ hex = "0.4"
 # jito-protos = "0.1.0"
 futures = "0.3"
 base64 = "0.22.1"
-<<<<<<< HEAD
 toml = "0.8"
 axum = { version = "0.7", features = ["json"] }
 tower-http = { version = "0.5", features = ["cors"] }
@@ -35,8 +34,6 @@ uuid = { version = "1", features = ["v4"] }
 anchor-client = "0.29"
 anyhow = "1"
 bincode = "1"
-=======
->>>>>>> b98063db64e327d63401fc99bce9fd880aa4d97f
 
 [profile.release]
 opt-level = 3

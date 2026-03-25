@@ -383,35 +383,52 @@ impl Strategy for FlashLoanStrategy {
 
         let mut opportunities = Vec::new();
 
-        // Check USDC -> token -> USDC routes via Jupiter
-        let usdc_price = prices.get_price("USDC").unwrap_or(1.0);
-        let sol_price = match prices.get_price("SOL") {
-            Some(p) if p > 0.0 => p,
-            _ => return vec![],
-        };
+        // Check USDC -> token -> USDC via real Jupiter quotes
+        if prices.get_price("SOL").is_none() {
+            return vec![];
+        }
 
-        // Look for price discrepancies across available tokens
+        let borrow_amount: u64 = 10_000_000; // 10 USDC probe (6 decimals)
         let tokens = ["RAY", "BONK", "WIF", "mSOL", "JitoSOL"];
+
         for token in &tokens {
-            let token_price = match prices.get_price(token) {
-                Some(p) if p > 0.0 => p,
-                _ => continue,
+            let token_mint = match Self::resolve_mint(token) {
+                Some(m) => m,
+                None => continue,
             };
 
-            // Simulate: borrow USDC -> buy token -> sell token for USDC
-            // If we can get more USDC back than we borrowed, it's profitable
-            let round_trip = usdc_price / token_price * token_price / usdc_price;
-            let profit_pct = (round_trip - 1.0) * 100.0;
+            let quote_buy = match self.fetch_jupiter_quote(USDC_MINT, token_mint, borrow_amount).await {
+                Ok(q) => q,
+                Err(_) => continue,
+            };
+            let token_amount: u64 = match quote_buy["outAmount"].as_str().and_then(|s| s.parse().ok()) {
+                Some(a) => a,
+                None => continue,
+            };
+
+            let quote_sell = match self.fetch_jupiter_quote(token_mint, USDC_MINT, token_amount).await {
+                Ok(q) => q,
+                Err(_) => continue,
+            };
+            let usdc_back: u64 = match quote_sell["outAmount"].as_str().and_then(|s| s.parse().ok()) {
+                Some(a) => a,
+                None => continue,
+            };
+
+            let profit_pct = ((usdc_back as f64 / borrow_amount as f64) - 1.0) * 100.0;
             let net_profit = profit_pct - ESTIMATED_FEE_PCT;
 
+            info!("Flash loan USDC -> {} -> USDC: borrow={} return={} profit={:.4}% net={:.4}%",
+                token, borrow_amount, usdc_back, profit_pct, net_profit);
+
             if net_profit > self.threshold.to_f64().unwrap_or(0.3) {
-                debug!("Flash loan opportunity: USDC -> {} -> USDC: {:.4}%", token, net_profit);
+                info!("FLASH LOAN ARB FOUND: USDC -> {} -> USDC: {:.4}%", token, net_profit);
                 opportunities.push(Opportunity {
                     id: Uuid::new_v4().to_string(),
                     strategy: StrategyKind::FlashLoan,
                     route: format!("USDC -> {} -> USDC (flash loan)", token),
                     expected_profit_pct: Decimal::from_f64(net_profit).unwrap_or_default(),
-                    trade_size_usdc: Decimal::new(10000, 0), // 10,000 USDC from vault
+                    trade_size_usdc: Decimal::new(10000, 0),
                     instructions: vec![],
                     detected_at: Instant::now(),
                 });
