@@ -18,6 +18,18 @@ use crate::executor::cex_executor::CexDexPosition;
 const CEX_TAKER_FEE_PCT: f64 = 0.1;
 /// CEX withdrawal fee to Solana (~0.01 SOL, varies by exchange).
 const CEX_WITHDRAWAL_FEE_SOL: f64 = 0.01;
+/// Combined CEX-CEX taker fees: buy side (0.1%) + sell side (0.1%).
+const CEX_CEX_FEES_PCT: f64 = 0.2;
+
+/// Map a CEX source id (e.g. "mexc") to a human-readable label for route strings.
+fn cex_display_name(source: &str) -> &str {
+    match source {
+        "mexc" => "MEXC",
+        "gate" => "Gate.io",
+        "kucoin" => "KuCoin",
+        _ => source,
+    }
+}
 
 /// Token symbol -> Solana mint address mapping for Jupiter API calls
 const MINT_MAP: &[(&str, &str)] = &[
@@ -243,6 +255,75 @@ impl Strategy for CexDexStrategy {
                         detected_at: Instant::now(),
                     });
                 }
+            }
+        }
+
+        // -----------------------------------------------------------------
+        // CEX-CEX: compare prices across exchanges for the same token
+        // -----------------------------------------------------------------
+        for token in &tokens {
+            let cex_prices = prices.get_cex_prices(token);
+            if cex_prices.len() < 2 {
+                continue;
+            }
+
+            // Find cheapest and most expensive CEX for this token
+            let &(buy_exchange, buy_price) = cex_prices
+                .iter()
+                .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
+                .unwrap();
+            let &(sell_exchange, sell_price) = cex_prices
+                .iter()
+                .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
+                .unwrap();
+
+            // Same exchange means no arb
+            if buy_exchange == sell_exchange {
+                continue;
+            }
+
+            let spread_pct = ((sell_price - buy_price) / buy_price) * 100.0;
+
+            // Get SOL price for converting withdrawal cost to percentage
+            let sol_price = prices.get_price("SOL").unwrap_or(150.0);
+            let trade_size = 100.0_f64; // USDC
+
+            // CEX-CEX fees: buy taker (0.1%) + sell taker (0.1%) + withdrawal tx cost
+            let withdrawal_cost_pct = execution_cost_pct(sol_price, trade_size, 1);
+            let total_fees_pct = CEX_CEX_FEES_PCT + withdrawal_cost_pct;
+            let net_profit = spread_pct - total_fees_pct;
+
+            if net_profit > self.threshold.to_f64().unwrap_or(1.0) {
+                debug!(
+                    "CEX-CEX opportunity: {} buy {} @ ${:.4} → sell {} @ ${:.4} (spread {:.4}% fees={:.4}% net={:.4}%)",
+                    token,
+                    cex_display_name(buy_exchange),
+                    buy_price,
+                    cex_display_name(sell_exchange),
+                    sell_price,
+                    spread_pct,
+                    total_fees_pct,
+                    net_profit,
+                );
+
+                opportunities.push(Opportunity {
+                    id: Uuid::new_v4().to_string(),
+                    strategy: StrategyKind::CexDex,
+                    route: format!(
+                        "{} buy {} @ ${:.2} → sell {} @ ${:.2} (spread {:.2}%)",
+                        token,
+                        cex_display_name(buy_exchange),
+                        buy_price,
+                        cex_display_name(sell_exchange),
+                        sell_price,
+                        spread_pct,
+                    ),
+                    expected_profit_pct: Decimal::from_f64(net_profit).unwrap_or_default(),
+                    estimated_fees_pct: Decimal::from_f64(total_fees_pct).unwrap_or_default(),
+                    trade_size_usdc: Decimal::new(100, 0),
+                    instructions: vec![], // CEX-CEX: no on-chain instructions
+                    detected_at: Instant::now(),
+                });
             }
         }
 
