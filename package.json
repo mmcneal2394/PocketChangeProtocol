@@ -22,8 +22,11 @@
     "@solana/wallet-adapter-react": "^0.15.39",
     "@solana/wallet-adapter-react-ui": "^0.9.39",
     "@solana/web3.js": "^1.98.4",
+<<<<<<< HEAD
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.37.0",
+=======
+>>>>>>> b98063db64e327d63401fc99bce9fd880aa4d97f
     "bs58": "^6.0.0",
     "ccxt": "^4.5.43",
     "cross-fetch": "^4.1.0",

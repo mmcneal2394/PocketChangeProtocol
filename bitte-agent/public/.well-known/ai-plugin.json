@@ -1,0 +1,17 @@
+{
+  "schema_version": "v1",
+  "name_for_human": "PocketChange Protocol",
+  "name_for_model": "pocketchange_protocol",
+  "description_for_human": "Solana DeFi intelligence agent. Scans for arbitrage windows, high-momentum tokens, alpha signals, and performs smart contract security audits.",
+  "description_for_model": "PocketChange Protocol provides real-time Solana DeFi analytics. Use it to: scan for arb opportunities, find trending tokens, detect alpha signals from on-chain + social data, and audit Solana/TypeScript code for vulnerabilities.",
+  "auth": {
+    "type": "none"
+  },
+  "api": {
+    "type": "openapi",
+    "url": "https://bitte-agent-navy.vercel.app/openapi.json"
+  },
+  "logo_url": "https://bitte-agent-navy.vercel.app/logo.png",
+  "contact_email": "agent@pocketchangeprotocol.xyz",
+  "legal_info_url": "https://bitte-agent-navy.vercel.app/legal"
+}

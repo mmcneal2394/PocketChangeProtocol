@@ -8,7 +8,7 @@ import YAML from "yaml";
 // Load user-defined settings map dynamically
 const configRaw = fs.readFileSync('./src/config.yaml', 'utf8');
 const USER_STRATEGIES = YAML.parse(configRaw).strategies;
-const RPC_ENDPOINT = "https://mainnet.helius-rpc.com/?api-key=df082a16-aebf-4ec4-8ad6-86abfa06c8fc&rebate-address=E883BMMcPDgYbarxZp7Qf3Kz8xBw7ZkdDSJkYT9nqJxP";
+const RPC_ENDPOINT = "https://mainnet.helius-rpc.com/?api-key=YOUR_HELIUS_API_KEY&rebate-address=E883BMMcPDgYbarxZp7Qf3Kz8xBw7ZkdDSJkYT9nqJxP";
 
 const KMS_BACKED_KEYS = [
     "5vewERBqeRo67iKyzbfKqydTiwUFZLn8TUNexoDhuAaCWWzHjnPQJ34kspW3SGFkwaA51evwJW7Fm6uHXgGWKjMH",

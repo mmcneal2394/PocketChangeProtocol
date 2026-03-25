@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
-import { Connection, Keypair } from '@solana/web3.js';
-import bs58 from 'bs58';
-import crypto from 'crypto';
+import { Connection, PublicKey } from '@solana/web3.js';
 
-const MASTER_KEY = process.env.KMS_MASTER_KEY || "00000000000000000000000000000000";
-const RPC_ENDPOINT = "https://beta.helius-rpc.com/?api-key=df082a16-aebf-4ec4-8ad6-86abfa06c8fc";
+// ── Security: NO private keys ever in this file ───────────────────────────────
+// Wallet dashboard shows only the single operator wallet (public key only)
+const RPC_ENDPOINT = process.env.RPC_ENDPOINT || 'https://api.mainnet-beta.solana.com';
+const WALLET_PUBLIC_KEY = process.env.WALLET_PUBLIC_KEY || '';
 
+<<<<<<< HEAD
 // Simplified AES-256-GCM encryption for SaaS 
 function encryptWalletKey(plainTextKey: string, salt: string) {
     const iv = crypto.randomBytes(12);
@@ -67,9 +68,38 @@ export async function GET(req: Request) {
         return NextResponse.json([
              { id: "fallback_1", pubkey: "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R", balance: "0.00 SOL", status: "Error", config: "High Volatility" },
         ]);
+=======
+export async function GET() {
+  try {
+    if (!WALLET_PUBLIC_KEY) {
+      return NextResponse.json([{ id: 'w1', pubkey: 'Not configured', balance: '0.000 SOL', status: 'Inactive', config: 'Set WALLET_PUBLIC_KEY env var' }]);
+>>>>>>> b98063db64e327d63401fc99bce9fd880aa4d97f
     }
+
+    const connection = new Connection(RPC_ENDPOINT, 'confirmed');
+    const pubkey = new PublicKey(WALLET_PUBLIC_KEY);
+    const balLamps = await connection.getBalance(pubkey).catch(() => 0);
+    const sol = (balLamps / 1e9).toFixed(6);
+
+    return NextResponse.json([{
+      id:      'w1',
+      pubkey:  WALLET_PUBLIC_KEY,
+      balance: `${sol} SOL`,
+      status:  parseFloat(sol) > 0.001 ? 'Active' : 'Needs Funding',
+      config:  'Jito Protected',
+    }], {
+      headers: {
+        'Cache-Control': 'no-store',
+        'X-Content-Type-Options': 'nosniff',
+      }
+    });
+  } catch (e) {
+    console.error('Wallet API Error:', e);
+    return NextResponse.json([], { status: 500 });
+  }
 }
 
+<<<<<<< HEAD
 export async function POST(req: Request) {
     try {
         const { publicKey, rawPrivateKey, userId } = await req.json();
@@ -93,4 +123,12 @@ export async function POST(req: Request) {
     } catch (error) {
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
+=======
+// ── POST: Disabled — wallet management is handled locally via .env only ───────
+export async function POST() {
+  return NextResponse.json(
+    { error: 'Wallet registration is handled via server configuration, not the API.' },
+    { status: 405 }
+  );
+>>>>>>> b98063db64e327d63401fc99bce9fd880aa4d97f
 }

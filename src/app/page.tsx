@@ -17,6 +17,7 @@ export default function LandingPage() {
       <div className="glow-orb glow-orb-secondary" style={{ top: "40%", right: "-20%", width: "800px", height: "800px", animationDuration: "25s", animationDirection: "reverse" }} />
       
       {/* Navbar */}
+<<<<<<< HEAD
       <nav className="landing-nav" style={{ padding: "24px 48px", display: "flex", justifyContent: "space-between", alignItems: "center", position: "absolute", top: 0, width: "100%", zIndex: 100, background: "linear-gradient(180deg, rgba(0,0,0,0.8), transparent)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
            <img src="https://cdn.helius-rpc.com/cdn-cgi/image//https://ipfs.io/ipfs/QmQwvUsgwBUa8PmKhTUgG6o1LL8PvUuo7XtkcVBNtQqry4" alt="Logo" style={{ width: "40px", height: "40px", borderRadius: "12px", boxShadow: "0 4px 20px rgba(255, 255, 255, 0.2)" }} />
@@ -30,14 +31,37 @@ export default function LandingPage() {
         <div>
            <Link href="/dashboard" style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.2), rgba(255,255,255,0.05))", border: "1px solid rgba(255,255,255,0.2)", padding: "12px 24px", borderRadius: "10px", color: "#fff", textDecoration: "none", fontWeight: 700, display: "flex", alignItems: "center", gap: "8px", boxShadow: "0 4px 15px rgba(255, 255, 255, 0.1)" }}>
                Launch App <ArrowForward fontSize="small" />
+=======
+      <nav style={{ padding: "24px 48px", display: "flex", justifyContent: "space-between", alignItems: "center", position: "absolute", top: 0, width: "100%", zIndex: 100, background: "linear-gradient(180deg, rgba(0,0,0,0.8), transparent)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+           <img src="https://cdn.helius-rpc.com/cdn-cgi/image//https://ipfs.io/ipfs/QmQwvUsgwBUa8PmKhTUgG6o1LL8PvUuo7XtkcVBNtQqry4" alt="Logo" style={{ width: "40px", height: "40px", borderRadius: "12px", boxShadow: "0 4px 20px rgba(255, 255, 255, 0.2)" }} />
+           <span style={{ fontSize: "1.4rem", fontWeight: 800, letterSpacing: "-0.5px" }} className="gradient-text">PocketChange Protocol</span>
+        </div>
+        <div style={{ display: "flex", gap: "24px", fontSize: "0.9rem", fontWeight: 600 }}>
+           <a href="#features" style={{ color: "var(--text-secondary)", textDecoration: "none" }}>Platform</a>
+           <a href="#security" style={{ color: "var(--text-secondary)", textDecoration: "none" }}>Security</a>
+           <Link href="/vault" style={{ color: "var(--text-secondary)", textDecoration: "none" }}>Vault Portal</Link>
+           <Link href="/admin" style={{ color: "#9b59b6", textDecoration: "none", fontWeight: 700 }}>⚙ Admin</Link>
+        </div>
+        <div>
+           <Link href="/vault" style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.2), rgba(255,255,255,0.05))", border: "1px solid rgba(255,255,255,0.2)", padding: "12px 24px", borderRadius: "10px", color: "#fff", textDecoration: "none", fontWeight: 700, display: "flex", alignItems: "center", gap: "8px", boxShadow: "0 4px 15px rgba(255, 255, 255, 0.1)" }}>
+               Enter Vault <ArrowForward fontSize="small" />
+>>>>>>> b98063db64e327d63401fc99bce9fd880aa4d97f
            </Link>
         </div>
       </nav>
 
+<<<<<<< HEAD
       <main className="landing-main" style={{ maxWidth: "1200px", margin: "0 auto", padding: "160px 24px 80px 24px", zIndex: 10, position: "relative" }}>
         
         {/* Hero Section */}
         <section className="landing-hero landing-section" style={{ textAlign: "center", marginBottom: "120px", display: "flex", flexDirection: "column", alignItems: "center" }}>
+=======
+      <main style={{ maxWidth: "1200px", margin: "0 auto", padding: "160px 24px 80px 24px", zIndex: 10, position: "relative" }}>
+        
+        {/* Hero Section */}
+        <section style={{ textAlign: "center", marginBottom: "120px", display: "flex", flexDirection: "column", alignItems: "center" }}>
+>>>>>>> b98063db64e327d63401fc99bce9fd880aa4d97f
            <div style={{ padding: "8px 16px", background: "rgba(0, 255, 170, 0.1)", color: "var(--success)", border: "1px solid var(--success)", borderRadius: "20px", fontSize: "0.85rem", fontWeight: 700, letterSpacing: "1px", marginBottom: "24px", animation: "fadeIn 1s ease" }}>
                ⚡ JITO MEV PROTECTION ACTIVE
            </div>
@@ -49,6 +73,7 @@ export default function LandingPage() {
                Deposit crypto capital and watch the Pocket Money Protocol deploy atomic flash loans targeting DEX inefficiencies simultaneously. Zero capital risk. Absolute delta-neutral mapping.
            </p>
 
+<<<<<<< HEAD
            <div className="landing-cta-row" style={{ display: "flex", gap: "24px", animation: "slideUp 1.4s cubic-bezier(0.16, 1, 0.3, 1)" }}>
                <Link href="/dashboard" className="neon-btn" style={{ background: "var(--primary)", color: "#000", padding: "20px 48px", borderRadius: "16px", textDecoration: "none", fontSize: "1.2rem", fontWeight: 800, border: "none" }}>
                    Start Earning Today
@@ -60,6 +85,19 @@ export default function LandingPage() {
 
            {/* Hero HUD Elements */}
            <div className="glassmorphism fade-in landing-stats" style={{ marginTop: "80px", width: "100%", padding: "24px", borderRadius: "24px", border: "1px solid rgba(255,255,255,0.1)", display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "24px", background: "linear-gradient(135deg, rgba(255,255,255,0.05), rgba(0,0,0,0.5))" }}>
+=======
+           <div style={{ display: "flex", gap: "24px", flexWrap: "wrap", justifyContent: "center", animation: "slideUp 1.4s cubic-bezier(0.16, 1, 0.3, 1)" }}>
+               <a href="https://bags.fm/t/PCP" target="_blank" rel="noopener noreferrer" className="neon-btn" style={{ background: "linear-gradient(135deg, #9b59b6, #6c3483)", color: "#fff", padding: "20px 48px", borderRadius: "16px", textDecoration: "none", fontSize: "1.2rem", fontWeight: 800, border: "1px solid rgba(138,43,226,0.5)", boxShadow: "0 8px 32px rgba(138,43,226,0.4)" }}>
+                   🛍 Buy $PCP on Bags.fm
+               </a>
+               <Link href="/wallets" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.2)", padding: "20px 48px", borderRadius: "16px", color: "#fff", textDecoration: "none", fontSize: "1.2rem", fontWeight: 700 }}>
+                   Enter Vault →
+               </Link>
+           </div>
+
+           {/* Hero HUD Elements */}
+           <div className="glassmorphism fade-in" style={{ marginTop: "80px", width: "100%", padding: "24px", borderRadius: "24px", border: "1px solid rgba(255,255,255,0.1)", display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "24px", background: "linear-gradient(135deg, rgba(255,255,255,0.05), rgba(0,0,0,0.5))" }}>
+>>>>>>> b98063db64e327d63401fc99bce9fd880aa4d97f
                <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
                    <p style={{ color: "var(--text-secondary)", fontWeight: 600, textTransform: "uppercase", fontSize: "0.85rem", letterSpacing: "1px" }}>Global TVL</p>
                    <p style={{ fontSize: "2.5rem", fontWeight: 800 }}>$1.42M</p>
@@ -76,8 +114,13 @@ export default function LandingPage() {
         </section>
 
         {/* Features Split */}
+<<<<<<< HEAD
         <section id="features" className="landing-section" style={{ marginBottom: "120px" }}>
             <div className="flex-split" style={{ display: "flex", gap: "64px", alignItems: "center", marginBottom: "64px" }}>
+=======
+        <section id="features" style={{ marginBottom: "120px" }}>
+            <div style={{ display: "flex", gap: "64px", alignItems: "center", marginBottom: "64px" }}>
+>>>>>>> b98063db64e327d63401fc99bce9fd880aa4d97f
                 <div style={{ flex: 1, paddingRight: "32px" }}>
                     <h2 style={{ fontSize: "2.8rem", fontWeight: 800, letterSpacing: "-1px", marginBottom: "24px", lineHeight: 1.1 }}>
                         Unrivaled Atomic Execution
@@ -111,7 +154,11 @@ export default function LandingPage() {
         {/* Feature Grid */}
         <section style={{ marginBottom: "120px" }}>
              <h2 style={{ textAlign: "center", fontSize: "2.5rem", fontWeight: 800, marginBottom: "64px" }}>Engineered for Total Sovereignty</h2>
+<<<<<<< HEAD
              <div className="grid-3-col" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "32px" }}>
+=======
+             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "32px" }}>
+>>>>>>> b98063db64e327d63401fc99bce9fd880aa4d97f
                  <FeatureCard icon={<Security style={{ color: "var(--success)", fontSize: "2.5rem" }}/>} title="KMS Payload Matrix" desc="Enterprise-grade Master Key decryption handled locally. Hackers accessing the remote node still fail to sign." />
                  <FeatureCard icon={<LocalAtm style={{ color: "var(--secondary)", fontSize: "2.5rem" }}/>} title="Yield Splitting (80/20)" desc="Depositors keep 80% of generated gross yield. The protocol treasury claims a standard 20% maintenance cut." />
                  <FeatureCard icon={<DeveloperMode style={{ color: "var(--primary)", fontSize: "2.5rem" }}/>} title="API Access Webhooks" desc="Deploy enterprise signals. React programmatically every time the system lands a multi-tier flash liquidation." />
@@ -122,6 +169,7 @@ export default function LandingPage() {
         </section>
 
         {/* CTA */}
+<<<<<<< HEAD
         <section className="landing-cta-section" style={{ textAlign: "center", padding: "80px", borderRadius: "32px", background: "linear-gradient(135deg, rgba(138,43,226,0.3), rgba(0,0,0,0.5))", border: "1px solid rgba(255,255,255,0.15)", position: "relative", overflow: "hidden" }}>
              <div className="glow-orb glow-orb-primary" style={{ top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: "400px", height: "400px" }} />
              <h2 style={{ fontSize: "3rem", fontWeight: 900, marginBottom: "24px", position: "relative", zIndex: 10 }}>Ready to capture the spreads?</h2>
@@ -129,12 +177,25 @@ export default function LandingPage() {
              <Link href="/dashboard" className="neon-btn" style={{ position: "relative", zIndex: 10, background: "var(--primary)", color: "#000", padding: "20px 48px", borderRadius: "16px", textDecoration: "none", fontSize: "1.2rem", fontWeight: 800, border: "none" }}>
                    Access the Protocol Vault
              </Link>
+=======
+        <section style={{ textAlign: "center", padding: "80px", borderRadius: "32px", background: "linear-gradient(135deg, rgba(138,43,226,0.3), rgba(0,0,0,0.5))", border: "1px solid rgba(255,255,255,0.15)", position: "relative", overflow: "hidden" }}>
+             <div className="glow-orb glow-orb-primary" style={{ top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: "400px", height: "400px" }} />
+             <h2 style={{ fontSize: "3rem", fontWeight: 900, marginBottom: "24px", position: "relative", zIndex: 10 }}>Ready to capture the spreads?</h2>
+             <p style={{ fontSize: "1.2rem", color: "var(--text-secondary)", marginBottom: "40px", maxWidth: "600px", margin: "0 auto 40px auto", position: "relative", zIndex: 10 }}>Zero maintenance required. Deposit liquidity, wait, and burn your mapping tokens for pure profit withdrawals.</p>
+             <a href="https://bags.fm/t/PCP" target="_blank" rel="noopener noreferrer" className="neon-btn" style={{ position: "relative", zIndex: 10, background: "linear-gradient(135deg, #9b59b6, #6c3483)", color: "#fff", padding: "20px 48px", borderRadius: "16px", textDecoration: "none", fontSize: "1.2rem", fontWeight: 800, border: "1px solid rgba(138,43,226,0.5)", boxShadow: "0 8px 32px rgba(138,43,226,0.4)" }}>
+                   🛍 Buy $PCP on Bags.fm
+             </a>
+>>>>>>> b98063db64e327d63401fc99bce9fd880aa4d97f
         </section>
       </main>
       
       {/* Footer */}
       <footer style={{ padding: "48px 24px", textAlign: "center", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+<<<<<<< HEAD
           <p style={{ color: "var(--text-secondary)", fontWeight: 600 }}>&copy; 2026 ArbitraSaaS. Built by Antigravity for the Global Economy.</p>
+=======
+          <p style={{ color: "var(--text-secondary)", fontWeight: 600 }}>&copy; 2026 PocketChange Protocol. Powered by Solana &amp; Jito MEV.</p>
+>>>>>>> b98063db64e327d63401fc99bce9fd880aa4d97f
       </footer>
     </div>
   );

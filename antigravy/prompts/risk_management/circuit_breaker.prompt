@@ -1,0 +1,60 @@
+name: circuit_breaker
+version: "1.0"
+description: |
+  Multi-level circuit breaker system for the PCP arbitrage swarm.
+  The Risk Manager Agent enforces these rules autonomously.
+  Manual override requires human operator action.
+
+levels:
+  L1_asset:
+    name: "Asset-Level Breaker"
+    trigger: "price_move_pct_1min > 5"
+    action: "pause_asset_trading"
+    duration_minutes: 5
+    auto_reset: true
+    log_event: true
+
+  L1_consecutive_fail:
+    name: "Token Failure Breaker"
+    trigger: "consecutive_failures_same_token >= 3"
+    action: "blacklist_token"
+    duration_minutes: 30
+    auto_reset: true
+
+  L2_rpc:
+    name: "RPC Health Breaker"
+    trigger: "rpc_error_rate_60s > 0.10"
+    action: "switch_to_fallback_rpc"
+    duration_minutes: 10
+    auto_reset: true
+    fallback: "${PUBLIC_RPC_ENDPOINT}"
+
+  L2_jupiter:
+    name: "Jupiter API Breaker"
+    trigger: "jupiter_429_rate_60s > 0.10"
+    action: "switch_to_dexscreener_fallback"
+    duration_minutes: 10
+    auto_reset: true
+
+  L3_portfolio:
+    name: "Portfolio Hard Stop"
+    trigger:
+      - condition: "total_loss_24h_pct > 5"
+        description: "5% portfolio loss in 24 hours"
+      - condition: "wallet_balance_sol < 0.1"
+        description: "Gas reserve floor breached"
+      - condition: "consecutive_failures_any >= 5"
+        description: "5+ consecutive failures across any tokens"
+    action: "HALT_ALL_TRADING"
+    auto_reset: false
+    requires_manual_resume: true
+    alert_channels:
+      - type: "console"
+        message: "⛔ LEVEL 3 CIRCUIT BREAKER — TRADING HALTED"
+      - type: "file"
+        path: ".tmp/emergency_halt.json"
+
+override:
+  requires_human: true
+  method: "edit risk_policy.yaml and set circuit_breakers.manual_override=true"
+  note: "Never add auto-override logic — that defeats the purpose"

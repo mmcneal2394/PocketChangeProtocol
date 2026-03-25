@@ -1,0 +1,50 @@
+# Antigravy Swarm — Risk Policy
+# This file is the source of truth for all risk parameters.
+# The Risk Manager Agent reads this at startup and every 60 seconds.
+# NEVER modify while trading is active. Stop swarm first.
+
+version: "1.0"
+last_updated: "2026-03-23"
+
+circuit_breakers:
+  manual_override: false   # Set to true to resume after L3 halt (requires human)
+  L1_price_move_pct: 5      # % price move in 60s to trigger L1
+  L1_pause_minutes: 5
+  L2_error_rate_pct: 10     # % error rate in 60s to trigger L2
+  L2_fallback_minutes: 10
+  L3_loss_pct_24h: 5        # % of starting balance loss in 24h to trigger L3
+  L3_gas_floor_sol: 0.1     # Minimum wallet balance before L3 triggers
+  L3_consecutive_failures: 5
+
+position_limits:
+  current_phase: "phase_1"
+  max_trade_sol: 0.2        # Absolute max per trade (phase 1)
+  max_pct_of_aum: 10        # Max % of total wallet per trade
+  max_asset_exposure_pct: 20 # Max % of wallet in any single token
+  max_concurrent: 3         # Max simultaneous open positions (phase 1)
+  max_leverage: 1.0         # No borrowed funds
+  gas_reserve_sol: 0.05     # Always keep this — never allocate
+
+execution:
+  slippage_bps: 50          # Max slippage per swap leg
+  jito_tip_pct_of_gross: 50 # % of gross profit to pay as Jito tip
+  min_jito_tip_lamports: 1000
+  max_retries: 2
+  retry_delay_ms: 500
+  simulation_required: true  # NEVER set to false
+
+thresholds:
+  min_profit_bps: 3          # Minimum net profit to consider execution
+  min_confidence: 60         # Analyst minimum confidence score
+  max_risk_score: 80         # Analyst maximum risk score
+
+monitoring:
+  ping_interval_s: 30        # How often to ping agent health
+  report_time_utc: "00:00"   # Daily risk report time
+  metrics_window_days: 30    # Rolling window for Sharpe/VaR calculations
+
+adaptation:
+  rebalance_interval_h: 6    # Capital rebalance frequency
+  underperform_win_rate: 0.40 # Below this → reduce token allocation
+  graduate_phase_after_days: 30  # Days of profitable operation before phase upgrade
+  graduate_min_sharpe: 1.5
