@@ -101,12 +101,11 @@ impl JupiterPoller {
             mint, USDC_MINT, QUOTE_AMOUNT
         );
 
-        let resp = self
-            .client
-            .get(&url)
-            .timeout(Duration::from_secs(5))
-            .send()
-            .await?;
+        let mut req = self.client.get(&url).timeout(Duration::from_secs(5));
+        if let Ok(key) = std::env::var("JUPITER_API_KEY") {
+            req = req.header("x-api-key", key);
+        }
+        let resp = req.send().await?;
 
         if resp.status() == 429 {
             return Err(anyhow::anyhow!("Rate limited"));
