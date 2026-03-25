@@ -97,6 +97,16 @@ model ActivePosition {
   closedAt        DateTime?
 }
 
+model TelegramChat {
+  id        String   @id @default(uuid())
+  chatId    BigInt   @unique
+  chatType  String   // private, group, supergroup, channel
+  title     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model Opportunity {
   id              String    @id @default(uuid())
   strategy        String

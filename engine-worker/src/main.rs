@@ -104,6 +104,10 @@ async fn main() -> anyhow::Result<()> {
     // 8. Build approval router
     let telegram = approval::telegram::TelegramBot::from_env();
     let has_telegram = telegram.is_some();
+    // Load persisted subscribers from DB on startup
+    if let Some(ref tg) = telegram {
+        tg.load_subscribers().await;
+    }
     let (exec_tx, mut exec_rx) = mpsc::channel::<Opportunity>(64);
 
     // We need to share telegram with multiple tasks — wrap in Arc
