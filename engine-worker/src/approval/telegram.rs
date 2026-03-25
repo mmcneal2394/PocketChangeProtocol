@@ -35,7 +35,18 @@ impl TelegramBot {
         if token.is_empty() {
             return None;
         }
-        Some(Self::new(token))
+        let bot = Self::new(token);
+        // Seed from TELEGRAM_CHAT_ID env var so subscribers survive redeploys
+        if let Ok(chat_id) = std::env::var("TELEGRAM_CHAT_ID") {
+            if let Ok(id) = chat_id.parse::<i64>() {
+                let subs = bot.subscribers.clone();
+                tokio::spawn(async move {
+                    subs.lock().await.insert(id);
+                    info!("Seeded subscriber from TELEGRAM_CHAT_ID: {}", id);
+                });
+            }
+        }
+        Some(bot)
     }
 
     /// Load subscribers from the API on startup
