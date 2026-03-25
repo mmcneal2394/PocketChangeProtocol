@@ -101,10 +101,11 @@ async fn main() -> anyhow::Result<()> {
         rpc.clone(),
     ));
 
-    // 8. Build approval router
-    let telegram = approval::telegram::TelegramBot::from_env();
-    let has_telegram = telegram.is_some();
-    // Load persisted subscribers from DB on startup (retry up to 3 times)
+    // 8. Build approval router — single shared TelegramBot via Arc
+    let telegram: Option<Arc<approval::telegram::TelegramBot>> =
+        approval::telegram::TelegramBot::from_env().map(Arc::new);
+
+    // Load persisted subscribers from DB on startup
     if let Some(ref tg) = telegram {
         for attempt in 1..=3 {
             tg.load_subscribers().await;
@@ -119,14 +120,12 @@ async fn main() -> anyhow::Result<()> {
             }
         }
     }
+    let has_telegram = telegram.is_some();
     let (exec_tx, mut exec_rx) = mpsc::channel::<Opportunity>(64);
 
-    // We need to share telegram with multiple tasks — wrap in Arc
-    // ApprovalRouter takes Option<TelegramBot> by value, so build it first
-    // then we'll create a second TelegramBot instance for polling if needed
     let router = Arc::new(approval::ApprovalRouter::new(
         config.clone(),
-        telegram,
+        telegram.clone(),
         exec_tx,
     ));
 
@@ -220,42 +219,41 @@ async fn main() -> anyhow::Result<()> {
         });
     }
 
-    // Telegram poller (create a second instance from env since TelegramBot is not Clone)
-    if has_telegram {
-        if let Some(bot) = approval::telegram::TelegramBot::from_env() {
-            let cb = circuit_breaker.clone();
-            let cfg = config.clone();
-            let start = std::time::Instant::now();
-            tasks.spawn(async move {
-                let mut last_update_id: i64 = 0;
-                loop {
-                    let commands = bot.poll_updates(&mut last_update_id).await;
-                    for (_chat_id, cmd) in commands {
-                        match cmd {
-                            approval::telegram::TelegramCommand::Start |
-                            approval::telegram::TelegramCommand::Stop => {
-                                // Handled in poll_updates
-                            }
-                            approval::telegram::TelegramCommand::Status => {
-                                let cb_state = cb.read().await;
-                                let uptime = start.elapsed().as_secs();
-                                let hours = uptime / 3600;
-                                let mins = (uptime % 3600) / 60;
-                                let mode = format!("{:?}", cfg.mode);
-                                let msg = format!(
-                                    "<b>Engine Status</b>\n\nMode: {}\nUptime: {}h {}m\nCircuit Breaker: {}",
-                                    mode, hours, mins,
-                                    if cb_state.is_tripped() { "🔴 TRIPPED" } else { "🟢 OK" }
-                                );
-                                drop(cb_state);
-                                let _ = bot.send_alert(&msg).await;
-                            }
+    // Telegram poller — uses same shared Arc<TelegramBot> instance
+    if let Some(ref bot) = telegram {
+        let bot = bot.clone();
+        let cb = circuit_breaker.clone();
+        let cfg = config.clone();
+        let start = std::time::Instant::now();
+        tasks.spawn(async move {
+            let mut last_update_id: i64 = 0;
+            loop {
+                let commands = bot.poll_updates(&mut last_update_id).await;
+                for (_chat_id, cmd) in commands {
+                    match cmd {
+                        approval::telegram::TelegramCommand::Start |
+                        approval::telegram::TelegramCommand::Stop => {
+                            // Handled in poll_updates
+                        }
+                        approval::telegram::TelegramCommand::Status => {
+                            let cb_state = cb.read().await;
+                            let uptime = start.elapsed().as_secs();
+                            let hours = uptime / 3600;
+                            let mins = (uptime % 3600) / 60;
+                            let mode = format!("{:?}", cfg.mode);
+                            let msg = format!(
+                                "<b>Engine Status</b>\n\nMode: {}\nUptime: {}h {}m\nCircuit Breaker: {}",
+                                mode, hours, mins,
+                                if cb_state.is_tripped() { "🔴 TRIPPED" } else { "🟢 OK" }
+                            );
+                            drop(cb_state);
+                            let _ = bot.send_alert(&msg).await;
                         }
                     }
-                    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
                 }
-            });
-        }
+                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+            }
+        });
     }
 
     // HTTP API server
