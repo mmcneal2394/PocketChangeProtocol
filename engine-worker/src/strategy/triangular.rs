@@ -6,59 +6,18 @@ use solana_sdk::instruction::{AccountMeta, Instruction};
 use solana_sdk::pubkey::Pubkey;
 use solana_sdk::signature::{Keypair, Signer};
 use uuid::Uuid;
+use std::sync::Arc;
 use std::time::Instant;
 use tracing::{info, debug, warn};
 use crate::types::*;
 use crate::price::PriceCache;
 use crate::strategy::{Strategy, execution_cost_pct, extract_price_impact_pct};
-
-/// Token pairs to scan for cross-DEX spread arbitrage.
-/// Each pair is checked across all DEXes — buy on the cheapest, sell on the most expensive.
-const ROUTES: &[(&str, &str)] = &[
-    ("SOL", "USDC"),
-    ("RAY", "USDC"),
-    ("BONK", "USDC"),
-    ("WIF", "USDC"),
-    ("mSOL", "USDC"),
-    ("JitoSOL", "USDC"),
-    ("mSOL", "SOL"),
-    ("JitoSOL", "SOL"),
-];
+use crate::tokens::TokenRegistry;
 
 /// DEX backends to query via Jupiter's `dexes` filter parameter.
 const DEXES: &[&str] = &["Raydium", "Whirlpool", "Meteora"];
 
 const JUPITER_API: &str = "https://public.jupiterapi.com";
-
-/// Mint address lookup for supported tokens
-const MINT_MAP: &[(&str, &str)] = &[
-    ("SOL", "So11111111111111111111111111111111111111112"),
-    ("USDC", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"),
-    ("RAY", "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R"),
-    ("BONK", "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263"),
-    ("JitoSOL", "J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn"),
-    ("mSOL", "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So"),
-    ("WIF", "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm"),
-];
-
-/// Token decimals for amount scaling
-const DECIMALS_MAP: &[(&str, u32)] = &[
-    ("SOL", 9),
-    ("USDC", 6),
-    ("RAY", 6),
-    ("BONK", 5),
-    ("JitoSOL", 9),
-    ("mSOL", 9),
-    ("WIF", 6),
-];
-
-fn resolve_mint(symbol: &str) -> Option<&'static str> {
-    MINT_MAP.iter().find(|(s, _)| *s == symbol).map(|(_, m)| *m)
-}
-
-fn resolve_decimals(symbol: &str) -> u32 {
-    DECIMALS_MAP.iter().find(|(s, _)| *s == symbol).map(|(_, d)| *d).unwrap_or(6)
-}
 
 /// Parse a route string like "USDC -> SOL -> USDC" into a list of (from, to) hops.
 fn parse_route(route: &str) -> Vec<(String, String)> {
@@ -82,14 +41,47 @@ struct DexQuote {
 pub struct TriangularStrategy {
     threshold: Decimal,
     client: reqwest::Client,
+    registry: Arc<TokenRegistry>,
 }
 
 impl TriangularStrategy {
-    pub fn new(threshold: f64) -> Self {
+    pub fn new(threshold: f64, registry: Arc<TokenRegistry>) -> Self {
         Self {
             threshold: Decimal::from_f64(threshold).unwrap_or(Decimal::new(3, 1)), // 0.3 default
             client: reqwest::Client::new(),
+            registry,
         }
+    }
+
+    fn resolve_mint(&self, symbol: &str) -> Option<String> {
+        self.registry.resolve_mint(symbol).map(|s| s.to_string())
+    }
+
+    fn resolve_decimals(&self, symbol: &str) -> u32 {
+        self.registry.resolve_decimals(symbol)
+    }
+
+    /// Generate cross-DEX routes from the token registry.
+    /// Pairs every triangular-enabled token with USDC, plus SOL-derivative pairs.
+    fn generate_routes(&self) -> Vec<(String, String)> {
+        let tokens = self.registry.for_strategy("triangular");
+        let mut routes = Vec::new();
+        for t in &tokens {
+            if t.symbol != "USDC" && t.symbol != "SOL" {
+                routes.push((t.symbol.clone(), "USDC".to_string()));
+            }
+        }
+        // Always include SOL/USDC
+        if self.registry.resolve_mint("SOL").is_some() {
+            routes.push(("SOL".to_string(), "USDC".to_string()));
+        }
+        // Add SOL-derivative pairs (mSOL/SOL, JitoSOL/SOL, etc.)
+        for t in &tokens {
+            if t.symbol.ends_with("SOL") && t.symbol != "SOL" {
+                routes.push((t.symbol.clone(), "SOL".to_string()));
+            }
+        }
+        routes
     }
 
     /// Fetch a Jupiter V6 quote for a single swap leg, optionally restricted to a single DEX.
@@ -275,7 +267,7 @@ impl TriangularStrategy {
         let mut all_instructions: Vec<Instruction> = Vec::new();
 
         let first_symbol = &hops[0].0;
-        let first_decimals = resolve_decimals(first_symbol);
+        let first_decimals = self.resolve_decimals(first_symbol);
         let initial_amount = opp.trade_size_usdc.to_u64().unwrap_or(5000) * 10u64.pow(first_decimals);
         let mut carry_amount = initial_amount;
 
@@ -298,9 +290,9 @@ impl TriangularStrategy {
             let clean_from = from_sym.split('[').next().unwrap_or(from_sym).trim();
             let clean_to = to_sym.split('[').next().unwrap_or(to_sym).trim();
 
-            let input_mint = resolve_mint(clean_from)
+            let input_mint = self.resolve_mint(clean_from)
                 .ok_or_else(|| anyhow::anyhow!("Unknown token symbol: {}", clean_from))?;
-            let output_mint = resolve_mint(clean_to)
+            let output_mint = self.resolve_mint(clean_to)
                 .ok_or_else(|| anyhow::anyhow!("Unknown token symbol: {}", clean_to))?;
 
             let dex_filter = leg_dexes.get(i).and_then(|d| d.as_deref());
@@ -311,7 +303,7 @@ impl TriangularStrategy {
             );
 
             // Get quote restricted to the specific DEX for this leg
-            let quote = self.fetch_quote(input_mint, output_mint, carry_amount, dex_filter).await
+            let quote = self.fetch_quote(&input_mint, &output_mint, carry_amount, dex_filter).await
                 .map_err(|e| anyhow::anyhow!("Quote failed for leg {} ({} -> {}): {}", i + 1, clean_from, clean_to, e))?;
 
             let out_amount_str = quote["outAmount"].as_str()
@@ -347,22 +339,23 @@ impl Strategy for TriangularStrategy {
 
     async fn evaluate(&self, prices: &PriceCache) -> Vec<Opportunity> {
         let mut opportunities = Vec::new();
+        let routes = self.generate_routes();
 
-        for (token_a, token_b) in ROUTES {
+        for (token_a, token_b) in &routes {
             // Skip pairs where we don't have a cached price for either token
             if prices.get_price(token_a).is_none() && prices.get_price(token_b).is_none() {
                 continue;
             }
 
-            let mint_a = match resolve_mint(token_a) { Some(m) => m, None => continue };
-            let mint_b = match resolve_mint(token_b) { Some(m) => m, None => continue };
+            let mint_a = match self.resolve_mint(token_a) { Some(m) => m, None => continue };
+            let mint_b = match self.resolve_mint(token_b) { Some(m) => m, None => continue };
 
-            let decimals_a = resolve_decimals(token_a);
+            let decimals_a = self.resolve_decimals(token_a);
             let start_amount: u64 = 10u64.pow(decimals_a); // 1 unit of token A
 
             // --- Buy leg: A -> B on each DEX ---
             let buy_quotes = self.fetch_quotes_all_dexes(
-                mint_a, mint_b, start_amount, token_a, token_b,
+                &mint_a, &mint_b, start_amount, token_a, token_b,
             ).await;
 
             if buy_quotes.len() < 2 {
@@ -379,7 +372,7 @@ impl Strategy for TriangularStrategy {
             };
 
             let sell_quotes = self.fetch_quotes_all_dexes(
-                mint_b, mint_a, median_buy_output, token_b, token_a,
+                &mint_b, &mint_a, median_buy_output, token_b, token_a,
             ).await;
 
             if sell_quotes.len() < 2 {
@@ -393,7 +386,7 @@ impl Strategy for TriangularStrategy {
 
             // Now get sell quotes using the best buy's actual output amount
             let sell_quotes_precise = self.fetch_quotes_all_dexes(
-                mint_b, mint_a, best_buy.out_amount, token_b, token_a,
+                &mint_b, &mint_a, best_buy.out_amount, token_b, token_a,
             ).await;
 
             // Best sell = DEX that gives the MOST A back for our B (highest out_amount on sell)
@@ -480,6 +473,10 @@ impl Strategy for TriangularStrategy {
 mod tests {
     use super::*;
 
+    fn test_registry() -> Arc<TokenRegistry> {
+        Arc::new(TokenRegistry::new_with_defaults())
+    }
+
     #[tokio::test]
     async fn test_no_arb_when_prices_balanced() {
         let mut cache = PriceCache::new();
@@ -487,7 +484,7 @@ mod tests {
         cache.update(&PriceSnapshot { mint: "RAY".into(), price_usdc: 2.0, source: "jupiter".into(), timestamp: Instant::now() });
         cache.update(&PriceSnapshot { mint: "USDC".into(), price_usdc: 1.0, source: "jupiter".into(), timestamp: Instant::now() });
 
-        let strategy = TriangularStrategy::new(0.3);
+        let strategy = TriangularStrategy::new(0.3, test_registry());
         let opps = strategy.evaluate(&cache).await;
         // Balanced prices should produce no opportunities (cross-DEX spreads are tiny)
         assert!(opps.is_empty());
@@ -538,26 +535,30 @@ mod tests {
 
     #[test]
     fn test_resolve_mint() {
-        assert_eq!(resolve_mint("SOL"), Some("So11111111111111111111111111111111111111112"));
-        assert_eq!(resolve_mint("USDC"), Some("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"));
-        assert_eq!(resolve_mint("BONK"), Some("DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263"));
-        assert_eq!(resolve_mint("UNKNOWN"), None);
+        let registry = test_registry();
+        assert_eq!(registry.resolve_mint("SOL"), Some("So11111111111111111111111111111111111111112"));
+        assert_eq!(registry.resolve_mint("USDC"), Some("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"));
+        assert_eq!(registry.resolve_mint("BONK"), Some("DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263"));
+        assert_eq!(registry.resolve_mint("UNKNOWN"), None);
     }
 
     #[test]
     fn test_resolve_decimals() {
-        assert_eq!(resolve_decimals("SOL"), 9);
-        assert_eq!(resolve_decimals("USDC"), 6);
-        assert_eq!(resolve_decimals("BONK"), 5);
+        let registry = test_registry();
+        assert_eq!(registry.resolve_decimals("SOL"), 9);
+        assert_eq!(registry.resolve_decimals("USDC"), 6);
+        assert_eq!(registry.resolve_decimals("BONK"), 5);
         // Unknown defaults to 6
-        assert_eq!(resolve_decimals("UNKNOWN"), 6);
+        assert_eq!(registry.resolve_decimals("UNKNOWN"), 6);
     }
 
     #[test]
     fn test_all_routes_have_known_mints() {
-        for (a, b) in ROUTES {
-            assert!(resolve_mint(a).is_some(), "Unknown mint for route token: {}", a);
-            assert!(resolve_mint(b).is_some(), "Unknown mint for route token: {}", b);
+        let strategy = TriangularStrategy::new(0.3, test_registry());
+        let routes = strategy.generate_routes();
+        for (a, b) in &routes {
+            assert!(strategy.resolve_mint(a).is_some(), "Unknown mint for route token: {}", a);
+            assert!(strategy.resolve_mint(b).is_some(), "Unknown mint for route token: {}", b);
         }
     }
 
@@ -571,8 +572,9 @@ mod tests {
 
     #[test]
     fn test_routes_are_pairs() {
-        // Ensure all routes are token pairs (not triples)
-        for (a, b) in ROUTES {
+        let strategy = TriangularStrategy::new(0.3, test_registry());
+        let routes = strategy.generate_routes();
+        for (a, b) in &routes {
             assert!(!a.is_empty());
             assert!(!b.is_empty());
             assert_ne!(a, b, "Route pair must have different tokens");

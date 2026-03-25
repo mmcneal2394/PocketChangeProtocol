@@ -5,6 +5,7 @@ use solana_sdk::instruction::{Instruction, AccountMeta};
 use solana_sdk::pubkey::Pubkey;
 use solana_sdk::signature::{Keypair, Signer};
 use uuid::Uuid;
+use std::sync::Arc;
 use std::str::FromStr;
 use std::time::Instant;
 use tracing::{info, debug, warn};
@@ -12,22 +13,13 @@ use crate::types::*;
 use crate::price::PriceCache;
 use crate::strategy::{Strategy, extract_price_impact_pct, estimate_execution_cost_usdc};
 use crate::engine::get_discriminator;
+use crate::tokens::TokenRegistry;
 
 /// Extra CPI overhead for vault borrow instruction (0.00002 SOL).
 const FLASH_LOAN_CPI_OVERHEAD_SOL: f64 = 0.00002;
 
 /// USDC mint on Solana mainnet (6 decimals)
 const USDC_MINT: &str = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
-
-/// Known token mints for route resolution
-const TOKEN_MINTS: &[(&str, &str)] = &[
-    ("SOL", "So11111111111111111111111111111111111111112"),
-    ("RAY", "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R"),
-    ("BONK", "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263"),
-    ("WIF", "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm"),
-    ("mSOL", "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So"),
-    ("JitoSOL", "J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn"),
-];
 
 /// Jupiter API slippage tolerance in basis points
 const SLIPPAGE_BPS: u32 = 50;
@@ -47,10 +39,12 @@ pub struct FlashLoanStrategy {
     treasury_usdc: Pubkey,
     /// HTTP client for Jupiter API calls
     http_client: reqwest::Client,
+    /// Token registry for dynamic token resolution
+    registry: Arc<TokenRegistry>,
 }
 
 impl FlashLoanStrategy {
-    pub fn new(threshold: f64, vault_available: bool) -> Self {
+    pub fn new(threshold: f64, vault_available: bool, registry: Arc<TokenRegistry>) -> Self {
         // Default PDAs — in production these are derived or loaded from config.
         // Using the on-chain program ID from CLAUDE.md.
         let program_id = Pubkey::from_str("34sgN4q5CaaGCwqePU6d2y6xzBuY5ASA8E8LtXjfyN3c")
@@ -73,15 +67,16 @@ impl FlashLoanStrategy {
             vault_usdc,
             treasury_usdc,
             http_client: reqwest::Client::new(),
+            registry,
         }
     }
 
     /// Resolve a token symbol (e.g. "RAY") to its mint address string.
-    fn resolve_mint(symbol: &str) -> Option<&'static str> {
+    fn resolve_mint(&self, symbol: &str) -> Option<String> {
         if symbol == "USDC" {
-            return Some(USDC_MINT);
+            return Some(USDC_MINT.to_string());
         }
-        TOKEN_MINTS.iter().find(|(s, _)| *s == symbol).map(|(_, m)| *m)
+        self.registry.resolve_mint(symbol).map(|s| s.to_string())
     }
 
     /// Extract the intermediate token symbol from the route string.
@@ -277,7 +272,7 @@ impl FlashLoanStrategy {
         let token_symbol = Self::parse_route_token(&opp.route)
             .ok_or_else(|| anyhow::anyhow!("Cannot parse token from route: {}", opp.route))?;
 
-        let token_mint = Self::resolve_mint(&token_symbol)
+        let token_mint = self.resolve_mint(&token_symbol)
             .ok_or_else(|| anyhow::anyhow!("Unknown token mint for: {}", token_symbol))?;
 
         // Convert trade_size_usdc to u64 lamports (USDC has 6 decimals)
@@ -296,7 +291,7 @@ impl FlashLoanStrategy {
 
         // Leg 1: USDC -> Token
         let quote_leg1 = self
-            .fetch_jupiter_quote(USDC_MINT, token_mint, borrow_amount)
+            .fetch_jupiter_quote(USDC_MINT, &token_mint, borrow_amount)
             .await?;
 
         let leg1_out_amount = quote_leg1["outAmount"]
@@ -314,7 +309,7 @@ impl FlashLoanStrategy {
 
         // Leg 2: Token -> USDC
         let quote_leg2 = self
-            .fetch_jupiter_quote(token_mint, USDC_MINT, leg1_out_amount)
+            .fetch_jupiter_quote(&token_mint, USDC_MINT, leg1_out_amount)
             .await?;
 
         let leg2_out_amount = quote_leg2["outAmount"]
@@ -392,13 +387,15 @@ impl Strategy for FlashLoanStrategy {
         }
 
         let borrow_amount: u64 = 10_000_000; // 10 USDC probe (6 decimals)
-        let tokens = ["RAY", "BONK", "WIF", "mSOL", "JitoSOL"];
+        let flash_tokens = self.registry.for_strategy("flash_loan");
 
-        for token in &tokens {
-            let token_mint = match Self::resolve_mint(token) {
-                Some(m) => m,
-                None => continue,
-            };
+        for token_entry in &flash_tokens {
+            // Skip SOL and USDC — we only flash-loan intermediate tokens
+            if token_entry.symbol == "SOL" || token_entry.symbol == "USDC" {
+                continue;
+            }
+            let token = token_entry.symbol.as_str();
+            let token_mint = token_entry.mint.as_str();
 
             let quote_buy = match self.fetch_jupiter_quote(USDC_MINT, token_mint, borrow_amount).await {
                 Ok(q) => q,
@@ -481,11 +478,16 @@ impl Strategy for FlashLoanStrategy {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tokens::TokenRegistry;
+
+    fn test_registry() -> Arc<TokenRegistry> {
+        Arc::new(TokenRegistry::new_with_defaults())
+    }
 
     #[tokio::test]
     async fn test_disabled_when_vault_unavailable() {
         let cache = PriceCache::new();
-        let strategy = FlashLoanStrategy::new(0.3, false);
+        let strategy = FlashLoanStrategy::new(0.3, false, test_registry());
         let opps = strategy.evaluate(&cache).await;
         assert!(opps.is_empty());
     }
@@ -497,7 +499,7 @@ mod tests {
         cache.update(&PriceSnapshot { mint: "USDC".into(), price_usdc: 1.0, source: "jupiter".into(), timestamp: Instant::now() });
         cache.update(&PriceSnapshot { mint: "RAY".into(), price_usdc: 2.0, source: "jupiter".into(), timestamp: Instant::now() });
 
-        let strategy = FlashLoanStrategy::new(0.3, true);
+        let strategy = FlashLoanStrategy::new(0.3, true, test_registry());
         let opps = strategy.evaluate(&cache).await;
         assert!(opps.is_empty()); // Balanced = no profit
     }
@@ -520,20 +522,21 @@ mod tests {
 
     #[test]
     fn test_resolve_mint() {
+        let strategy = FlashLoanStrategy::new(0.3, true, test_registry());
         assert_eq!(
-            FlashLoanStrategy::resolve_mint("USDC"),
-            Some("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v")
+            strategy.resolve_mint("USDC"),
+            Some("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v".to_string())
         );
         assert_eq!(
-            FlashLoanStrategy::resolve_mint("RAY"),
-            Some("4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R")
+            strategy.resolve_mint("RAY"),
+            Some("4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R".to_string())
         );
-        assert!(FlashLoanStrategy::resolve_mint("UNKNOWN").is_none());
+        assert!(strategy.resolve_mint("UNKNOWN").is_none());
     }
 
     #[test]
     fn test_build_borrow_ix_discriminator() {
-        let strategy = FlashLoanStrategy::new(0.3, true);
+        let strategy = FlashLoanStrategy::new(0.3, true, test_registry());
         let admin = Pubkey::new_unique();
         let admin_usdc = Pubkey::new_unique();
         let ix = strategy.build_borrow_ix(&admin, &admin_usdc, 10_000_000_000);
@@ -549,7 +552,7 @@ mod tests {
 
     #[test]
     fn test_build_process_ix_discriminator() {
-        let strategy = FlashLoanStrategy::new(0.3, true);
+        let strategy = FlashLoanStrategy::new(0.3, true, test_registry());
         let admin = Pubkey::new_unique();
         let ix = strategy.build_process_ix(&admin, 500_000);
 
@@ -560,7 +563,7 @@ mod tests {
 
     #[test]
     fn test_build_instructions_fails_when_vault_unavailable() {
-        let strategy = FlashLoanStrategy::new(0.3, false);
+        let strategy = FlashLoanStrategy::new(0.3, false, test_registry());
         let wallet = Keypair::new();
         let opp = Opportunity {
             id: "test".to_string(),

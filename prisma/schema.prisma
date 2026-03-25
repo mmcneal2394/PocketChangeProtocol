@@ -108,6 +108,17 @@ model TelegramChat {
   updatedAt DateTime @updatedAt
 }
 
+model WatchedToken {
+  id        String   @id @default(uuid())
+  symbol    String   @unique    // e.g., "SOL", "RAY", "JUP"
+  mint      String               // Solana mint address
+  decimals  Int      @default(6)
+  isActive  Boolean  @default(true)
+  strategies String  @default("all") // "all", "triangular", "flash_loan", "cex_dex", "statistical"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model Opportunity {
   id              String    @id @default(uuid())
   strategy        String

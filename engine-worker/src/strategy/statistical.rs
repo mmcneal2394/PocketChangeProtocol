@@ -6,57 +6,61 @@ use solana_sdk::instruction::{AccountMeta, Instruction};
 use solana_sdk::pubkey::Pubkey;
 use solana_sdk::signature::{Keypair, Signer};
 use uuid::Uuid;
+use std::sync::Arc;
 use std::time::Instant;
 use tracing::{debug, info};
 use crate::types::*;
 use crate::price::PriceCache;
 use crate::strategy::{Strategy, estimate_execution_cost_usdc};
+use crate::tokens::TokenRegistry;
 
 const JUPITER_API: &str = "https://public.jupiterapi.com";
-
-const TOKEN_MINTS: &[(&str, &str)] = &[
-    ("SOL", "So11111111111111111111111111111111111111112"),
-    ("JitoSOL", "J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn"),
-    ("mSOL", "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So"),
-];
-
-/// Round-trip pairs for atomic LSD arbitrage.
-/// Each entry is (base_token, derivative_token).
-/// We swap base -> derivative -> base and check if we end up with more than we started.
-const ROUND_TRIP_PAIRS: &[(&str, &str)] = &[
-    ("SOL", "JitoSOL"),
-    ("SOL", "mSOL"),
-];
 
 pub struct StatisticalStrategy {
     /// Minimum net profit percentage to emit an opportunity.
     threshold: Decimal,
     client: reqwest::Client,
+    registry: Arc<TokenRegistry>,
 }
 
 impl StatisticalStrategy {
-    pub fn new(threshold: f64) -> Self {
+    pub fn new(threshold: f64, registry: Arc<TokenRegistry>) -> Self {
         Self {
             threshold: Decimal::from_f64(threshold).unwrap_or(Decimal::new(5, 2)), // default 0.05%
             client: reqwest::Client::new(),
+            registry,
         }
     }
 
     /// Resolve a token symbol to its Solana mint address.
-    fn resolve_mint(symbol: &str) -> Option<&'static str> {
-        TOKEN_MINTS.iter().find(|(s, _)| *s == symbol).map(|(_, m)| *m)
+    fn resolve_mint(&self, symbol: &str) -> Option<String> {
+        self.registry.resolve_mint(symbol).map(|s| s.to_string())
     }
 
     /// Convert a USDC notional amount to base units (lamports) for a given token.
-    fn usdc_to_base_units(symbol: &str, usdc_amount: f64) -> u64 {
-        let (price_est, decimals): (f64, u32) = match symbol {
-            "SOL" => (150.0, 9),
-            "JitoSOL" => (165.0, 9),
-            "mSOL" => (160.0, 9),
-            _ => (1.0, 6),
+    fn usdc_to_base_units(&self, symbol: &str, usdc_amount: f64) -> u64 {
+        let price_est: f64 = match symbol {
+            "SOL" => 150.0,
+            "JitoSOL" => 165.0,
+            "mSOL" => 160.0,
+            _ => 1.0,
         };
+        let decimals = self.registry.resolve_decimals(symbol);
         let token_amount = usdc_amount / price_est;
         (token_amount * 10_f64.powi(decimals as i32)) as u64
+    }
+
+    /// Generate round-trip pairs from the registry.
+    /// Finds SOL derivatives (symbols ending with "SOL" that aren't "SOL" itself) and pairs them with SOL.
+    fn generate_round_trip_pairs(&self) -> Vec<(String, String)> {
+        let tokens = self.registry.for_strategy("statistical");
+        let mut pairs = Vec::new();
+        for t in &tokens {
+            if t.symbol.ends_with("SOL") && t.symbol != "SOL" {
+                pairs.push(("SOL".to_string(), t.symbol.clone()));
+            }
+        }
+        pairs
     }
 
     /// Fetch a Jupiter V6 quote for a single swap leg.
@@ -213,21 +217,21 @@ impl StatisticalStrategy {
         let (token_a, token_b) = Self::parse_round_trip_route(&opp.route)?;
         let user_pubkey = wallet.pubkey().to_string();
 
-        let mint_a = Self::resolve_mint(&token_a)
+        let mint_a = self.resolve_mint(&token_a)
             .ok_or_else(|| anyhow::anyhow!("Unknown mint for {}", token_a))?;
-        let mint_b = Self::resolve_mint(&token_b)
+        let mint_b = self.resolve_mint(&token_b)
             .ok_or_else(|| anyhow::anyhow!("Unknown mint for {}", token_b))?;
 
         // Leg 1: token_a -> token_b
         let trade_usdc = opp.trade_size_usdc.to_f64().unwrap_or(100.0);
-        let amount_a = Self::usdc_to_base_units(&token_a, trade_usdc);
+        let amount_a = self.usdc_to_base_units(&token_a, trade_usdc);
 
         info!(
             "Round-trip leg 1: {} ({}) -> {} ({}), amount={}",
             token_a, mint_a, token_b, mint_b, amount_a
         );
 
-        let quote_1 = self.fetch_jupiter_quote(mint_a, mint_b, amount_a).await
+        let quote_1 = self.fetch_jupiter_quote(&mint_a, &mint_b, amount_a).await
             .map_err(|e| anyhow::anyhow!("Leg 1 quote failed: {}", e))?;
 
         let out_b: u64 = quote_1["outAmount"]
@@ -246,7 +250,7 @@ impl StatisticalStrategy {
             token_b, mint_b, token_a, mint_a, out_b
         );
 
-        let quote_2 = self.fetch_jupiter_quote(mint_b, mint_a, out_b).await
+        let quote_2 = self.fetch_jupiter_quote(&mint_b, &mint_a, out_b).await
             .map_err(|e| anyhow::anyhow!("Leg 2 quote failed: {}", e))?;
 
         info!(
@@ -280,21 +284,24 @@ impl Strategy for StatisticalStrategy {
         let mut opportunities = Vec::new();
         let sol_price = prices.get_price("SOL").unwrap_or(150.0);
         let trade_size_usdc = 100.0_f64;
+        let round_trip_pairs = self.generate_round_trip_pairs();
 
-        for &(token_a, token_b) in ROUND_TRIP_PAIRS {
-            let mint_a = match Self::resolve_mint(token_a) {
+        for (token_a, token_b) in &round_trip_pairs {
+            let token_a = token_a.as_str();
+            let token_b = token_b.as_str();
+            let mint_a = match self.resolve_mint(token_a) {
                 Some(m) => m,
                 None => continue,
             };
-            let mint_b = match Self::resolve_mint(token_b) {
+            let mint_b = match self.resolve_mint(token_b) {
                 Some(m) => m,
                 None => continue,
             };
 
             // Leg 1: token_a -> token_b (1 SOL = 10^9 lamports as the probe amount)
-            let amount_a = Self::usdc_to_base_units(token_a, trade_size_usdc);
+            let amount_a = self.usdc_to_base_units(token_a, trade_size_usdc);
 
-            let quote_1 = match self.fetch_jupiter_quote(mint_a, mint_b, amount_a).await {
+            let quote_1 = match self.fetch_jupiter_quote(&mint_a, &mint_b, amount_a).await {
                 Ok(q) => q,
                 Err(e) => {
                     debug!("Round-trip {}->{}: leg 1 quote failed: {}", token_a, token_b, e);
@@ -314,7 +321,7 @@ impl Strategy for StatisticalStrategy {
             };
 
             // Leg 2: token_b -> token_a (feed leg 1 output)
-            let quote_2 = match self.fetch_jupiter_quote(mint_b, mint_a, out_b).await {
+            let quote_2 = match self.fetch_jupiter_quote(&mint_b, &mint_a, out_b).await {
                 Ok(q) => q,
                 Err(e) => {
                     debug!("Round-trip {}->{}->{}: leg 2 quote failed: {}", token_a, token_b, token_a, e);
@@ -396,32 +403,39 @@ impl Strategy for StatisticalStrategy {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tokens::TokenRegistry;
+
+    fn test_registry() -> Arc<TokenRegistry> {
+        Arc::new(TokenRegistry::new_with_defaults())
+    }
 
     #[test]
     fn test_resolve_mint() {
+        let strategy = StatisticalStrategy::new(0.05, test_registry());
         assert_eq!(
-            StatisticalStrategy::resolve_mint("SOL"),
-            Some("So11111111111111111111111111111111111111112")
+            strategy.resolve_mint("SOL"),
+            Some("So11111111111111111111111111111111111111112".to_string())
         );
         assert_eq!(
-            StatisticalStrategy::resolve_mint("JitoSOL"),
-            Some("J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn")
+            strategy.resolve_mint("JitoSOL"),
+            Some("J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn".to_string())
         );
         assert_eq!(
-            StatisticalStrategy::resolve_mint("mSOL"),
-            Some("mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So")
+            strategy.resolve_mint("mSOL"),
+            Some("mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So".to_string())
         );
-        assert_eq!(StatisticalStrategy::resolve_mint("UNKNOWN"), None);
+        assert_eq!(strategy.resolve_mint("UNKNOWN"), None);
     }
 
     #[test]
     fn test_usdc_to_base_units() {
+        let strategy = StatisticalStrategy::new(0.05, test_registry());
         // 500 USDC worth of SOL at ~150 USD/SOL = ~3.33 SOL = ~3_333_333_333 lamports
-        let units = StatisticalStrategy::usdc_to_base_units("SOL", 500.0);
+        let units = strategy.usdc_to_base_units("SOL", 500.0);
         assert!(units > 3_000_000_000 && units < 4_000_000_000, "SOL base units: {}", units);
 
         // 500 USDC worth of JitoSOL at ~165 = ~3.03 JitoSOL
-        let units = StatisticalStrategy::usdc_to_base_units("JitoSOL", 500.0);
+        let units = strategy.usdc_to_base_units("JitoSOL", 500.0);
         assert!(units > 2_500_000_000 && units < 4_000_000_000, "JitoSOL base units: {}", units);
     }
 
@@ -446,7 +460,16 @@ mod tests {
 
     #[test]
     fn test_default_threshold() {
-        let strat = StatisticalStrategy::new(0.05);
+        let strat = StatisticalStrategy::new(0.05, test_registry());
         assert_eq!(strat.threshold, Decimal::from_f64(0.05).unwrap());
+    }
+
+    #[test]
+    fn test_generate_round_trip_pairs() {
+        let strategy = StatisticalStrategy::new(0.05, test_registry());
+        let pairs = strategy.generate_round_trip_pairs();
+        // Should contain JitoSOL and mSOL paired with SOL
+        assert!(pairs.contains(&("SOL".to_string(), "JitoSOL".to_string())));
+        assert!(pairs.contains(&("SOL".to_string(), "mSOL".to_string())));
     }
 }

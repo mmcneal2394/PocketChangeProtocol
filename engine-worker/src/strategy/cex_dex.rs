@@ -13,6 +13,7 @@ use crate::types::*;
 use crate::price::PriceCache;
 use crate::strategy::{Strategy, execution_cost_pct};
 use crate::executor::cex_executor::CexDexPosition;
+use crate::tokens::TokenRegistry;
 
 /// CEX spot market order fee (MEXC/Gate/KuCoin taker fee).
 const CEX_TAKER_FEE_PCT: f64 = 0.1;
@@ -31,35 +32,28 @@ fn cex_display_name(source: &str) -> &str {
     }
 }
 
-/// Token symbol -> Solana mint address mapping for Jupiter API calls
-const MINT_MAP: &[(&str, &str)] = &[
-    ("SOL", "So11111111111111111111111111111111111111112"),
-    ("RAY", "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R"),
-    ("WIF", "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm"),
-    ("BONK", "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263"),
-    ("mSOL", "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So"),
-    ("JitoSOL", "J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn"),
-];
 const USDC_MINT: &str = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 
 pub struct CexDexStrategy {
     threshold: Decimal,
     open_position: Arc<Mutex<Option<CexDexPosition>>>,
     client: reqwest::Client,
+    registry: Arc<TokenRegistry>,
 }
 
 impl CexDexStrategy {
-    pub fn new(threshold: f64) -> Self {
+    pub fn new(threshold: f64, registry: Arc<TokenRegistry>) -> Self {
         Self {
             threshold: Decimal::from_f64(threshold).unwrap_or(Decimal::new(1, 0)),
             open_position: Arc::new(Mutex::new(None)),
             client: reqwest::Client::new(),
+            registry,
         }
     }
 
     /// Resolve a token symbol (e.g. "SOL") to its Solana mint address.
-    fn resolve_mint(symbol: &str) -> Option<&'static str> {
-        MINT_MAP.iter().find(|(s, _)| *s == symbol).map(|(_, m)| *m)
+    fn resolve_mint(&self, symbol: &str) -> Option<String> {
+        self.registry.resolve_mint(symbol).map(|s| s.to_string())
     }
 
     /// Extract the token symbol from an opportunity route string.
@@ -70,17 +64,18 @@ impl CexDexStrategy {
 
     /// Determine the trade size in token base units from USDC amount and a rough price.
     /// For the DEX leg we convert USDC notional to lamports/base-units.
-    fn usdc_to_base_units(symbol: &str, usdc_amount: f64) -> u64 {
+    fn usdc_to_base_units(&self, symbol: &str, usdc_amount: f64) -> u64 {
         // Rough prices for sizing — actual execution uses Jupiter quote output
-        let (price_est, decimals): (f64, u32) = match symbol {
-            "SOL" => (150.0, 9),
-            "RAY" => (2.0, 6),
-            "WIF" => (1.5, 6),
-            "BONK" => (0.00002, 5),
-            "mSOL" => (160.0, 9),
-            "JitoSOL" => (165.0, 9),
-            _ => (1.0, 6),
+        let price_est: f64 = match symbol {
+            "SOL" => 150.0,
+            "RAY" => 2.0,
+            "WIF" => 1.5,
+            "BONK" => 0.00002,
+            "mSOL" => 160.0,
+            "JitoSOL" => 165.0,
+            _ => 1.0,
         };
+        let decimals = self.registry.resolve_decimals(symbol);
         let token_amount = usdc_amount / price_est;
         (token_amount * 10_f64.powi(decimals as i32)) as u64
     }
@@ -196,9 +191,14 @@ impl Strategy for CexDexStrategy {
         }
 
         let mut opportunities = Vec::new();
-        let tokens = ["SOL", "RAY", "WIF", "BONK"];
+        let cex_tokens: Vec<String> = self.registry.for_strategy("cex_dex")
+            .iter()
+            .filter(|t| t.symbol != "USDC")
+            .map(|t| t.symbol.clone())
+            .collect();
 
-        for token in &tokens {
+        for token in &cex_tokens {
+            let token = token.as_str();
             // DEX (Jupiter) price — stored under plain mint key
             let dex_price = match prices.get_price(token) {
                 Some(p) => p,
@@ -261,7 +261,8 @@ impl Strategy for CexDexStrategy {
         // -----------------------------------------------------------------
         // CEX-CEX: compare prices across exchanges for the same token
         // -----------------------------------------------------------------
-        for token in &tokens {
+        for token in &cex_tokens {
+            let token = token.as_str();
             let cex_prices = prices.get_cex_prices(token);
             if cex_prices.len() < 2 {
                 continue;
@@ -338,7 +339,7 @@ impl Strategy for CexDexStrategy {
 
         let token = Self::parse_token_from_route(&opp.route)
             .ok_or_else(|| anyhow::anyhow!("Cannot parse token from route: {}", opp.route))?;
-        let token_mint = Self::resolve_mint(token)
+        let token_mint = self.resolve_mint(token)
             .ok_or_else(|| anyhow::anyhow!("Unknown token mint for: {}", token))?;
 
         // Determine direction: "buy DEX" means USDC -> token on-chain
@@ -347,12 +348,12 @@ impl Strategy for CexDexStrategy {
             // Buy token on DEX with USDC
             let usdc_amount = opp.trade_size_usdc.to_f64().unwrap_or(2000.0);
             let base_units = (usdc_amount * 1_000_000.0) as u64; // USDC has 6 decimals
-            (USDC_MINT, token_mint, base_units)
+            (USDC_MINT.to_string(), token_mint, base_units)
         } else {
             // Sell token on DEX for USDC
             let usdc_amount = opp.trade_size_usdc.to_f64().unwrap_or(2000.0);
-            let base_units = Self::usdc_to_base_units(token, usdc_amount);
-            (token_mint, USDC_MINT, base_units)
+            let base_units = self.usdc_to_base_units(token, usdc_amount);
+            (token_mint, USDC_MINT.to_string(), base_units)
         };
 
         let user_pubkey = wallet.pubkey().to_string();
@@ -360,10 +361,6 @@ impl Strategy for CexDexStrategy {
         // Block on async Jupiter calls from sync context (we're inside a tokio runtime)
         let handle = tokio::runtime::Handle::current();
         let client = self.client.clone();
-
-        // Build a temporary strategy ref for the async calls
-        let input_mint = input_mint.to_string();
-        let output_mint = output_mint.to_string();
 
         let instructions = tokio::task::block_in_place(|| {
             handle.block_on(async {
@@ -469,10 +466,15 @@ impl Strategy for CexDexStrategy {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tokens::TokenRegistry;
+
+    fn test_registry() -> Arc<TokenRegistry> {
+        Arc::new(TokenRegistry::new_with_defaults())
+    }
 
     #[tokio::test]
     async fn test_no_opportunity_when_position_open() {
-        let strategy = CexDexStrategy::new(1.0);
+        let strategy = CexDexStrategy::new(1.0, test_registry());
         *strategy.open_position.lock().await = Some(CexDexPosition {
             id: "test".into(),
             status: crate::executor::cex_executor::CexDexStatus::DexConfirmed,
