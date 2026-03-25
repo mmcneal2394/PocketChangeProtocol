@@ -61,27 +61,20 @@ impl TriangularStrategy {
         self.registry.resolve_decimals(symbol)
     }
 
-    /// Generate cross-DEX routes from the token registry.
-    /// Pairs every triangular-enabled token with USDC, plus SOL-derivative pairs.
+    /// High-liquidity pairs that actually exist on multiple DEXes.
+    /// Only these are worth cross-DEX checking. Curated to minimize API calls.
     fn generate_routes(&self) -> Vec<(String, String)> {
-        let tokens = self.registry.for_strategy("triangular");
-        let mut routes = Vec::new();
-        for t in &tokens {
-            if t.symbol != "USDC" && t.symbol != "SOL" {
-                routes.push((t.symbol.clone(), "USDC".to_string()));
-            }
-        }
-        // Always include SOL/USDC
-        if self.registry.resolve_mint("SOL").is_some() {
-            routes.push(("SOL".to_string(), "USDC".to_string()));
-        }
-        // Add SOL-derivative pairs (mSOL/SOL, JitoSOL/SOL, etc.)
-        for t in &tokens {
-            if t.symbol.ends_with("SOL") && t.symbol != "SOL" {
-                routes.push((t.symbol.clone(), "SOL".to_string()));
-            }
-        }
-        routes
+        vec![
+            // Major pairs with deep liquidity on Raydium + Orca + Meteora
+            ("SOL".into(), "USDC".into()),
+            ("RAY".into(), "USDC".into()),
+            ("BONK".into(), "USDC".into()),
+            ("WIF".into(), "USDC".into()),
+            ("JUP".into(), "USDC".into()),
+            // SOL derivative pairs (staking arb)
+            ("JitoSOL".into(), "SOL".into()),
+            ("mSOL".into(), "SOL".into()),
+        ]
     }
 
     /// Fetch a Jupiter V6 quote for a single swap leg, optionally restricted to a single DEX.
@@ -363,31 +356,18 @@ impl Strategy for TriangularStrategy {
                 continue;
             }
 
-            // --- Sell leg: B -> A on each DEX ---
-            // To compare apples-to-apples, we use the median buy output as the sell input.
-            let median_buy_output = {
-                let mut amounts: Vec<u64> = buy_quotes.iter().map(|q| q.out_amount).collect();
-                amounts.sort();
-                amounts[amounts.len() / 2]
-            };
-
-            let sell_quotes = self.fetch_quotes_all_dexes(
-                &mint_b, &mint_a, median_buy_output, token_b, token_a,
-            ).await;
-
-            if sell_quotes.len() < 2 {
-                debug!("{}/{}: fewer than 2 DEX quotes for sell leg, skipping", token_a, token_b);
-                continue;
-            }
-
-            // --- Find best cross-DEX combination ---
-            // Best buy = DEX that gives the MOST B for our A (highest out_amount on buy)
+            // --- Find best buy DEX ---
             let best_buy = buy_quotes.iter().max_by_key(|q| q.out_amount).unwrap();
 
-            // Now get sell quotes using the best buy's actual output amount
+            // --- Sell leg: B -> A on each DEX using best buy output ---
             let sell_quotes_precise = self.fetch_quotes_all_dexes(
                 &mint_b, &mint_a, best_buy.out_amount, token_b, token_a,
             ).await;
+
+            if sell_quotes_precise.len() < 2 {
+                debug!("{}/{}: fewer than 2 DEX quotes for sell leg, skipping", token_a, token_b);
+                continue;
+            }
 
             // Best sell = DEX that gives the MOST A back for our B (highest out_amount on sell)
             let best_sell = match sell_quotes_precise.iter()
