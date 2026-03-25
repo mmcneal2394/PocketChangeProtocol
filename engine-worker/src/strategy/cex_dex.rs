@@ -11,10 +11,13 @@ use tokio::sync::Mutex;
 use tracing::{info, warn, debug};
 use crate::types::*;
 use crate::price::PriceCache;
-use crate::strategy::Strategy;
+use crate::strategy::{Strategy, execution_cost_pct};
 use crate::executor::cex_executor::CexDexPosition;
 
-const ESTIMATED_TOTAL_FEE_PCT: f64 = 0.15; // CEX fee + gas + slippage
+/// CEX spot market order fee (MEXC/Gate/KuCoin taker fee).
+const CEX_TAKER_FEE_PCT: f64 = 0.1;
+/// CEX withdrawal fee to Solana (~0.01 SOL, varies by exchange).
+const CEX_WITHDRAWAL_FEE_SOL: f64 = 0.01;
 
 /// Token symbol -> Solana mint address mapping for Jupiter API calls
 const MINT_MAP: &[(&str, &str)] = &[
@@ -196,13 +199,25 @@ impl Strategy for CexDexStrategy {
                 continue;
             }
 
+            // Get SOL price for USDC conversion of on-chain costs
+            let sol_price = prices.get_price("SOL").unwrap_or(150.0);
+            let trade_size = 100.0_f64; // USDC
+
             for (source, cex_price) in &cex_prices {
                 let spread_pct = ((cex_price - dex_price) / dex_price * 100.0).abs();
-                let net_profit = spread_pct - ESTIMATED_TOTAL_FEE_PCT;
+
+                // --- Accurate fee calculation ---
+                // DEX leg: Jito tip + priority fee (1 transaction)
+                let dex_fixed_pct = execution_cost_pct(sol_price, trade_size, 1);
+                // CEX withdrawal fee converted to pct of trade size
+                let withdrawal_fee_pct = (CEX_WITHDRAWAL_FEE_SOL * sol_price / trade_size) * 100.0;
+                // Total fees = CEX taker + DEX fixed + withdrawal
+                let total_fees_pct = CEX_TAKER_FEE_PCT + dex_fixed_pct + withdrawal_fee_pct;
+                let net_profit = spread_pct - total_fees_pct;
 
                 // Only execute when spread > 2x fees
                 if net_profit > self.threshold.to_f64().unwrap_or(1.0)
-                    && spread_pct > ESTIMATED_TOTAL_FEE_PCT * 2.0
+                    && spread_pct > total_fees_pct * 2.0
                 {
                     let direction = if cex_price > &dex_price {
                         "buy DEX, sell CEX"
@@ -210,8 +225,8 @@ impl Strategy for CexDexStrategy {
                         "buy CEX, sell DEX"
                     };
                     debug!(
-                        "CEX-DEX opportunity: {} on {} spread {:.4}% ({})",
-                        token, source, spread_pct, direction
+                        "CEX-DEX opportunity: {} on {} spread {:.4}% fees={:.4}% net={:.4}% ({})",
+                        token, source, spread_pct, total_fees_pct, net_profit, direction
                     );
 
                     opportunities.push(Opportunity {
@@ -222,6 +237,7 @@ impl Strategy for CexDexStrategy {
                             token, direction, source, spread_pct
                         ),
                         expected_profit_pct: Decimal::from_f64(net_profit).unwrap_or_default(),
+                        estimated_fees_pct: Decimal::from_f64(total_fees_pct).unwrap_or_default(),
                         trade_size_usdc: Decimal::new(100, 0), // Lower size for non-atomic
                         instructions: vec![],
                         detected_at: Instant::now(),

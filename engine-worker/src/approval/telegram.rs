@@ -90,13 +90,17 @@ impl TelegramBot {
     }
 
     pub async fn send_opportunity(&self, opp: &Opportunity) -> anyhow::Result<()> {
+        let gross_profit = opp.expected_profit_pct + opp.estimated_fees_pct;
         let text = format!(
             "<b>Arb Opportunity Detected</b>\n\n\
              Strategy: <code>{}</code>\n\
              Route: <code>{}</code>\n\
-             Expected Profit: <code>{}%</code>\n\
-             Trade Size: <code>{} USDC</code>",
-            opp.strategy, opp.route, opp.expected_profit_pct, opp.trade_size_usdc
+             Expected Profit (net): <code>{}%</code>\n\
+             Trade Size: <code>{} USDC</code>\n\
+             Est. Fees: <code>{}%</code>\n\
+             Gross Profit: <code>{}%</code>",
+            opp.strategy, opp.route, opp.expected_profit_pct,
+            opp.trade_size_usdc, opp.estimated_fees_pct, gross_profit
         );
         self.broadcast_html(&text).await
     }

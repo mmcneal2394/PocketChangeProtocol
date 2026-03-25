@@ -10,10 +10,11 @@ use std::time::Instant;
 use tracing::{info, debug, warn};
 use crate::types::*;
 use crate::price::PriceCache;
-use crate::strategy::Strategy;
+use crate::strategy::{Strategy, extract_price_impact_pct, estimate_execution_cost_usdc};
 use crate::engine::get_discriminator;
 
-const ESTIMATED_FEE_PCT: f64 = 0.3;
+/// Extra CPI overhead for vault borrow instruction (0.00002 SOL).
+const FLASH_LOAN_CPI_OVERHEAD_SOL: f64 = 0.00002;
 
 /// USDC mint on Solana mainnet (6 decimals)
 const USDC_MINT: &str = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
@@ -417,11 +418,23 @@ impl Strategy for FlashLoanStrategy {
                 None => continue,
             };
 
-            let profit_pct = ((usdc_back as f64 / borrow_amount as f64) - 1.0) * 100.0;
-            let net_profit = profit_pct - ESTIMATED_FEE_PCT;
+            let gross_profit_pct = ((usdc_back as f64 / borrow_amount as f64) - 1.0) * 100.0;
 
-            info!("Flash loan USDC -> {} -> USDC: borrow={} return={} profit={:.4}% net={:.4}%",
-                token, borrow_amount, usdc_back, profit_pct, net_profit);
+            // --- Accurate fee calculation ---
+            let sol_price = prices.get_price("SOL").unwrap_or(150.0);
+            let trade_size = 100.0_f64; // USDC
+            // 2 transactions (buy + sell) plus flash loan CPI overhead
+            let fixed_cost_usdc = estimate_execution_cost_usdc(sol_price, 2)
+                + FLASH_LOAN_CPI_OVERHEAD_SOL * sol_price;
+            let fixed_cost_pct = (fixed_cost_usdc / trade_size) * 100.0;
+            // Sum price impact from both Jupiter quotes
+            let buy_impact = extract_price_impact_pct(&quote_buy);
+            let sell_impact = extract_price_impact_pct(&quote_sell);
+            let total_fees_pct = fixed_cost_pct + buy_impact + sell_impact;
+            let net_profit = gross_profit_pct - total_fees_pct;
+
+            info!("Flash loan USDC -> {} -> USDC: borrow={} return={} gross={:.4}% fees={:.4}% net={:.4}%",
+                token, borrow_amount, usdc_back, gross_profit_pct, total_fees_pct, net_profit);
 
             if net_profit > self.threshold.to_f64().unwrap_or(0.3) {
                 info!("FLASH LOAN ARB FOUND: USDC -> {} -> USDC: {:.4}%", token, net_profit);
@@ -430,6 +443,7 @@ impl Strategy for FlashLoanStrategy {
                     strategy: StrategyKind::FlashLoan,
                     route: format!("USDC -> {} -> USDC (flash loan)", token),
                     expected_profit_pct: Decimal::from_f64(net_profit).unwrap_or_default(),
+                    estimated_fees_pct: Decimal::from_f64(total_fees_pct).unwrap_or_default(),
                     trade_size_usdc: Decimal::new(100, 0),
                     instructions: vec![],
                     detected_at: Instant::now(),
@@ -553,6 +567,7 @@ mod tests {
             strategy: StrategyKind::FlashLoan,
             route: "USDC -> RAY -> USDC (flash loan)".to_string(),
             expected_profit_pct: Decimal::new(5, 1),
+            estimated_fees_pct: Decimal::new(3, 2),
             trade_size_usdc: Decimal::new(100, 0),
             instructions: vec![],
             detected_at: Instant::now(),

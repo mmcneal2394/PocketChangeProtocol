@@ -29,6 +29,7 @@ pub struct Opportunity {
     pub strategy: StrategyKind,
     pub route: String,
     pub expected_profit_pct: Decimal,
+    pub estimated_fees_pct: Decimal,
     pub trade_size_usdc: Decimal,
     #[serde(skip)]
     pub instructions: Vec<Instruction>,

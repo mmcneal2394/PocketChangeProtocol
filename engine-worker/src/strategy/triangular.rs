@@ -10,7 +10,7 @@ use std::time::Instant;
 use tracing::{info, debug, warn};
 use crate::types::*;
 use crate::price::PriceCache;
-use crate::strategy::Strategy;
+use crate::strategy::{Strategy, execution_cost_pct, extract_price_impact_pct};
 
 /// Token pairs to scan for cross-DEX spread arbitrage.
 /// Each pair is checked across all DEXes — buy on the cheapest, sell on the most expensive.
@@ -27,8 +27,6 @@ const ROUTES: &[(&str, &str)] = &[
 
 /// DEX backends to query via Jupiter's `dexes` filter parameter.
 const DEXES: &[&str] = &["Raydium", "Whirlpool", "Meteora"];
-
-const ESTIMATED_FEE_PCT: f64 = 0.3; // ~0.3% for fees + slippage + Jito tip
 
 const JUPITER_API: &str = "https://public.jupiterapi.com";
 
@@ -414,15 +412,26 @@ impl Strategy for TriangularStrategy {
             };
 
             // Profit: did we get more A back than we started with?
-            let profit_pct = ((best_sell.out_amount as f64 / start_amount as f64) - 1.0) * 100.0;
-            let net_profit = profit_pct - ESTIMATED_FEE_PCT;
+            let gross_profit_pct = ((best_sell.out_amount as f64 / start_amount as f64) - 1.0) * 100.0;
+
+            // --- Accurate fee calculation ---
+            let sol_price = prices.get_price("SOL").unwrap_or(150.0);
+            let trade_size = 100.0_f64; // USDC
+            // 2 transactions (buy leg + sell leg) with safety margin
+            let fixed_cost_pct = execution_cost_pct(sol_price, trade_size, 2);
+            // Sum price impact from both leg quotes
+            let buy_impact = extract_price_impact_pct(&best_buy.raw_quote);
+            let sell_impact = extract_price_impact_pct(&best_sell.raw_quote);
+            let total_price_impact_pct = buy_impact + sell_impact;
+            let total_fees_pct = fixed_cost_pct + total_price_impact_pct;
+            let net_profit = gross_profit_pct - total_fees_pct;
 
             info!(
-                "{}/{}: buy on {} (out={}), sell on {} (out={}) | gross={:.4}% net={:.4}%",
+                "{}/{}: buy on {} (out={}), sell on {} (out={}) | gross={:.4}% fees={:.4}% net={:.4}%",
                 token_a, token_b,
                 best_buy.dex, best_buy.out_amount,
                 best_sell.dex, best_sell.out_amount,
-                profit_pct, net_profit
+                gross_profit_pct, total_fees_pct, net_profit
             );
 
             if net_profit > self.threshold.to_f64().unwrap_or(0.3) {
@@ -439,6 +448,7 @@ impl Strategy for TriangularStrategy {
                     strategy: StrategyKind::Triangular,
                     route,
                     expected_profit_pct: Decimal::from_f64(net_profit).unwrap_or_default(),
+                    estimated_fees_pct: Decimal::from_f64(total_fees_pct).unwrap_or_default(),
                     trade_size_usdc: Decimal::new(100, 0),
                     instructions: vec![],
                     detected_at: Instant::now(),
@@ -485,15 +495,19 @@ mod tests {
 
     #[test]
     fn test_profit_calculation() {
+        use crate::strategy::{execution_cost_pct};
         // Cross-DEX spread: buy 1 SOL on Raydium for 150 USDC, sell on Orca for 150.6 USDC
         // Gross profit = (150.6 - 150.0) / 150.0 * 100 = 0.4%
-        // Net = 0.4% - 0.3% fee = 0.1% profit
         let buy_cost = 150.0_f64;
         let sell_revenue = 150.6_f64;
         let gross = (sell_revenue / buy_cost - 1.0) * 100.0;
-        let net = gross - ESTIMATED_FEE_PCT;
+        // Real fees: 2 txs at SOL price $150, trade size $100
+        let fees = execution_cost_pct(150.0, 100.0, 2);
+        let net = gross - fees;
         assert!(gross > 0.3);
         assert!(net > 0.0);
+        // Fee should be small relative to trade size
+        assert!(fees < 0.1, "Fixed fee pct should be tiny: {}", fees);
     }
 
     #[test]
