@@ -14,7 +14,7 @@ enabled = true
 
 [strategy.cex_dex]
 auto_execute_threshold = 0.5
-enabled = true
+enabled = false
 
 [strategy.flash_loan]
 auto_execute_threshold = 0.1

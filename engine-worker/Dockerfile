@@ -43,7 +43,7 @@ enabled = true\n\
 \n\
 [strategy.cex_dex]\n\
 auto_execute_threshold = 0.5\n\
-enabled = true\n\
+enabled = false\n\
 \n\
 [strategy.flash_loan]\n\
 auto_execute_threshold = 0.1\n\
