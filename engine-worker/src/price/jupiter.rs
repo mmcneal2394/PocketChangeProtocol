@@ -4,17 +4,7 @@ use tokio::sync::{broadcast, RwLock};
 use tracing::{info, warn};
 use crate::types::PriceSnapshot;
 use crate::price::PriceCache;
-
-/// Token mints to poll
-const MINTS: &[(&str, &str)] = &[
-    ("SOL", "So11111111111111111111111111111111111111112"),
-    ("USDC", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"),
-    ("RAY", "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R"),
-    ("BONK", "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263"),
-    ("JitoSOL", "J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn"),
-    ("mSOL", "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So"),
-    ("WIF", "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm"),
-];
+use crate::tokens::TokenRegistry;
 
 /// USDC mint for quote denomination
 const USDC_MINT: &str = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
@@ -25,14 +15,20 @@ pub struct JupiterPoller {
     cache: Arc<RwLock<PriceCache>>,
     tx: broadcast::Sender<PriceSnapshot>,
     client: reqwest::Client,
+    registry: Arc<TokenRegistry>,
 }
 
 impl JupiterPoller {
-    pub fn new(cache: Arc<RwLock<PriceCache>>, tx: broadcast::Sender<PriceSnapshot>) -> Self {
+    pub fn new(
+        cache: Arc<RwLock<PriceCache>>,
+        tx: broadcast::Sender<PriceSnapshot>,
+        registry: Arc<TokenRegistry>,
+    ) -> Self {
         Self {
             cache,
             tx,
             client: reqwest::Client::new(),
+            registry,
         }
     }
 
@@ -45,8 +41,11 @@ impl JupiterPoller {
             }
 
             let mut success = false;
-            for (name, mint) in MINTS.iter() {
-                if *mint == USDC_MINT {
+            for token in self.registry.all() {
+                let name = &token.symbol;
+                let mint = &token.mint;
+
+                if mint == USDC_MINT {
                     // USDC is always $1
                     let snapshot = PriceSnapshot {
                         mint: name.to_string(),

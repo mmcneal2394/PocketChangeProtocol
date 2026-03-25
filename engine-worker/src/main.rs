@@ -8,6 +8,7 @@ mod strategy;
 mod approval;
 mod executor;
 mod engine;
+mod tokens;
 
 use std::sync::Arc;
 use std::str::FromStr;
@@ -79,6 +80,11 @@ async fn main() -> anyhow::Result<()> {
         false
     };
 
+    // 5b. Load token registry from API (falls back to hardcoded defaults)
+    let api_base = std::env::var("NEXTJS_API_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
+    let token_registry = Arc::new(tokens::TokenRegistry::load_from_api(&api_base).await);
+    info!("Token registry: {} tokens loaded", token_registry.all().len());
+
     // 6. Init shared state
     let price_cache = Arc::new(RwLock::new(PriceCache::new()));
     let (price_tx, _) = broadcast::channel::<PriceSnapshot>(256);
@@ -133,7 +139,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Price feed: Jupiter
     {
-        let poller = price::jupiter::JupiterPoller::new(price_cache.clone(), price_tx.clone());
+        let poller = price::jupiter::JupiterPoller::new(price_cache.clone(), price_tx.clone(), token_registry.clone());
         tasks.spawn(async move { poller.run(500).await; });
     }
 
@@ -153,19 +159,23 @@ async fn main() -> anyhow::Result<()> {
     let strategies: Vec<Arc<dyn Strategy>> = vec![
         Arc::new(strategy::triangular::TriangularStrategy::new(
             config.get_strategy_threshold("triangular"),
+            token_registry.clone(),
         )),
         Arc::new(strategy::flash_loan::FlashLoanStrategy::new(
             config.get_strategy_threshold("flash_loan"),
             vault_available,
+            token_registry.clone(),
         )),
         Arc::new(strategy::cex_dex::CexDexStrategy::new(
             config.get_strategy_threshold("cex_dex"),
+            token_registry.clone(),
         )),
         Arc::new(strategy::funding_rate::FundingRateStrategy::new(
             config.get_strategy_threshold("funding_rate"),
         )),
         Arc::new(strategy::statistical::StatisticalStrategy::new(
             config.get_strategy_threshold("statistical"),
+            token_registry.clone(),
         )),
     ];
 
