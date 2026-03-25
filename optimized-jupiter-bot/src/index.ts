@@ -1,15 +1,3 @@
-<<<<<<< HEAD
-import { createGeyserClient } from './geyser/client';
-import { startGeyserListeners } from './geyser/handlers';
-import { logger } from './utils/logger';
-
-async function main() {
-  logger.info('Starting Optimized Jupiter Arbitrage Bot...');
-
-  // Start building cache
-  logger.info(`Starting highly optimized JUPBOT engine using AMSTERDAM bypass...`);
-
-=======
 import { createGeyserClient }    from './geyser/client';
 import { startGeyserListeners }  from './geyser/handlers';
 import { logger }                 from './utils/logger';
@@ -141,7 +129,6 @@ async function main() {
   // ── Start 72h strategy auto-calibration in background ──────────────────
   startStrategyTuner();
 
->>>>>>> b98063db64e327d63401fc99bce9fd880aa4d97f
   // Initialize Geyser gRPC connection
   logger.info('Connecting to Chainstack Geyser gRPC...');
   try {
@@ -151,18 +138,10 @@ async function main() {
     startGeyserListeners(stream);
 
     logger.info('Bot is successfully running and waiting for stream updates.');
-<<<<<<< HEAD
-
-    logger.info('Live Geyser Listener securely active across Mainnet physical socket.');
-
-    setTimeout(async () => {
-        logger.warn("🔥 [FORCED TEST START] Constructing comprehensive structural diagnostic trace explicitly via the core Arbitrage Engine natively (SOL -> USDC -> SOL)...");
-=======
     logger.info('Live Geyser Listener securely active across Mainnet physical socket.');
 
     setTimeout(async () => {
         logger.warn("🔥 [FORCED TEST START] Constructing diagnostic trace via the core Arbitrage Engine (SOL -> USDC -> SOL)...");
->>>>>>> b98063db64e327d63401fc99bce9fd880aa4d97f
         const { globalArbEngine } = await import('./local_calc/arb_engine');
         const mockOpp = {
             type: 'Force-Test-Hop',
@@ -176,11 +155,7 @@ async function main() {
         };
         // @ts-ignore
         await globalArbEngine['executeArbitrage'](mockOpp);
-<<<<<<< HEAD
-        logger.info("✅ [FORCED TEST COMPLETE] Engine securely reverted to mathematically-limited physical Geyser scanner.");
-=======
         logger.info("✅ [FORCED TEST COMPLETE] Engine reverted to Geyser scanner.");
->>>>>>> b98063db64e327d63401fc99bce9fd880aa4d97f
     }, 8000);
   } catch (error) {
     logger.error('Failed to start bot due to Geyser connection issue:', error);
@@ -192,7 +167,4 @@ main().catch((error) => {
   logger.error('Fatal unhandled exception:', error);
   process.exit(1);
 });
-<<<<<<< HEAD
-=======
 
->>>>>>> b98063db64e327d63401fc99bce9fd880aa4d97f

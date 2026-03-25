@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 "use client";
 
 import { TrendingUp, AccountBalanceWallet, SwapCalls, Bolt, Public, AccountCircle, Memory } from "@mui/icons-material";
@@ -380,11 +379,4 @@ export default function DashboardPage() {
       </div>
     </div>
   );
-=======
-import { redirect } from 'next/navigation';
-
-// /dashboard redirects to the main vault dashboard at /
-export default function DashboardPage() {
-  redirect('/');
->>>>>>> b98063db64e327d63401fc99bce9fd880aa4d97f
 }
