@@ -83,7 +83,7 @@ async fn main() -> anyhow::Result<()> {
     // 5b. Load token registry from API (falls back to hardcoded defaults)
     let api_base = std::env::var("NEXTJS_API_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
     let token_registry = Arc::new(tokens::TokenRegistry::load_from_api(&api_base).await);
-    info!("Token registry: {} tokens loaded", token_registry.all().await.len());
+    info!("Token registry: {} tokens loaded", token_registry.all().len());
     token_registry.spawn_refresh_task();
 
     // 6. Init shared state
