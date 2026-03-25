@@ -6,9 +6,6 @@ use crate::types::Opportunity;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum TelegramCommand {
-    Approve(String),
-    Reject(String),
-    Resume,
     Start,
     Stop,
     Status,
@@ -230,25 +227,12 @@ impl TelegramBot {
         let text = text.trim();
         // Strip @botname suffix (e.g., /start@PCP_notibot)
         let text = text.split('@').next().unwrap_or(text);
-        if text == "/start" {
-            return Some(TelegramCommand::Start);
+        match text {
+            "/start" => Some(TelegramCommand::Start),
+            "/stop" => Some(TelegramCommand::Stop),
+            "/status" => Some(TelegramCommand::Status),
+            _ => None,
         }
-        if text == "/stop" {
-            return Some(TelegramCommand::Stop);
-        }
-        if text == "/status" {
-            return Some(TelegramCommand::Status);
-        }
-        if text == "/resume" {
-            return Some(TelegramCommand::Resume);
-        }
-        if let Some(id) = text.strip_prefix("/approve_") {
-            return Some(TelegramCommand::Approve(id.to_string()));
-        }
-        if let Some(id) = text.strip_prefix("/reject_") {
-            return Some(TelegramCommand::Reject(id.to_string()));
-        }
-        None
     }
 }
 
