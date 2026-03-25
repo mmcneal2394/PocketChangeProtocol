@@ -430,7 +430,7 @@ impl Strategy for FlashLoanStrategy {
                     strategy: StrategyKind::FlashLoan,
                     route: format!("USDC -> {} -> USDC (flash loan)", token),
                     expected_profit_pct: Decimal::from_f64(net_profit).unwrap_or_default(),
-                    trade_size_usdc: Decimal::new(10000, 0),
+                    trade_size_usdc: Decimal::new(100, 0),
                     instructions: vec![],
                     detected_at: Instant::now(),
                 });
@@ -553,7 +553,7 @@ mod tests {
             strategy: StrategyKind::FlashLoan,
             route: "USDC -> RAY -> USDC (flash loan)".to_string(),
             expected_profit_pct: Decimal::new(5, 1),
-            trade_size_usdc: Decimal::new(10000, 0),
+            trade_size_usdc: Decimal::new(100, 0),
             instructions: vec![],
             detected_at: Instant::now(),
         };

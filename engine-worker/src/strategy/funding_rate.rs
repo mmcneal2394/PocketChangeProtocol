@@ -572,7 +572,7 @@ mod tests {
             strategy: StrategyKind::FundingRate,
             route: "SOL-PERP".into(),
             expected_profit_pct: Decimal::from_f64(0.1).unwrap(),
-            trade_size_usdc: Decimal::new(5000, 0),
+            trade_size_usdc: Decimal::new(100, 0),
             instructions: vec![],
             detected_at: Instant::now(),
         };
@@ -687,13 +687,13 @@ mod tests {
     #[test]
     fn test_usdc_to_base_asset_amount() {
         // $5000 USDC at SOL price $150 → 33.333... SOL → ~33_333_333_333 base units
-        let trade_size = Decimal::new(5000, 0);
+        let trade_size = Decimal::new(100, 0);
         let base_amount = FundingRateStrategy::usdc_to_base_asset_amount(&trade_size, 150.0);
         // 5000 / 150 = 33.333... SOL × 1e9 = 33_333_333_333
         assert_eq!(base_amount, 33_333_333_333);
 
         // $10000 USDC at BTC price $60000 → 0.1667 BTC
-        let trade_size_btc = Decimal::new(10000, 0);
+        let trade_size_btc = Decimal::new(100, 0);
         let base_btc = FundingRateStrategy::usdc_to_base_asset_amount(&trade_size_btc, 60000.0);
         // 10000 / 60000 = 0.16667 BTC × 1e9 = 166_666_666
         assert_eq!(base_btc, 166_666_666);

@@ -365,7 +365,7 @@ impl Strategy for StatisticalStrategy {
                         route: format!("{}/{} {} (z={:.2})", pair.token_a, pair.token_b, direction, z),
                         expected_profit_pct: Decimal::from_f64(z_abs * HISTORICAL_PCT_PER_Z)
                             .unwrap_or_default(),
-                        trade_size_usdc: Decimal::new(1000, 0),
+                        trade_size_usdc: Decimal::new(100, 0),
                         instructions: vec![],
                         detected_at: Instant::now(),
                     });

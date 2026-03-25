@@ -222,7 +222,7 @@ impl Strategy for CexDexStrategy {
                             token, direction, source, spread_pct
                         ),
                         expected_profit_pct: Decimal::from_f64(net_profit).unwrap_or_default(),
-                        trade_size_usdc: Decimal::new(2000, 0), // Lower size for non-atomic
+                        trade_size_usdc: Decimal::new(100, 0), // Lower size for non-atomic
                         instructions: vec![],
                         detected_at: Instant::now(),
                     });
