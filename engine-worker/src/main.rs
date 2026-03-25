@@ -104,9 +104,20 @@ async fn main() -> anyhow::Result<()> {
     // 8. Build approval router
     let telegram = approval::telegram::TelegramBot::from_env();
     let has_telegram = telegram.is_some();
-    // Load persisted subscribers from DB on startup
+    // Load persisted subscribers from DB on startup (retry up to 3 times)
     if let Some(ref tg) = telegram {
-        tg.load_subscribers().await;
+        for attempt in 1..=3 {
+            tg.load_subscribers().await;
+            let count = tg.subscriber_count().await;
+            if count > 0 {
+                info!("Loaded {} subscribers on attempt {}", count, attempt);
+                break;
+            }
+            if attempt < 3 {
+                warn!("No subscribers loaded (attempt {}), retrying in 5s...", attempt);
+                tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+            }
+        }
     }
     let (exec_tx, mut exec_rx) = mpsc::channel::<Opportunity>(64);
 
