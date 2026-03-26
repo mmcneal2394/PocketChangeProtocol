@@ -399,6 +399,12 @@ impl Strategy for TriangularStrategy {
             let total_fees_pct = fixed_cost_pct + total_price_impact_pct;
             let net_profit = gross_profit_pct - total_fees_pct;
 
+            // Sanity check
+            if net_profit > 10.0 || net_profit < -50.0 {
+                warn!("{}/{}: insane profit {:.2}% — likely decimals mismatch, skipping", token_a, token_b, net_profit);
+                continue;
+            }
+
             info!(
                 "{}/{}: buy on {} (out={}), sell on {} (out={}) | gross={:.4}% fees={:.4}% net={:.4}%",
                 token_a, token_b,

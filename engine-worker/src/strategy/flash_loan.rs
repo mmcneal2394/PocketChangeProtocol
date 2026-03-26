@@ -417,6 +417,13 @@ impl Strategy for FlashLoanStrategy {
 
             let gross_profit_pct = ((usdc_back as f64 / borrow_amount as f64) - 1.0) * 100.0;
 
+            // Sanity check — reject obviously impossible profits (> 10%)
+            if gross_profit_pct > 10.0 || gross_profit_pct < -50.0 {
+                warn!("Flash loan {} returned insane profit {:.2}% (borrow={}, return={}) — likely decimals mismatch, skipping",
+                    token, gross_profit_pct, borrow_amount, usdc_back);
+                continue;
+            }
+
             // --- Accurate fee calculation ---
             let sol_price = prices.get_price("SOL").unwrap_or(150.0);
             let trade_size = 100.0_f64; // USDC
