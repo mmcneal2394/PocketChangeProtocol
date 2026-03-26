@@ -2,6 +2,9 @@ version: '3.8'
 
 services:
   # -------------------------------------------------------------------
+<<<<<<< HEAD
+  # 1. Rust Arbitrage Execution Engine (Core Worker)
+=======
   # 1. PostgreSQL DB for Engine Metrics & User Billing Mappings
   # -------------------------------------------------------------------
   db:
@@ -24,6 +27,7 @@ services:
 
   # -------------------------------------------------------------------
   # 2. Rust Arbitrage Execution Engine (Core Worker)
+>>>>>>> b98063db64e327d63401fc99bce9fd880aa4d97f
   # -------------------------------------------------------------------
   engine-worker:
     build:
@@ -31,6 +35,24 @@ services:
       dockerfile: Dockerfile
     container_name: arbitrasaas_engine
     restart: unless-stopped
+<<<<<<< HEAD
+    ports:
+      - "3002:3002"
+    environment:
+      - SOLANA_RPC_URL=${SOLANA_RPC_URL:-https://api.devnet.solana.com}
+      - KMS_MASTER_KEY=${KMS_MASTER_KEY}
+      - ENGINE_API_SECRET=${ENGINE_API_SECRET}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
+      - BITGET_API_KEY=${BITGET_API_KEY:-}
+      - BITGET_API_SECRET=${BITGET_API_SECRET:-}
+      - BITGET_PASSPHRASE=${BITGET_PASSPHRASE:-}
+    volumes:
+      - shared_telemetry:/app/telemetry
+
+  # -------------------------------------------------------------------
+  # 2. Next.js SaaS Web Dashboard & API
+=======
     depends_on:
       db:
         condition: service_healthy
@@ -44,6 +66,7 @@ services:
 
   # -------------------------------------------------------------------
   # 3. Next.js SaaS Web Dashboard & API
+>>>>>>> b98063db64e327d63401fc99bce9fd880aa4d97f
   # -------------------------------------------------------------------
   web:
     build:
@@ -58,6 +81,15 @@ services:
     environment:
       - NODE_ENV=production
       - NEXT_PUBLIC_NETWORK=${NEXT_PUBLIC_NETWORK:-devnet}
+<<<<<<< HEAD
+      - DATABASE_URL=${DATABASE_URL}
+      - ENGINE_API_SECRET=${ENGINE_API_SECRET}
+      - NEXTJS_API_URL=http://engine-worker:3002
+    volumes:
+      - shared_telemetry:/app/engine-worker
+
+volumes:
+=======
       - DATABASE_URL=postgres://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-admin123}@db:5432/${POSTGRES_DB:-arbitrasaas}
     volumes:
       # Access telemetry outputs written by the Rust engine
@@ -65,4 +97,5 @@ services:
 
 volumes:
   pgdata:
+>>>>>>> b98063db64e327d63401fc99bce9fd880aa4d97f
   shared_telemetry:

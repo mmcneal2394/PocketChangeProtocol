@@ -7,8 +7,8 @@ description = "Multi-tenant Solana Arbitrage Worker Engine"
 
 [dependencies]
 tokio = { version = "1.35", features = ["full", "rt-multi-thread", "macros"] }
-solana-client = "1.18" # Solana RPC interactions
-solana-sdk = "1.18"
+solana-client = "2.2" # Solana RPC interactions
+solana-sdk = "2.2"
 serde = { version = "=1.0.228", features = ["derive"] }
 serde_json = "1.0"
 reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
@@ -16,10 +16,32 @@ dotenv = "0.15"
 log = "0.4"
 env_logger = "0.10"
 aes-gcm = "0.10" # For decrypting HSM-managed wallet keys
+hex = "0.4"
 # jito-protos = "0.1.0"
-sha2 = "0.10.8"
 futures = "0.3"
 base64 = "0.22.1"
+toml = "0.8"
+axum = { version = "0.7", features = ["json"] }
+tower-http = { version = "0.5", features = ["cors"] }
+chrono = { version = "0.4", features = ["serde"] }
+hmac = "0.12"
+sha2 = "0.10"
+rust_decimal = { version = "1.33", features = ["serde-with-str"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
+async-trait = "0.1"
+uuid = { version = "1", features = ["v4"] }
+# anchor-client removed — we build vault instructions manually via sha2 discriminators
+anyhow = "1"
+bincode = "1"
+tokio-tungstenite = { version = "0.21", features = ["native-tls"] }
+solana-account-decoder = "2.2"
+borsh = "0.10"
+yellowstone-grpc-client = "12.2"
+yellowstone-grpc-proto = "12.1"
+tonic = { version = "0.14", features = ["tls-native-roots", "transport"] }
+rustls-native-certs = "0.7"
+rustls-pemfile = "2"
 
 [profile.release]
 opt-level = 3

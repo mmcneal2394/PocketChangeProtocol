@@ -24,13 +24,13 @@ export default function WalletsPage() {
   const [cooldownTime, setCooldownTime] = useState(0); // 0 means inactive
   const [isVaultPaused, setIsVaultPaused] = useState(false); // Admin Pause Auth
 
-  const PROGRAM_ID = new PublicKey("FSRUKKMxfWNDiVKKVyxiaaweZR8HZEMnsyHmb8caPjAy"); 
+  const PROGRAM_ID = new PublicKey("34sgN4q5CaaGCwqePU6d2y6xzBuY5ASA8E8LtXjfyN3c"); 
   const NETWORK = process.env.NEXT_PUBLIC_NETWORK || "localnet"; 
   const USDC_MINT = NETWORK === "devnet" 
       ? new PublicKey("4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU")
       : new PublicKey("J86cnryv65eNYsgXx3KssYcEh34gkDwqwpVR4SYEEoAd"); 
   const PCP_MINT = NETWORK === "devnet"
-      ? new PublicKey("PCPxZ3m2v...mockdev")
+      ? new PublicKey("11111111111111111111111111111111")
       : new PublicKey("HnroupxERUkWZGzqcqWyXHbGF326rV2MkcT4RNcKY3Aw");
 
   useEffect(() => {
@@ -112,12 +112,12 @@ export default function WalletsPage() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "32px", animation: "fadeIn 0.4s ease forwards" }}>
-      <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <header className="page-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
           <h1 style={{ fontSize: "2rem", fontWeight: 800, marginBottom: "8px" }}>Vault Staking</h1>
           <p style={{ color: "var(--text-secondary)", fontSize: "1rem" }}>Deposit USDC and earn auto-compounding yields from the Arbitrage execution layer.</p>
         </div>
-        <div style={{ display: "flex", gap: "16px" }}>
+        <div className="page-header-actions" style={{ display: "flex", gap: "16px" }}>
             <button onClick={() => setIsVaultPaused(!isVaultPaused)} style={{
                 background: isVaultPaused ? "rgba(255, 68, 68, 0.15)" : "rgba(255, 255, 255, 0.05)", 
                 border: isVaultPaused ? "1px solid rgba(255, 68, 68, 0.4)" : "1px solid var(--border)", 
@@ -183,35 +183,24 @@ export default function WalletsPage() {
         )}
 
         {loading ? (
-          <div style={{ textAlign: "center", padding: "40px 0", color: "var(--text-secondary)" }}>
-            <Loop style={{ animation: "spin 1s linear infinite", fontSize: "2rem", marginBottom: "12px" }} />
-            <p>Loading vault data...</p>
-          </div>
-        ) : wallets.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "60px 0" }}>
-            <AccountBalanceWallet style={{ fontSize: "3rem", color: "var(--text-secondary)", marginBottom: "16px" }} />
-            <p style={{ fontSize: "1.1rem", fontWeight: 600, marginBottom: "8px" }}>No active stakers yet</p>
-            <p style={{ color: "var(--text-secondary)", marginBottom: "24px" }}>Be the first to deposit USDC and earn arbitrage yields.</p>
-            <button onClick={() => setIsDepositModalOpen(true)} style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.2), rgba(255,255,255,0.1))", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", padding: "12px 32px", borderRadius: "10px", fontWeight: 700, cursor: "pointer", fontSize: "1rem" }}>
-              + Deposit into Vault
-            </button>
-          </div>
+             <p style={{ color: "var(--text-secondary)", textAlign: "center", padding: "40px 0" }}>Querying Blockchain & Decrypting KMS Keys...</p>
         ) : (
         <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", whiteSpace: "nowrap" }}>
           <thead>
             <tr style={{ borderBottom: "1px solid var(--border)", color: "var(--text-secondary)" }}>
-              <th style={{ padding: "16px" }}>Operator Wallet</th>
-              <th style={{ padding: "16px" }}>Balance</th>
-              <th style={{ padding: "16px" }}>Configuration</th>
+              <th style={{ padding: "16px" }}>Staker Address</th>
+              <th style={{ padding: "16px" }}>Total Deposited</th>
+              <th style={{ padding: "16px" }}>Pool Share ($PCP)</th>
               <th style={{ padding: "16px" }}>Status</th>
+              <th style={{ padding: "16px", textAlign: "right" }}>Actions</th>
             </tr>
           </thead>
           <tbody>
             {wallets.map((w, idx) => (
-              <tr key={w.id} style={{ borderBottom: idx !== wallets.length - 1 ? "1px solid var(--border)" : "none" }}>
-                <td style={{ padding: "16px", fontWeight: 500, fontFamily: "monospace", color: "var(--secondary)", fontSize: "0.9rem" }}>
-                  {w.pubkey?.slice(0,6)}...{w.pubkey?.slice(-4)}
-                  <ContentCopy onClick={() => navigator.clipboard.writeText(w.pubkey)} style={{ fontSize: "0.9rem", color: "var(--text-secondary)", marginLeft: "8px", cursor: "pointer", verticalAlign: "middle" }} />
+              <tr key={w.id} style={{ borderBottom: idx !== wallets.length -1 ? "1px solid var(--border)" : "none" }}>
+                <td style={{ padding: "16px", fontWeight: 500, fontFamily: "monospace", color: "var(--secondary)", fontSize: "0.95rem" }}>
+                  {w.pubkey}
+                  <ContentCopy style={{ fontSize: "1rem", color: "var(--text-secondary)", marginLeft: "8px", cursor: "pointer", verticalAlign: "middle" }} />
                 </td>
                 <td style={{ padding: "16px", fontWeight: 700 }}>{w.balance}</td>
                 <td style={{ padding: "16px" }}>
@@ -221,9 +210,21 @@ export default function WalletsPage() {
                 </td>
                 <td style={{ padding: "16px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                    <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: w.status === "Active" ? "var(--success)" : "var(--error)", boxShadow: `0 0 8px ${w.status === "Active" ? "var(--success)" : "var(--error)"}` }}></div>
-                    <span style={{ fontSize: "0.9rem", color: w.status === "Active" ? "var(--success)" : "var(--error)" }}>{w.status}</span>
+                    <div style={{
+                      width: "8px", height: "8px", borderRadius: "50%",
+                      background: w.status === "Active" ? "var(--success)" : "var(--error)",
+                      boxShadow: `0 0 8px ${w.status === "Active" ? "var(--success)" : "var(--error)"}`
+                    }}></div>
+                    <span style={{ fontSize: "0.9rem", color: w.status === "Active" ? "var(--success)" : "var(--error)" }}>
+                        {w.status === "Active" ? "Verified" : "Low Funds"}
+                    </span>
                   </div>
+                </td>
+                <td style={{ padding: "16px", textAlign: "right", color: "var(--text-secondary)" }}>
+                  <button style={{ background: "transparent", border: "none", color: "var(--secondary)", cursor: "pointer", marginRight: "16px" }}>
+                    Configure
+                  </button>
+                  <DeleteOutline style={{ color: "var(--error)", cursor: "pointer", verticalAlign: "middle" }} />
                 </td>
               </tr>
             ))}
@@ -232,7 +233,7 @@ export default function WalletsPage() {
         )}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
+      <div className="grid-2-col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
         <div className="glassmorphism fade-in" style={{ padding: "24px", borderRadius: "16px", border: "1px solid rgba(255,255,255,0.2)" }}>
           <h3 style={{ fontSize: "1.2rem", fontWeight: 600, marginBottom: "16px" }}>Unstaking Execution</h3>
           <p style={{ color: "var(--text-secondary)", fontSize: "0.95rem", lineHeight: 1.6, marginBottom: "16px" }}>
@@ -270,7 +271,7 @@ export default function WalletsPage() {
 
       {isDepositModalOpen && (
         <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.8)", backdropFilter: "blur(10px)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div className="glassmorphism fade-in" style={{ width: "450px", padding: "32px", borderRadius: "20px", border: "1px solid rgba(255, 255, 255, 0.2)", position: "relative" }}>
+          <div className="glassmorphism fade-in modal-responsive" style={{ width: "450px", padding: "32px", borderRadius: "20px", border: "1px solid rgba(255, 255, 255, 0.2)", position: "relative" }}>
              <button onClick={() => setIsDepositModalOpen(false)} style={{ position: "absolute", top: "24px", right: "24px", background: "transparent", border: "none", color: "var(--text-secondary)", cursor: "pointer" }}>
                  <Close />
              </button>
