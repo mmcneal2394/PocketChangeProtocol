@@ -40,6 +40,8 @@ borsh = "0.10"
 yellowstone-grpc-client = "12.2"
 yellowstone-grpc-proto = "12.1"
 tonic = "0.12"
+rustls-native-certs = "0.7"
+rustls-pemfile = "2"
 
 [profile.release]
 opt-level = 3
