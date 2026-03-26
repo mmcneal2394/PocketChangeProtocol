@@ -60,10 +60,25 @@ impl GeyserMonitor {
     ) -> anyhow::Result<()> {
         info!("Connecting to Geyser gRPC: {} (token length: {})", self.endpoint, self.token.len());
 
-        let connect_result = GeyserGrpcClient::build_from_shared(self.endpoint.clone())
+        // Load system CA bundle so rustls trusts ZeroSSL (Chainstack's CA)
+        let ca_pem = std::fs::read("/etc/ssl/certs/ca-certificates.crt")
+            .unwrap_or_else(|_| Vec::new());
+
+        let mut builder = GeyserGrpcClient::build_from_shared(self.endpoint.clone())
             .map_err(|e| anyhow::anyhow!("build_from_shared failed: {:?}", e))?
             .x_token(Some(self.token.clone()))
-            .map_err(|e| anyhow::anyhow!("x_token failed: {:?}", e))?
+            .map_err(|e| anyhow::anyhow!("x_token failed: {:?}", e))?;
+
+        if !ca_pem.is_empty() {
+            let cert = tonic::transport::Certificate::from_pem(ca_pem);
+            let tls = yellowstone_grpc_client::ClientTlsConfig::new()
+                .ca_certificate(cert);
+            builder = builder.tls_config(tls)
+                .map_err(|e| anyhow::anyhow!("tls_config failed: {:?}", e))?;
+            info!("Loaded system CA certificates for Geyser TLS");
+        }
+
+        let connect_result = builder
             .connect_timeout(std::time::Duration::from_secs(10))
             .timeout(std::time::Duration::from_secs(10))
             .connect()
