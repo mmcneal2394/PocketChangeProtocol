@@ -3,6 +3,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::str::FromStr;
+use futures::{SinkExt, StreamExt};
 use tokio::sync::{mpsc, RwLock};
 use tracing::{info, warn, error, debug};
 use solana_sdk::pubkey::Pubkey;
@@ -104,7 +105,7 @@ impl GeyserMonitor {
         let usdc_mint = Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap();
         let mut updates: u64 = 0;
 
-        while let Some(msg) = stream.message().await? {
+        while let Some(Ok(msg)) = stream.next().await {
             if let Some(update) = msg.update_oneof {
                 match update {
                     UpdateOneof::Account(acct) => {
