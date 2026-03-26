@@ -65,7 +65,7 @@ impl GeyserMonitor {
             .map_err(|e| anyhow::anyhow!("build_from_shared failed: {:?}", e))?
             .x_token(Some(self.token.clone()))
             .map_err(|e| anyhow::anyhow!("x_token failed: {:?}", e))?
-            .tls_config(yellowstone_grpc_client::ClientTlsConfig::new())
+            .tls_config(yellowstone_grpc_client::ClientTlsConfig::new().with_webpki_roots())
             .map_err(|e| anyhow::anyhow!("tls_config failed: {:?}", e))?
             .connect_timeout(std::time::Duration::from_secs(10))
             .timeout(std::time::Duration::from_secs(10))
