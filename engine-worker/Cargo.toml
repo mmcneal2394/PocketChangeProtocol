@@ -39,7 +39,7 @@ solana-account-decoder = "2.2"
 borsh = "0.10"
 yellowstone-grpc-client = "12.2"
 yellowstone-grpc-proto = "12.1"
-tonic = "0.12"
+tonic = { version = "0.12", features = ["tls"] }
 rustls-native-certs = "0.7"
 rustls-pemfile = "2"
 
