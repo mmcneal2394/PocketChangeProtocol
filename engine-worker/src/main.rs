@@ -9,6 +9,7 @@ mod approval;
 mod executor;
 mod engine;
 mod tokens;
+mod pool_monitor;
 
 use std::sync::Arc;
 use std::str::FromStr;
@@ -138,6 +139,19 @@ async fn main() -> anyhow::Result<()> {
     // 9. Spawn all tasks
     let mut tasks = JoinSet::new();
 
+    // Strategy opportunity channel (shared by poll-based strategies AND pool monitor)
+    let (opp_tx, opp_rx) = mpsc::channel::<Opportunity>(128);
+
+    // Pool monitor: WebSocket-based cross-DEX spread detection
+    {
+        let pm_rpc = rpc.clone();
+        let pm_rpc_url = config.rpc_url();
+        let pm_opp_tx = opp_tx.clone();
+        tasks.spawn(async move {
+            pool_monitor::run_pool_monitor(pm_rpc, pm_rpc_url, pm_opp_tx).await;
+        });
+    }
+
     // Price feed: Jupiter
     {
         let poller = price::jupiter::JupiterPoller::new(price_cache.clone(), price_tx.clone(), token_registry.clone());
@@ -155,7 +169,6 @@ async fn main() -> anyhow::Result<()> {
     }
 
     // Strategy detectors
-    let (opp_tx, opp_rx) = mpsc::channel::<Opportunity>(128);
 
     let strategies: Vec<Arc<dyn Strategy>> = vec![
         Arc::new(strategy::triangular::TriangularStrategy::new(
