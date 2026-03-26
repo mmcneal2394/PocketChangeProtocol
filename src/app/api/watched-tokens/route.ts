@@ -6,7 +6,9 @@ let _prisma: any = null;
 function getDb() {
   if (!_prisma) {
     const { PrismaClient } = require("@prisma/client");
-    _prisma = new PrismaClient();
+    _prisma = new PrismaClient({
+      datasourceUrl: process.env.DATABASE_URL,
+    });
   }
   return _prisma;
 }
