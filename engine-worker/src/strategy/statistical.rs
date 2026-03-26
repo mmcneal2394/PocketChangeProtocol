@@ -348,6 +348,12 @@ impl Strategy for StatisticalStrategy {
             let fees_pct = (fees_usdc / trade_size_usdc) * 100.0;
             let net_profit_pct = gross_profit_pct - fees_pct;
 
+            // Sanity check
+            if net_profit_pct > 10.0 || net_profit_pct < -50.0 {
+                warn!("{} -> {} -> {}: insane profit {:.2}% — skipping", token_a, token_b, token_a, net_profit_pct);
+                continue;
+            }
+
             debug!(
                 "Round-trip {} -> {} -> {}: in={} out={} gross={:.4}% fees={:.4}% net={:.4}%",
                 token_a, token_b, token_a, amount_a, out_a_final, gross_profit_pct, fees_pct, net_profit_pct
