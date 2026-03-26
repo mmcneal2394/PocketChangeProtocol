@@ -39,15 +39,18 @@ const SIGNALS_DIR    = path.join(process.cwd(), 'signals');
 const EPOCH_FILE     = path.join(SIGNALS_DIR, 'epoch_boost.json');
 const VOL_FILE       = path.join(SIGNALS_DIR, 'volatility.json');
 const LAUNCH_FILE    = path.join(SIGNALS_DIR, 'fresh_launches.json');
+const TRENDING_FILE  = path.join(SIGNALS_DIR, 'trending.json');   // ← NEW: DexScreener top-volume
 const SIGNAL_MAX_AGE = 2 * 60 * 1000; // ignore signals older than 2 min
 
-interface EpochSignal  { active: boolean; boost: number; updatedAt: number; }
-interface VolSignal    { mints: Array<{ mint: string; pct1h: number }>; updatedAt: number; }
-interface LaunchSignal { mints: Array<{ mint: string; source: string }>; updatedAt: number; }
+interface EpochSignal    { active: boolean; boost: number; updatedAt: number; }
+interface VolSignal      { mints: Array<{ mint: string; pct1h: number }>; updatedAt: number; }
+interface LaunchSignal   { mints: Array<{ mint: string; source: string }>; updatedAt: number; }
+interface TrendingSignal { mints: Array<{ mint: string; symbol: string; volume24h: number; dexCount: number }>; updatedAt: number; }
 
-let epochSignal:  EpochSignal  = { active: false, boost: 0, updatedAt: 0 };
-let volSignal:    VolSignal    = { mints: [], updatedAt: 0 };
-let launchSignal: LaunchSignal = { mints: [], updatedAt: 0 };
+let epochSignal:    EpochSignal    = { active: false, boost: 0, updatedAt: 0 };
+let volSignal:      VolSignal      = { mints: [], updatedAt: 0 };
+let launchSignal:   LaunchSignal   = { mints: [], updatedAt: 0 };
+let trendingSignal: TrendingSignal = { mints: [], updatedAt: 0 };  // ← NEW
 
 function readSignal<T>(file: string, fallback: T): T {
   try {
@@ -60,14 +63,16 @@ function readSignal<T>(file: string, fallback: T): T {
 
 // Refresh signals every 60s (non-blocking)
 setInterval(() => {
-  epochSignal  = readSignal<EpochSignal> (EPOCH_FILE,  { active: false, boost: 0, updatedAt: 0 });
-  volSignal    = readSignal<VolSignal>   (VOL_FILE,    { mints: [], updatedAt: 0 });
-  launchSignal = readSignal<LaunchSignal>(LAUNCH_FILE, { mints: [], updatedAt: 0 });
+  epochSignal    = readSignal<EpochSignal>   (EPOCH_FILE,    { active: false, boost: 0, updatedAt: 0 });
+  volSignal      = readSignal<VolSignal>     (VOL_FILE,      { mints: [], updatedAt: 0 });
+  launchSignal   = readSignal<LaunchSignal>  (LAUNCH_FILE,   { mints: [], updatedAt: 0 });
+  trendingSignal = readSignal<TrendingSignal>(TRENDING_FILE, { mints: [], updatedAt: 0 });
 }, 60_000);
 // Initial read
-epochSignal  = readSignal<EpochSignal> (EPOCH_FILE,  { active: false, boost: 0, updatedAt: 0 });
-volSignal    = readSignal<VolSignal>   (VOL_FILE,    { mints: [], updatedAt: 0 });
-launchSignal = readSignal<LaunchSignal>(LAUNCH_FILE, { mints: [], updatedAt: 0 });
+epochSignal    = readSignal<EpochSignal>   (EPOCH_FILE,    { active: false, boost: 0, updatedAt: 0 });
+volSignal      = readSignal<VolSignal>     (VOL_FILE,      { mints: [], updatedAt: 0 });
+launchSignal   = readSignal<LaunchSignal>  (LAUNCH_FILE,   { mints: [], updatedAt: 0 });
+trendingSignal = readSignal<TrendingSignal>(TRENDING_FILE, { mints: [], updatedAt: 0 });
 
 // ── Min-mode: low-capital operation (~$5 / 0.05 SOL) ────────────────────────────
 // Activated by: MIN_MODE=true in env, or --min-mode CLI flag via dry_run_sim.ts
@@ -150,6 +155,30 @@ export async function handleAccountUpdate(data: any) {
     const otherRoutes = routes.filter(r => !volMints.has(r.outputMint));
     routes = [...volRoutes, ...otherRoutes].slice(0, BATCH_SIZE);
     if (volRoutes.length > 0) logger.debug(`[SIGNAL] ⚡ ${volRoutes.length} volatile route(s) elevated`);
+  }
+
+  // ── Boost 3: Trending / high-volume cross-DEX tokens → front of queue ──────
+  if (trendingSignal.mints.length > 0) {
+    const trendMints   = new Set(trendingSignal.mints.map(m => m.mint));
+    const trendRoutes  = routes.filter(r => trendMints.has(r.outputMint));
+    const otherRoutes  = routes.filter(r => !trendMints.has(r.outputMint));
+
+    // Also register any trending mints not yet in route_manager
+    for (const tm of trendingSignal.mints) {
+      if (!routes.find(r => r.outputMint === tm.mint)) {
+        globalRouteManager.addToken({
+          mint:         tm.mint,
+          source:       'DexScreener-Trending',
+          category:     tm.dexCount >= 3 ? 'bluechip' : 'meme',
+          liquidityUsd: tm.volume24h / 24,  // hourly volume as liquidity proxy
+          trustScore:   Math.min(100, 40 + tm.dexCount * 10),
+          addedAt:      Date.now(),
+        });
+      }
+    }
+
+    routes = [...trendRoutes, ...otherRoutes].slice(0, BATCH_SIZE);
+    if (trendRoutes.length > 0) logger.debug(`[SIGNAL] 📈 ${trendRoutes.length} trending route(s) elevated to batch head`);
   }
 
   await Promise.allSettled(routes.map(route =>

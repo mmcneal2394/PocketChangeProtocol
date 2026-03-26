@@ -31,6 +31,56 @@ yarn-error.log*
 .DS_Store
 *.pem
 *.log
+*.txt
+!LICENSE.txt
+!README*.txt
+optimized-jupiter-bot/*.json
+!optimized-jupiter-bot/package.json
+!optimized-jupiter-bot/tsconfig.json
+!optimized-jupiter-bot/tip_accounts.json
+
+# ── RUNTIME SIGNAL DATA — live trade state, never commit ───────────────────────
+optimized-jupiter-bot/signals/
+signals/
+
+# ── ARCHIVE — deprecated scripts, not needed for audit ─────────────────────────
+optimized-jupiter-bot/scripts/_archive/
+
+# ── BACKUP FILES ────────────────────────────────────────────────────────────────
+backups/
+*.gz
+*.tar
+*.zip
+*.tar.gz
+bot_dist.tar.gz
+safe_bot.tar.gz
+pcprotocol.tar.gz
+deploy.zip
+src_*.tar.gz
+env_*.tar.gz
+helius_*.tar.gz
+
+# ── TEMP / DEBUG SCRIPTS ──────────────────────────────────────────────────────
+optimized-jupiter-bot/harden.js
+optimized-jupiter-bot/security_audit*.js
+optimized-jupiter-bot/emergency_sweep.js
+optimized-jupiter-bot/recover_rent.js
+optimized-jupiter-bot/scan_all_wallets.js
+optimized-jupiter-bot/sweep_wallet*.js
+optimized-jupiter-bot/check_*.js
+optimized-jupiter-bot/gen_wallet.js
+
+# ── DEMO / MEDIA FILES — large, not needed in repo ───────────────────────────
+*.mp4
+*.webm
+*.webp
+*.gif
+!public/**/*.gif
+!public/**/*.webp
+
+# ── SYSTEM ────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
 
 # anchor
 target/
