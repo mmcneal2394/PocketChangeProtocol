@@ -62,7 +62,7 @@ impl GeyserMonitor {
 
         let mut client = GeyserGrpcClient::build_from_shared(self.endpoint.clone())?
             .x_token(Some(self.token.clone()))?
-            .tls_config(tonic::transport::ClientTlsConfig::new())?
+            .tls_config(yellowstone_grpc_client::ClientTlsConfig::new())?
             .connect()
             .await?;
 
