@@ -59,7 +59,7 @@ pub trait Strategy: Send + Sync {
 
 /// Minimum seconds between strategy evaluations.
 /// Prevents hammering Jupiter API on every price tick.
-const MIN_EVAL_INTERVAL_SECS: u64 = 10;
+const MIN_EVAL_INTERVAL_SECS: u64 = 5;
 
 pub async fn run_detector(
     strategy: Arc<dyn Strategy>,
