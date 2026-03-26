@@ -41,6 +41,8 @@ pub struct FlashLoanStrategy {
     http_client: reqwest::Client,
     /// Token registry for dynamic token resolution
     registry: Arc<TokenRegistry>,
+    /// Wallet USDC balance in lamports (updated externally). 0 = simulate with $50.
+    pub wallet_usdc_balance: std::sync::atomic::AtomicU64,
 }
 
 impl FlashLoanStrategy {
@@ -68,6 +70,7 @@ impl FlashLoanStrategy {
             treasury_usdc,
             http_client: reqwest::Client::new(),
             registry,
+            wallet_usdc_balance: std::sync::atomic::AtomicU64::new(0),
         }
     }
 
@@ -386,12 +389,16 @@ impl Strategy for FlashLoanStrategy {
             return vec![];
         }
 
-        // Use 95% of configured max_trade_size as borrow amount
-        // In production this should read actual wallet USDC balance
-        let sol_price = prices.get_price("SOL").unwrap_or(90.0);
-        let max_usdc = 45.0_f64; // Will be replaced with on-chain balance check
-        let borrow_usdc = max_usdc * 0.95;
-        let borrow_amount: u64 = (borrow_usdc * 1_000_000.0) as u64; // USDC 6 decimals
+        // Determine borrow amount: use wallet balance if available, else simulate with $50
+        let wallet_usdc_balance = self.wallet_usdc_balance.load(std::sync::atomic::Ordering::Relaxed);
+        let borrow_usdc = if wallet_usdc_balance > 0 {
+            // Real wallet: use 95% of balance
+            (wallet_usdc_balance as f64 / 1_000_000.0) * 0.95
+        } else {
+            // No funds / paper mode: simulate with $50
+            50.0
+        };
+        let borrow_amount: u64 = (borrow_usdc * 1_000_000.0) as u64;
         let flash_tokens = self.registry.for_strategy("flash_loan");
 
         for token_entry in &flash_tokens {
@@ -431,7 +438,7 @@ impl Strategy for FlashLoanStrategy {
 
             // --- Accurate fee calculation ---
             let sol_price = prices.get_price("SOL").unwrap_or(150.0);
-            let trade_size = 45.0_f64; // USDC
+            let trade_size = borrow_usdc;
             // 2 transactions (buy + sell) plus flash loan CPI overhead
             let fixed_cost_usdc = estimate_execution_cost_usdc(sol_price, 2)
                 + FLASH_LOAN_CPI_OVERHEAD_SOL * sol_price;
