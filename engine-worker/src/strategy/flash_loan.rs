@@ -386,7 +386,7 @@ impl Strategy for FlashLoanStrategy {
             return vec![];
         }
 
-        let borrow_amount: u64 = 10_000_000; // 10 USDC probe (6 decimals)
+        let borrow_amount: u64 = 45_000_000; // 45 USDC (6 decimals)
         let flash_tokens = self.registry.for_strategy("flash_loan");
 
         for token_entry in &flash_tokens {
@@ -426,7 +426,7 @@ impl Strategy for FlashLoanStrategy {
 
             // --- Accurate fee calculation ---
             let sol_price = prices.get_price("SOL").unwrap_or(150.0);
-            let trade_size = 100.0_f64; // USDC
+            let trade_size = 45.0_f64; // USDC
             // 2 transactions (buy + sell) plus flash loan CPI overhead
             let fixed_cost_usdc = estimate_execution_cost_usdc(sol_price, 2)
                 + FLASH_LOAN_CPI_OVERHEAD_SOL * sol_price;
@@ -448,7 +448,7 @@ impl Strategy for FlashLoanStrategy {
                     route: format!("USDC -> {} -> USDC (flash loan)", token),
                     expected_profit_pct: Decimal::from_f64(net_profit).unwrap_or_default(),
                     estimated_fees_pct: Decimal::from_f64(total_fees_pct).unwrap_or_default(),
-                    trade_size_usdc: Decimal::new(100, 0),
+                    trade_size_usdc: Decimal::new(45, 0),
                     instructions: vec![],
                     detected_at: Instant::now(),
                 });
@@ -578,7 +578,7 @@ mod tests {
             route: "USDC -> RAY -> USDC (flash loan)".to_string(),
             expected_profit_pct: Decimal::new(5, 1),
             estimated_fees_pct: Decimal::new(3, 2),
-            trade_size_usdc: Decimal::new(100, 0),
+            trade_size_usdc: Decimal::new(45, 0),
             instructions: vec![],
             detected_at: Instant::now(),
         };

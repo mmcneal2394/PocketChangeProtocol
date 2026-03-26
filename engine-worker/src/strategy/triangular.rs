@@ -428,7 +428,7 @@ impl Strategy for TriangularStrategy {
                     route,
                     expected_profit_pct: Decimal::from_f64(net_profit).unwrap_or_default(),
                     estimated_fees_pct: Decimal::from_f64(total_fees_pct).unwrap_or_default(),
-                    trade_size_usdc: Decimal::new(100, 0),
+                    trade_size_usdc: Decimal::new(45, 0),
                     instructions: vec![],
                     detected_at: Instant::now(),
                 });
