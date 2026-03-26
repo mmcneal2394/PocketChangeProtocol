@@ -12,3 +12,8 @@ node_modules
 .next_build2
 backups
 docs
+anchor/programs
+anchor/target/debug
+anchor/target/release
+anchor/target/deploy
+pocketchange-vault
