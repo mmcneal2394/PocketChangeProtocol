@@ -10,7 +10,7 @@ const JUPITER_API = 'https://public.jupiterapi.com';
 
 // 1. Standard Node for Reading Chain State (Balances, Blockhashes, Priorities)
 <<<<<<< HEAD
-const READ_RPC = 'https://solana-mainnet.core.chainstack.com/95d603f3d634acfbf2ac5a57a32baf97';
+const READ_RPC = 'https://solana-mainnet.core.chainstack.com/YOUR_CHAINSTACK_KEY';
 =======
 const READ_RPC = 'https://solana-mainnet.core.chainstack.com/YOUR_CHAINSTACK_KEY';
 >>>>>>> b98063db64e327d63401fc99bce9fd880aa4d97f

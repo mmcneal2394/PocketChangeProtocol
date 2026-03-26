@@ -3,7 +3,7 @@ import fs from 'fs';
 
 const JUPITER_API = 'https://lite-api.jup.ag';
 <<<<<<< HEAD
-const RPC_ENDPOINT = 'https://solana-mainnet.core.chainstack.com/95d603f3d634acfbf2ac5a57a32baf97';
+const RPC_ENDPOINT = 'https://solana-mainnet.core.chainstack.com/YOUR_CHAINSTACK_KEY';
 =======
 const RPC_ENDPOINT = 'https://solana-mainnet.core.chainstack.com/YOUR_CHAINSTACK_KEY';
 >>>>>>> b98063db64e327d63401fc99bce9fd880aa4d97f
