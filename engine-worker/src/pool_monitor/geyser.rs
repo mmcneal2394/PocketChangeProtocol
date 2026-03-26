@@ -46,7 +46,7 @@ impl GeyserMonitor {
         loop {
             match self.connect_and_stream(&pool_addresses, &multi_dex_map, &spread_tx).await {
                 Ok(_) => warn!("Geyser stream ended, reconnecting in 5s..."),
-                Err(e) => error!("Geyser error: {}, reconnecting in 5s...", e),
+                Err(e) => error!("Geyser error: {:?}, reconnecting in 5s...", e),
             }
             tokio::time::sleep(std::time::Duration::from_secs(5)).await;
         }
@@ -58,13 +58,24 @@ impl GeyserMonitor {
         multi_dex_map: &Arc<RwLock<MultiDexMap>>,
         spread_tx: &mpsc::Sender<SpreadOpportunity>,
     ) -> anyhow::Result<()> {
-        info!("Connecting to Geyser gRPC: {}", self.endpoint);
+        // Try connecting with token as x-token metadata
+        info!("Connecting to Geyser gRPC: {} (token length: {})", self.endpoint, self.token.len());
 
-        let mut client = GeyserGrpcClient::build_from_shared(self.endpoint.clone())?
-            .x_token(Some(self.token.clone()))?
-            .tls_config(yellowstone_grpc_client::ClientTlsConfig::new())?
+        let connect_result = GeyserGrpcClient::build_from_shared(self.endpoint.clone())
+            .map_err(|e| anyhow::anyhow!("build_from_shared failed: {:?}", e))?
+            .x_token(Some(self.token.clone()))
+            .map_err(|e| anyhow::anyhow!("x_token failed: {:?}", e))?
+            .tls_config(yellowstone_grpc_client::ClientTlsConfig::new())
+            .map_err(|e| anyhow::anyhow!("tls_config failed: {:?}", e))?
+            .connect_timeout(std::time::Duration::from_secs(10))
+            .timeout(std::time::Duration::from_secs(10))
             .connect()
-            .await?;
+            .await;
+
+        let mut client = match connect_result {
+            Ok(c) => c,
+            Err(e) => return Err(anyhow::anyhow!("Geyser connect failed: {:?}", e)),
+        };
 
         info!("Geyser gRPC connected, subscribing to {} pool accounts", pool_addresses.len());
 
