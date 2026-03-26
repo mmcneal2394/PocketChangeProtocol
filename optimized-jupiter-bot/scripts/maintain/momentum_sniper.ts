@@ -478,12 +478,14 @@ async function checkExits() {
           store.stats.totalPnlSol += pnlSol;
           if (pnlSol >= 0) store.stats.wins++; else store.stats.losses++;
           if (sl) store.blacklist.push(pos.mint);
+          exits.push(pos);
+        } else {
+          console.warn(`[SNIPER] ❌ Swap execution failed for ${pos.symbol} — keeping in memory to retry`);
         }
       } else {
         console.warn(`[SNIPER] ⚠️  No sell quote for ${pos.symbol} — holding`);
         continue;
       }
-      exits.push(pos);
     } else {
       // Status line: show trailing state when active
       const trailTag = peak >= 2
