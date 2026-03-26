@@ -89,19 +89,40 @@ impl GeyserMonitor {
             Err(e) => return Err(anyhow::anyhow!("Geyser connect failed: {:?}", e)),
         };
 
-        info!("Geyser gRPC connected, subscribing to {} pool accounts", pool_addresses.len());
+        info!("Geyser gRPC connected");
 
-        // Build subscription
+        // Subscribe to DEX program accounts — catches ALL pool updates across all DEXes
         let mut accounts_filter = HashMap::new();
-        let account_keys: Vec<String> = pool_addresses.iter()
-            .map(|p| p.to_string())
-            .collect();
 
+        // Subscribe to specific pool accounts if we have them
+        if !pool_addresses.is_empty() {
+            let account_keys: Vec<String> = pool_addresses.iter()
+                .map(|p| p.to_string())
+                .collect();
+            accounts_filter.insert(
+                "pools".to_string(),
+                SubscribeRequestFilterAccounts {
+                    account: account_keys,
+                    owner: vec![],
+                    filters: vec![],
+                    nonempty_txn_signature: None,
+                },
+            );
+            info!("Subscribed to {} specific pool accounts", pool_addresses.len());
+        }
+
+        // Also subscribe to ALL accounts owned by major DEX programs
+        // This catches every pool state change without needing to know pool addresses upfront
         accounts_filter.insert(
-            "pools".to_string(),
+            "dex_programs".to_string(),
             SubscribeRequestFilterAccounts {
-                account: account_keys,
-                owner: vec![],
+                account: vec![],
+                owner: vec![
+                    "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8".to_string(), // Raydium AMM V4
+                    "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc".to_string(),  // Orca Whirlpool
+                    "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo".to_string(),  // Meteora DLMM
+                    "PSwapMdSai8tjrEXcxFeQth87xC4rRsa4VA5mhGhXkP".to_string(),  // PumpSwap AMM
+                ],
                 filters: vec![],
                 nonempty_txn_signature: None,
             },
@@ -124,7 +145,7 @@ impl GeyserMonitor {
         };
 
         subscribe_tx.send(request).await?;
-        info!("Geyser subscription active — streaming {} pool accounts", pool_addresses.len());
+        info!("Geyser subscription active — streaming {} specific pools + 4 DEX programs (Raydium, Orca, Meteora, PumpSwap)", pool_addresses.len());
 
         let usdc_mint = Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap();
         let mut updates: u64 = 0;
