@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 const CA = "4yfwG2VqohXCMpX7SKz3uy7CKzujL4SkhjJMkgKvBAGS";
-const LOGO = "/logo.png"; // served from public/ — zero latency on Vercel
+const LOGO = "/logo.jpg"; // served from public/ — zero latency on Vercel
 
 export default function LandingPage() {
   const [mounted, setMounted] = useState(false);
