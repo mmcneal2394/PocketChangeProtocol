@@ -386,7 +386,12 @@ impl Strategy for FlashLoanStrategy {
             return vec![];
         }
 
-        let borrow_amount: u64 = 45_000_000; // 45 USDC (6 decimals)
+        // Use 95% of configured max_trade_size as borrow amount
+        // In production this should read actual wallet USDC balance
+        let sol_price = prices.get_price("SOL").unwrap_or(90.0);
+        let max_usdc = 45.0_f64; // Will be replaced with on-chain balance check
+        let borrow_usdc = max_usdc * 0.95;
+        let borrow_amount: u64 = (borrow_usdc * 1_000_000.0) as u64; // USDC 6 decimals
         let flash_tokens = self.registry.for_strategy("flash_loan");
 
         for token_entry in &flash_tokens {
