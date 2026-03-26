@@ -15,6 +15,7 @@ use std::sync::Arc;
 use std::str::FromStr;
 use tokio::sync::{broadcast, mpsc, RwLock};
 use tokio::task::JoinSet;
+use futures::FutureExt;
 use tracing::{info, warn, error};
 
 use config::EngineConfig;
@@ -148,7 +149,13 @@ async fn main() -> anyhow::Result<()> {
         let pm_rpc_url = config.rpc_url();
         let pm_opp_tx = opp_tx.clone();
         tasks.spawn(async move {
-            pool_monitor::run_pool_monitor(pm_rpc, pm_rpc_url, pm_opp_tx).await;
+            info!("Spawning pool monitor task...");
+            match std::panic::AssertUnwindSafe(
+                pool_monitor::run_pool_monitor(pm_rpc, pm_rpc_url, pm_opp_tx)
+            ).catch_unwind().await {
+                Ok(_) => warn!("Pool monitor exited"),
+                Err(e) => error!("Pool monitor PANICKED: {:?}", e),
+            }
         });
     }
 

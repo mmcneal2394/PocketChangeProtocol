@@ -80,7 +80,6 @@ impl GeyserMonitor {
 
         let connect_result = builder
             .connect_timeout(std::time::Duration::from_secs(10))
-            .timeout(std::time::Duration::from_secs(10))
             .connect()
             .await;
 
@@ -91,42 +90,48 @@ impl GeyserMonitor {
 
         info!("Geyser gRPC connected");
 
-        // Subscribe to DEX program accounts — catches ALL pool updates across all DEXes
+        // Subscribe to DEX program accounts by owner — server-side filtering
+        // This catches every pool state change without sending a huge account list
         let mut accounts_filter = HashMap::new();
 
-        // Subscribe to specific pool accounts if we have them
-        if !pool_addresses.is_empty() {
-            let account_keys: Vec<String> = pool_addresses.iter()
-                .map(|p| p.to_string())
-                .collect();
-            accounts_filter.insert(
-                "pools".to_string(),
-                SubscribeRequestFilterAccounts {
-                    account: account_keys,
-                    owner: vec![],
-                    filters: vec![],
-                    nonempty_txn_signature: None,
-                },
-            );
-            info!("Subscribed to {} specific pool accounts", pool_addresses.len());
-        }
-
-        // Also subscribe to ALL accounts owned by major DEX programs
-        // This catches every pool state change without needing to know pool addresses upfront
         accounts_filter.insert(
-            "dex_programs".to_string(),
+            "raydium".to_string(),
             SubscribeRequestFilterAccounts {
                 account: vec![],
-                owner: vec![
-                    "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8".to_string(), // Raydium AMM V4
-                    "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc".to_string(),  // Orca Whirlpool
-                    "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo".to_string(),  // Meteora DLMM
-                    "PSwapMdSai8tjrEXcxFeQth87xC4rRsa4VA5mhGhXkP".to_string(),  // PumpSwap AMM
-                ],
+                owner: vec!["675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8".to_string()],
                 filters: vec![],
                 nonempty_txn_signature: None,
             },
         );
+        accounts_filter.insert(
+            "orca".to_string(),
+            SubscribeRequestFilterAccounts {
+                account: vec![],
+                owner: vec!["whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc".to_string()],
+                filters: vec![],
+                nonempty_txn_signature: None,
+            },
+        );
+        accounts_filter.insert(
+            "meteora".to_string(),
+            SubscribeRequestFilterAccounts {
+                account: vec![],
+                owner: vec!["LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo".to_string()],
+                filters: vec![],
+                nonempty_txn_signature: None,
+            },
+        );
+        accounts_filter.insert(
+            "pumpswap".to_string(),
+            SubscribeRequestFilterAccounts {
+                account: vec![],
+                owner: vec!["PSwapMdSai8tjrEXcxFeQth87xC4rRsa4VA5mhGhXkP".to_string()],
+                filters: vec![],
+                nonempty_txn_signature: None,
+            },
+        );
+
+        info!("Subscribing to 4 DEX program owners (pool_addresses available: {})", pool_addresses.len());
 
         let (mut subscribe_tx, mut stream) = client.subscribe().await?;
 
@@ -145,49 +150,61 @@ impl GeyserMonitor {
         };
 
         subscribe_tx.send(request).await?;
-        info!("Geyser subscription active — streaming {} specific pools + 4 DEX programs (Raydium, Orca, Meteora, PumpSwap)", pool_addresses.len());
+        info!("Geyser subscription active — streaming 4 DEX programs (Raydium, Orca, Meteora, PumpSwap)");
 
         let usdc_mint = Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap();
         let mut updates: u64 = 0;
 
-        while let Some(Ok(msg)) = stream.next().await {
-            if let Some(update) = msg.update_oneof {
-                match update {
-                    UpdateOneof::Account(acct) => {
-                        if let Some(info) = acct.account {
-                            if info.pubkey.len() == 32 {
-                                let mut arr = [0u8; 32];
-                                arr.copy_from_slice(&info.pubkey);
-                                let pubkey = Pubkey::new_from_array(arr);
+        loop {
+            match stream.next().await {
+                Some(Ok(msg)) => {
+                    if let Some(update) = msg.update_oneof {
+                        match update {
+                            UpdateOneof::Account(acct) => {
+                                if let Some(info) = acct.account {
+                                    if info.pubkey.len() == 32 {
+                                        let mut arr = [0u8; 32];
+                                        arr.copy_from_slice(&info.pubkey);
+                                        let pubkey = Pubkey::new_from_array(arr);
 
-                                updates += 1;
-                                if updates % 100 == 1 {
-                                    debug!("Geyser: {} pool updates received", updates);
-                                }
+                                        updates += 1;
+                                        if updates % 1000 == 1 {
+                                            info!("Geyser: {} DEX account updates received so far", updates);
+                                        }
 
-                                let map = multi_dex_map.read().await;
-                                for token in map.values() {
-                                    if token.pools.iter().any(|p| p.address == pubkey) {
-                                        if let Some(spread) = token.best_spread(&usdc_mint) {
-                                            if spread.spread_pct > 0.1 {
-                                                info!(
-                                                    "GEYSER SPREAD: {} {:.4}% ({} -> {})",
-                                                    spread.symbol.as_deref().unwrap_or("?"),
-                                                    spread.spread_pct,
-                                                    spread.buy_dex, spread.sell_dex,
-                                                );
-                                                let _ = spread_tx.send(spread).await;
+                                        let map = multi_dex_map.read().await;
+                                        for token in map.values() {
+                                            if token.pools.iter().any(|p| p.address == pubkey) {
+                                                if let Some(spread) = token.best_spread(&usdc_mint) {
+                                                    if spread.spread_pct > 0.1 {
+                                                        info!(
+                                                            "GEYSER SPREAD: {} {:.4}% ({} -> {})",
+                                                            spread.symbol.as_deref().unwrap_or("?"),
+                                                            spread.spread_pct,
+                                                            spread.buy_dex, spread.sell_dex,
+                                                        );
+                                                        let _ = spread_tx.send(spread).await;
+                                                    }
+                                                }
                                             }
                                         }
                                     }
                                 }
                             }
+                            UpdateOneof::Ping(_) => {
+                                debug!("Geyser ping received");
+                            }
+                            _ => {}
                         }
                     }
-                    UpdateOneof::Ping(_) => {
-                        debug!("Geyser ping");
-                    }
-                    _ => {}
+                }
+                Some(Err(e)) => {
+                    error!("Geyser stream error: {:?}", e);
+                    return Err(anyhow::anyhow!("Geyser stream error: {:?}", e));
+                }
+                None => {
+                    warn!("Geyser stream ended (None received)");
+                    break;
                 }
             }
         }
