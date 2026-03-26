@@ -58,15 +58,12 @@ impl GeyserMonitor {
         multi_dex_map: &Arc<RwLock<MultiDexMap>>,
         spread_tx: &mpsc::Sender<SpreadOpportunity>,
     ) -> anyhow::Result<()> {
-        // Try connecting with token as x-token metadata
         info!("Connecting to Geyser gRPC: {} (token length: {})", self.endpoint, self.token.len());
 
         let connect_result = GeyserGrpcClient::build_from_shared(self.endpoint.clone())
             .map_err(|e| anyhow::anyhow!("build_from_shared failed: {:?}", e))?
             .x_token(Some(self.token.clone()))
             .map_err(|e| anyhow::anyhow!("x_token failed: {:?}", e))?
-            .tls_config(yellowstone_grpc_client::ClientTlsConfig::new().with_webpki_roots())
-            .map_err(|e| anyhow::anyhow!("tls_config failed: {:?}", e))?
             .connect_timeout(std::time::Duration::from_secs(10))
             .timeout(std::time::Duration::from_secs(10))
             .connect()

@@ -60,5 +60,6 @@ enabled = true\n' > engine.toml
 EXPOSE 3002
 
 ENV RUST_LOG=info
+ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
 
 CMD ["./arbitrasaas-engine"]
