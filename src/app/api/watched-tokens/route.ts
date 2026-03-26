@@ -1,26 +1,16 @@
 import { NextResponse } from "next/server";
+import { Pool } from "pg";
 
 export const dynamic = "force-dynamic";
 
-let _prisma: any = null;
-function getDb() {
-  if (!_prisma) {
-    const { PrismaClient } = require("@prisma/client");
-    _prisma = new PrismaClient({
-      datasourceUrl: process.env.DATABASE_URL,
-    });
-  }
-  return _prisma;
-}
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 export async function GET() {
   try {
-    const prisma = getDb();
-    const tokens = await prisma.watchedToken.findMany({
-      where: { isActive: true },
-      orderBy: { symbol: "asc" },
-    });
-    return NextResponse.json(tokens);
+    const { rows } = await pool.query(
+      'SELECT * FROM "WatchedToken" WHERE "isActive" = true ORDER BY symbol'
+    );
+    return NextResponse.json(rows);
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
@@ -28,15 +18,15 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const prisma = getDb();
-    const body = await req.json();
-    const { symbol, mint, decimals, strategies } = body;
-    const token = await prisma.watchedToken.upsert({
-      where: { symbol },
-      update: { mint: mint || undefined, decimals: decimals || undefined, strategies: strategies || undefined, isActive: true },
-      create: { symbol, mint, decimals: decimals || 6, strategies: strategies || "all", isActive: true },
-    });
-    return NextResponse.json(token, { status: 201 });
+    const { symbol, mint, decimals, strategies } = await req.json();
+    const { rows } = await pool.query(
+      `INSERT INTO "WatchedToken" (id, symbol, mint, decimals, "isActive", strategies, "createdAt", "updatedAt")
+       VALUES (gen_random_uuid(), $1, $2, $3, true, $4, NOW(), NOW())
+       ON CONFLICT (symbol) DO UPDATE SET "isActive" = true, "updatedAt" = NOW()
+       RETURNING *`,
+      [symbol, mint, decimals || 6, strategies || "all"]
+    );
+    return NextResponse.json(rows[0], { status: 201 });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 400 });
   }
@@ -44,15 +34,15 @@ export async function POST(req: Request) {
 
 export async function PATCH(req: Request) {
   try {
-    const prisma = getDb();
-    const body = await req.json();
-    const { symbol, isActive, strategies } = body;
-    const token = await prisma.watchedToken.update({
-      where: { symbol },
-      data: { isActive: isActive ?? undefined, strategies: strategies ?? undefined },
-    });
-    return NextResponse.json(token);
+    const { symbol, isActive, strategies } = await req.json();
+    const { rows } = await pool.query(
+      `UPDATE "WatchedToken" SET "isActive" = COALESCE($2, "isActive"), strategies = COALESCE($3, strategies), "updatedAt" = NOW()
+       WHERE symbol = $1 RETURNING *`,
+      [symbol, isActive, strategies]
+    );
+    if (rows.length === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    return NextResponse.json(rows[0]);
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 404 });
+    return NextResponse.json({ error: err.message }, { status: 400 });
   }
 }
