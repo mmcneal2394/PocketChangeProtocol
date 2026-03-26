@@ -3,10 +3,13 @@ seeds = false
 skip-lint = false
 
 [programs.localnet]
-pocketchange_vault = "4yfwG2VqohXCMpX7SKz3uy7CKzujL4SkhjJMkgKvBAGS"
+pocketchange_vault = "34sgN4q5CaaGCwqePU6d2y6xzBuY5ASA8E8LtXjfyN3c"
+
+[programs.devnet]
+pocketchange_vault = "34sgN4q5CaaGCwqePU6d2y6xzBuY5ASA8E8LtXjfyN3c"
 
 [programs.mainnet]
-pocketchange_vault = "4yfwG2VqohXCMpX7SKz3uy7CKzujL4SkhjJMkgKvBAGS"
+pocketchange_vault = "34sgN4q5CaaGCwqePU6d2y6xzBuY5ASA8E8LtXjfyN3c"
 
 [registry]
 url = "https://api.apr.dev"
@@ -16,4 +19,4 @@ cluster = "Localnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
-test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
+test = "npx ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
