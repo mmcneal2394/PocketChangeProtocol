@@ -34,6 +34,9 @@ uuid = { version = "1", features = ["v4"] }
 anchor-client = "0.29"
 anyhow = "1"
 bincode = "1"
+tokio-tungstenite = { version = "0.21", features = ["native-tls"] }
+solana-account-decoder = "1.18"
+borsh = "0.10"
 
 [profile.release]
 opt-level = 3
