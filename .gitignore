@@ -54,7 +54,14 @@ optimized-jupiter-bot/*.json
 !optimized-jupiter-bot/tsconfig.json
 !optimized-jupiter-bot/tip_accounts.json
 
-# ── BACKUP FILES ───────────────────────────────────────────────────────────────
+# ── RUNTIME SIGNAL DATA — live trade state, never commit ───────────────────────
+optimized-jupiter-bot/signals/
+signals/
+
+# ── ARCHIVE — deprecated scripts, not needed for audit ─────────────────────────
+optimized-jupiter-bot/scripts/_archive/
+
+# ── BACKUP FILES ────────────────────────────────────────────────────────────────
 backups/
 *.gz
 *.tar

@@ -32,6 +32,7 @@ const SLOW_WINDOW = 500;  // trade rows for slow loop
 
 const PARAMS_PATH     = path.join(process.cwd(), 'strategy_params.json');
 const TELEMETRY_PATHS = [
+  path.join(process.cwd(), 'signals', 'trade_journal.jsonl'), // sniper trade log (primary)
   path.join(process.cwd(), 'engine-worker', 'telemetry.jsonl'),
   path.join(process.cwd(), 'telemetry.jsonl'),
 ];
@@ -83,11 +84,24 @@ function readTelemetry(maxRows: number): TradeRow[] {
     if (!fs.existsSync(p)) continue;
     try {
       const lines = fs.readFileSync(p, 'utf-8').trim().split('\n');
-      return lines
+      const rows = lines
         .filter(l => l.length > 5)
-        .map(l => { try { return JSON.parse(l); } catch { return null; } })
+        .map(l => {
+          try {
+            const j = JSON.parse(l);
+            // Normalize trade_journal.jsonl format → TradeRow
+            // Journal has: { action, pnlSol, amountSol } — only SELL rows = completed trades
+            if (j.action === 'SELL' && j.pnlSol != null) {
+              return { success: j.pnlSol >= 0, profit_sol: j.pnlSol, spread_bps: j.spread_bps } as TradeRow;
+            }
+            // Native telemetry.jsonl format: { success, profit_sol }
+            if (j.profit_sol != null) return j as TradeRow;
+            return null;
+          } catch { return null; }
+        })
         .filter(Boolean)
         .slice(-maxRows) as TradeRow[];
+      if (rows.length > 0) return rows;
     } catch { continue; }
   }
   return [];
