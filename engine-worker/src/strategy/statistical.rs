@@ -8,7 +8,7 @@ use solana_sdk::signature::{Keypair, Signer};
 use uuid::Uuid;
 use std::sync::Arc;
 use std::time::Instant;
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 use crate::types::*;
 use crate::price::PriceCache;
 use crate::strategy::{Strategy, estimate_execution_cost_usdc};
@@ -381,7 +381,7 @@ impl Strategy for StatisticalStrategy {
                 route,
                 expected_profit_pct: Decimal::from_f64(net_profit_pct).unwrap_or_default(),
                 estimated_fees_pct: Decimal::from_f64(fees_pct).unwrap_or_default(),
-                trade_size_usdc: Decimal::new(100, 0),
+                trade_size_usdc: Decimal::new(45, 0),
                 instructions: vec![],
                 detected_at: Instant::now(),
             });

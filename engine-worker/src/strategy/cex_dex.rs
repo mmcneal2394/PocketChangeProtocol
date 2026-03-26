@@ -250,7 +250,7 @@ impl Strategy for CexDexStrategy {
                         ),
                         expected_profit_pct: Decimal::from_f64(net_profit).unwrap_or_default(),
                         estimated_fees_pct: Decimal::from_f64(total_fees_pct).unwrap_or_default(),
-                        trade_size_usdc: Decimal::new(100, 0), // Lower size for non-atomic
+                        trade_size_usdc: Decimal::new(45, 0), // Lower size for non-atomic
                         instructions: vec![],
                         detected_at: Instant::now(),
                     });
@@ -321,7 +321,7 @@ impl Strategy for CexDexStrategy {
                     ),
                     expected_profit_pct: Decimal::from_f64(net_profit).unwrap_or_default(),
                     estimated_fees_pct: Decimal::from_f64(total_fees_pct).unwrap_or_default(),
-                    trade_size_usdc: Decimal::new(100, 0),
+                    trade_size_usdc: Decimal::new(45, 0),
                     instructions: vec![], // CEX-CEX: no on-chain instructions
                     detected_at: Instant::now(),
                 });
@@ -482,7 +482,7 @@ mod tests {
             dex_tx_hash: None,
             cex_order_id: None,
             pair: "SOL".into(),
-            size: Decimal::new(100, 0),
+            size: Decimal::new(45, 0),
             opened_at: Instant::now(),
             max_exposure_secs: 300,
         });
