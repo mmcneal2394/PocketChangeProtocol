@@ -7,8 +7,8 @@ description = "Multi-tenant Solana Arbitrage Worker Engine"
 
 [dependencies]
 tokio = { version = "1.35", features = ["full", "rt-multi-thread", "macros"] }
-solana-client = "1.18" # Solana RPC interactions
-solana-sdk = "1.18"
+solana-client = "2.2" # Solana RPC interactions
+solana-sdk = "2.2"
 serde = { version = "=1.0.228", features = ["derive"] }
 serde_json = "1.0"
 reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
@@ -31,12 +31,15 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
 async-trait = "0.1"
 uuid = { version = "1", features = ["v4"] }
-anchor-client = "0.29"
+# anchor-client removed — we build vault instructions manually via sha2 discriminators
 anyhow = "1"
 bincode = "1"
 tokio-tungstenite = { version = "0.21", features = ["native-tls"] }
-solana-account-decoder = "1.18"
+solana-account-decoder = "2.2"
 borsh = "0.10"
+yellowstone-grpc-client = "12.2"
+yellowstone-grpc-proto = "12.2"
+tonic = "0.12"
 
 [profile.release]
 opt-level = 3
