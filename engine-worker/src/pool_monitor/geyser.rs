@@ -225,7 +225,7 @@ impl GeyserMonitor {
                                         for token in map.values() {
                                             if token.pools.iter().any(|p| p.address == pubkey) {
                                                 if let Some(spread) = token.best_spread(&usdc_mint) {
-                                                    if spread.spread_pct > 0.1 {
+                                                    if spread.spread_pct > 0.03 {
                                                         info!(
                                                             "GEYSER SPREAD: {} {:.4}% ({} -> {})",
                                                             spread.symbol.as_deref().unwrap_or("?"),

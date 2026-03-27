@@ -276,8 +276,8 @@ impl PoolScanner {
                         else { p.token_b_symbol.clone() }
                     });
 
-                debug!("Multi-DEX token: {} ({}) on {} DEXes",
-                    symbol.as_deref().unwrap_or("?"), mint, dexes.len());
+                info!("Multi-DEX token: {} ({}) on {} DEXes: {:?}",
+                    symbol.as_deref().unwrap_or("?"), mint, dexes.len(), dexes);
 
                 multi_dex_map.insert(mint, MultiDexToken {
                     mint,
