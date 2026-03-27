@@ -7,12 +7,13 @@
  *      learns from missed opportunities
  *   3. EXPLORATION — lowers threshold during quiet periods to generate data
  *
- * Persists to Redis (survives restarts) + file (backup).
+ * Persists to Postgres (primary) + Redis (cache) + file (backup).
  * Schema-versioned for safe upgrades.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
 import fs from 'fs';
+import { loadTradesFromDB, saveTradetoDB, loadScorerState, saveScorerState } from './scorer_db';
 import path from 'path';
 
 const SIGNALS_DIR = path.join(process.cwd(), 'signals');
@@ -194,99 +195,57 @@ export async function loadModelFromRedis() {
 // Initialize — file first
 loadModel();
 
-// Then try Redis, then check for reset, then seed training data
+// Init: Postgres (primary) → Redis (fallback) → file (last resort) → training seed
 async function initScorer() {
-  await loadModelFromRedis().catch(() => {});
+  // 1. Try Postgres first (durable, survives redeploys)
+  const dbState = await loadScorerState().catch(() => null);
+  const dbTrades = await loadTradesFromDB().catch(() => []);
 
-  // Force reset AFTER Redis load (so it actually clears everything)
+  if (dbState && dbState.totalTrades > 0) {
+    // Restore scorer state from Postgres
+    model.bucketStats = dbState.bucketStats;
+    model.featureWeights = dbState.featureWeights;
+    model.winRate = dbState.winRate;
+    model.threshold = dbState.threshold;
+    console.log(`[SCORER] Loaded from Postgres: ${dbState.totalTrades} trades, ${(dbState.winRate * 100).toFixed(0)}% WR, threshold ${(dbState.threshold * 100).toFixed(0)}%`);
+  } else if (dbTrades.length > 0) {
+    // No scorer state saved yet, but we have trades — rebuild from trade history
+    console.log(`[SCORER] Rebuilding from ${dbTrades.length} Postgres trades...`);
+    for (const t of dbTrades) {
+      updateBuckets(t.metrics, t.won);
+      model.trades.push({
+        mint: t.mint, symbol: t.symbol, metrics: t.metrics,
+        pnlPct: t.pnlPct, pnlSol: 0, won: t.won,
+        holdMs: 0, reason: t.exitReason, ts: Date.now(),
+      });
+    }
+    recalculateWeights();
+    const wins = model.trades.filter(t => t.won).length;
+    model.winRate = model.trades.length > 0 ? wins / model.trades.length : 0.5;
+    await saveScorerState({
+      bucketStats: model.bucketStats,
+      featureWeights: model.featureWeights,
+      winRate: model.winRate,
+      threshold: model.threshold,
+      totalTrades: model.trades.length,
+    }).catch(() => {});
+    console.log(`[SCORER] Rebuilt: ${model.trades.length} trades, ${(model.winRate * 100).toFixed(0)}% WR`);
+  } else {
+    // 2. Fall back to Redis
+    await loadModelFromRedis().catch(() => {});
+    console.log(`[SCORER] Loaded from Redis/file fallback`);
+  }
+
+  // 3. Force reset if requested
   if (process.env.RESET_SCORER === 'true') {
     const shadowKeep = model.shadowTrades.filter(s => s.checked);
     model = createFreshModel();
     model.shadowTrades = shadowKeep;
-    saveModel(); // writes to both file AND Redis
+    saveModel();
     console.log(`[SCORER] HARD RESET — cleared all trades + bucket stats, kept ${shadowKeep.length} shadow records`);
   }
-
-  // Seed from backtest training data if scorer has fewer trades than the dataset
-  seedFromTrainingData();
 }
 initScorer().catch(() => {});
-
-/** Inject retroactive backtest results into the scorer's bucket stats */
-function seedFromTrainingData() {
-  try {
-    const fs = require('fs');
-    const path = require('path');
-    const dataPath = path.join(__dirname, 'training_data.json');
-    if (!fs.existsSync(dataPath)) return;
-
-    const { trades } = JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
-    if (!trades || !trades.length) return;
-
-    // Skip if we already have more real trades than training data
-    const realTrades = model.trades.filter(t => !t.reason?.startsWith('backtest'));
-    if (realTrades.length >= trades.length) {
-      console.log(`[SCORER] Skipping training seed — already have ${realTrades.length} real trades`);
-      return;
-    }
-
-    // Remove any previously seeded backtest trades before re-seeding
-    model.trades = model.trades.filter(t => !t.reason?.startsWith('backtest'));
-
-    let seeded = 0;
-    for (const t of trades) {
-      const metrics: EntryMetrics = {
-        volume1h:        t.volume_1h || 0,
-        priceChange1h:   t.price_change_1h || 0,
-        momentum5m:      t.momentum_5m || 0,
-        buyRatio:        t.buy_ratio || 1,
-        buys1h:          t.buys_1h || 0,
-        liquidity:       t.liquidity || 0,
-        mcap:            t.mcap || 0,
-        tokenAgeSec:     t.token_age_sec || 3600,
-        velocityScore:   t.buy_ratio > 1.5 ? 5 : 2,  // estimate from buy ratio
-        detectionSource: 0, // DexScreener trending
-        source:          'dexscreener',
-      };
-
-      const won = t.won;
-      const pnlPct = t.pnl_pct || 0;
-
-      // Update bucket stats (the core learning mechanism)
-      updateBuckets(metrics, won);
-
-      // Record as a trade so the scorer counts it for threshold adaptation
-      model.trades.push({
-        mint: `backtest_${t.symbol}`,
-        symbol: t.symbol,
-        metrics,
-        pnlPct,
-        pnlSol: pnlPct * 0.0025, // estimate based on 0.25 SOL buy
-        won,
-        holdMs: 600_000, // assume 10min hold
-        reason: `backtest_${t.symbol}`,
-        ts: Date.now() - 3600_000, // 1h ago
-      });
-      seeded++;
-    }
-
-    // Recalculate weights and win rate from all trades
-    recalculateWeights();
-    const wins = model.trades.filter(t => t.won).length;
-    model.winRate = wins / model.trades.length;
-    model.updatedAt = Date.now();
-    saveModel();
-
-    console.log(`[SCORER] Seeded ${seeded} backtest trades | WR: ${(model.winRate * 100).toFixed(0)}% | Threshold: ${(model.threshold * 100).toFixed(0)}%`);
-
-    const ranked = FEATURES
-      .map(f => ({ name: f.name, weight: model.featureWeights[f.name] ?? f.defaultWeight }))
-      .sort((a, b) => b.weight - a.weight);
-    console.log(`[SCORER] Learned weights: ${ranked.map(f => `${f.name}(${f.weight.toFixed(2)})`).join(', ')}`);
-  } catch (e: any) {
-    console.warn(`[SCORER] Training data seed failed: ${e.message}`);
-  }
-}
 
 // ── Bucket classification ────────────────────────────────────────────────────
 function getBucket(featureName: string, value: number): 'low' | 'mid' | 'high' {
@@ -462,6 +421,19 @@ export function recordTradeOutcome(
 
   model.updatedAt = Date.now();
   saveModel();
+
+  // Persist to Postgres (durable, survives redeploys)
+  saveTradetoDB({
+    mint, symbol, source: metrics.source || 'live',
+    metrics, won, pnlPct, pnlSol, holdMs, exitReason: reason,
+  }).catch(() => {});
+  saveScorerState({
+    bucketStats: model.bucketStats,
+    featureWeights: model.featureWeights,
+    winRate: model.winRate,
+    threshold: model.threshold,
+    totalTrades: model.trades.length,
+  }).catch(() => {});
 
   const wins = model.trades.filter(t => t.won);
   const losses = model.trades.filter(t => !t.won);

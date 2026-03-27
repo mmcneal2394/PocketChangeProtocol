@@ -133,3 +133,58 @@ model Opportunity {
   executionProfit Float?
   createdAt       DateTime  @default(now())
 }
+
+// ── Sniper: persistent trade outcomes for adaptive scorer ──────────────────
+
+model SniperTrade {
+  id              String    @id @default(uuid())
+  mint            String
+  symbol          String
+  source          String    // "velocity-first", "dexscreener", "backtest", "artemis"
+  txSignature     String?   // on-chain tx sig (null for paper/backtest)
+
+  // Entry metrics (what the scorer saw at decision time)
+  volume1h        Float     @default(0)
+  priceChange1h   Float     @default(0)
+  momentum5m      Float     @default(0)
+  buyRatio        Float     @default(1)
+  buys1h          Int       @default(0)
+  liquidity       Float     @default(0)
+  mcap            Float     @default(0)
+  tokenAgeSec     Int       @default(0)
+  velocityScore   Float     @default(0)
+
+  // Scoring at entry
+  adaptiveScore   Float?
+  confidence      String?
+  threshold       Float?
+
+  // Outcome
+  won             Boolean
+  pnlPct          Float
+  pnlSol          Float     @default(0)
+  holdMs          Int       @default(0)
+  exitReason      String?   // TP, SL, TRAIL, TIMEOUT, backtest
+
+  // Entry/exit prices
+  entryPriceSol   Float?
+  exitPriceSol    Float?
+  buySizeSol      Float?
+  tokenAmount     Float?
+
+  createdAt       DateTime  @default(now())
+
+  @@index([mint])
+  @@index([createdAt])
+  @@index([source])
+}
+
+model ScorerState {
+  id              String    @id @default("singleton")
+  bucketStats     Json      // { featureName: { low: {wins,total}, mid: {}, high: {} } }
+  featureWeights  Json      // { featureName: weight }
+  winRate         Float     @default(0.5)
+  threshold       Float     @default(0.35)
+  totalTrades     Int       @default(0)
+  updatedAt       DateTime  @updatedAt
+}
