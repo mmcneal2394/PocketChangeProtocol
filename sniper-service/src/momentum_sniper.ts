@@ -667,16 +667,20 @@ async function checkExits() {
     // ═══════════════════════════════════════════════════════════════════════
     // THREE-PHASE EXIT SYSTEM
     //
-    // Phase 1 (0% to +5%):  Hard SL at -10%. No trail. Cut fast if wrong.
-    // Phase 2 (+5% to +15%): SL moves to 0% (breakeven). Lock in no-loss.
-    // Phase 3 (+15%+):       Trail activates — 10% below peak. TP at +30%.
+    // THREE-PHASE EXIT (Artemis-informed: let winners develop, cut losers)
+    // Phase 1 (0% to +8%):  Hard SL at -15%. No trail. Give it room to breathe.
+    // Phase 2 (+8% to +20%): SL moves to 0% (breakeven). Lock in no-loss.
+    // Phase 3 (+20%+):       Trail activates — 12% below peak. TP at +50%.
+    // MINIMUM HOLD: 45s before any exit (except -25% catastrophic SL)
     // ═══════════════════════════════════════════════════════════════════════
 
-    const HARD_SL = 10;        // Phase 1: -10% stop loss
-    const BREAKEVEN_TRIGGER = 5;  // Phase 2: at +5%, SL moves to 0%
-    const TRAIL_TRIGGER = 15;     // Phase 3: at +15%, trailing stop activates
-    const TRAIL_DISTANCE = 10;    // Phase 3: trail 10% below peak
-    const FULL_TP = 30;           // +30% full take profit
+    const MIN_HOLD_MS = 45_000;   // 45s breathing room — memecoins need time
+    const CATASTROPHIC_SL = 25;   // only exit before MIN_HOLD if -25%
+    const HARD_SL = 15;           // Phase 1: -15% stop loss (was -10%, too tight)
+    const BREAKEVEN_TRIGGER = 8;  // Phase 2: at +8%, SL moves to 0% (was +5%)
+    const TRAIL_TRIGGER = 20;     // Phase 3: at +20%, trailing stop (was +15%)
+    const TRAIL_DISTANCE = 12;    // Phase 3: trail 12% below peak (was 10%)
+    const FULL_TP = 50;           // +50% full take profit (was +30%, Artemis shows winners run far)
 
     let activeSl: number;
     let trail = false;
@@ -699,14 +703,29 @@ async function checkExits() {
     const tp = pnlPct >= FULL_TP;
     const sl = pnlPct <= -activeSl;
 
-    // Order flow reversal — early exit if sellers take over
+    // MINIMUM HOLD: don't exit in first 45s unless catastrophic loss
+    // Artemis data: all big winners needed time to develop, early exits killed them
+    const inBreathingRoom = heldMs < MIN_HOLD_MS;
+    if (inBreathingRoom && !forceExit) {
+      if (pnlPct > -CATASTROPHIC_SL) {
+        // Still breathing — skip this exit check entirely
+        if (heldMs % 10_000 < EXIT_CHECK_MS) {
+          console.log(`[SNIPER] ⏳ ${pos.symbol} breathing (${(heldMs/1000).toFixed(0)}s/${MIN_HOLD_MS/1000}s) | PnL:${pnlPct >= 0 ? '+' : ''}${pnlPct.toFixed(1)}%`);
+        }
+        continue;
+      }
+      // Catastrophic loss — exit even during breathing room
+      console.log(`[SNIPER] 🚨 ${pos.symbol} CATASTROPHIC -${CATASTROPHIC_SL}% hit during breathing room`);
+    }
+
+    // Order flow reversal — only after 90s AND only if clearly dumping
+    // (was 0-180s, too aggressive — normal curve volatility triggers false exits)
     let orderFlowReversal = false;
-    if (heldMs < 180_000 && pnlPct < 0 && !forceExit) {
+    if (heldMs > 90_000 && heldMs < 300_000 && pnlPct < -3 && !forceExit) {
       const vel = loadVelocity(pos.mint);
-      if (vel && vel.buys60s + vel.sells60s >= 3) {
+      if (vel && vel.buys60s + vel.sells60s >= 5) {
         const curRatio = vel.buyRatio60s;
-        const entryRatio = (pos.entryBuyRatio || 0.6) / (1 + (pos.entryBuyRatio || 0.6));
-        if (curRatio < 0.40 && curRatio < entryRatio * 0.65) {
+        if (curRatio < 0.30) { // was 0.40, tightened to only trigger on clear dumps
           orderFlowReversal = true;
           logOrderFlowReversal(pos.mint);
           console.log(`[SNIPER] 🚨 ${pos.symbol} ORDER FLOW REVERSED — buy ratio ${(curRatio*100).toFixed(0)}% | PnL:${pnlPct.toFixed(1)}%`);
@@ -1220,6 +1239,10 @@ async function main() {
     }
 
     // Gate 7: Top holder concentration check via Helius RPC
+    // Fresh tokens (<2min) naturally have high creator concentration — relax to 70%
+    // Older tokens should have distributed more — strict 50%
+    const tokenAgeSec = velData.ageSec || 0;
+    const MAX_TOP_HOLDER = tokenAgeSec < 120 ? 70 : 50;
     try {
       const conn = new (await import('@solana/web3.js')).Connection(RPC, 'confirmed');
       const mintPk = new (await import('@solana/web3.js')).PublicKey(mint);
@@ -1228,8 +1251,8 @@ async function main() {
         const totalSupply = largest.value.reduce((s, a) => s + (a.uiAmount || 0), 0);
         const topHolder = largest.value[0]?.uiAmount || 0;
         const topHolderPct = totalSupply > 0 ? (topHolder / totalSupply) * 100 : 0;
-        if (topHolderPct > 50) {
-          console.log(`[${source}] ⏭️ ${symbol} — top holder owns ${topHolderPct.toFixed(0)}% (rug risk)`);
+        if (topHolderPct > MAX_TOP_HOLDER) {
+          console.log(`[${source}] ⏭️ ${symbol} — top holder owns ${topHolderPct.toFixed(0)}% > ${MAX_TOP_HOLDER}% (age:${tokenAgeSec.toFixed(0)}s)`);
           return;
         }
       }
