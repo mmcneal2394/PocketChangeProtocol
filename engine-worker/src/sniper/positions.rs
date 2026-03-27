@@ -172,11 +172,11 @@ impl PositionManager {
     }
 }
 
-/// Dynamic TP/SL based on how far the token has already moved
+/// Dynamic TP/SL — wider targets, let winners run (Artemis-informed)
 fn calc_exit_targets(price_change_1h: f64) -> (f64, f64) {
-    if price_change_1h >= 80.0 { (8.0, 7.0) }
-    else if price_change_1h >= 40.0 { (12.0, 10.0) }
-    else { (20.0, 15.0) }
+    if price_change_1h >= 80.0 { (20.0, 15.0) }
+    else if price_change_1h >= 40.0 { (35.0, 15.0) }
+    else { (50.0, 15.0) }
 }
 
 /// Exit monitor loop — checks positions every second for exits
@@ -206,6 +206,9 @@ pub async fn exit_monitor_loop(
         let mut pos_mgr = positions.write().await;
         let now = now_ms();
         let mut exit_infos: Vec<ExitInfo> = Vec::new();
+
+        let min_hold_ms: u64 = 45_000; // 45s breathing room
+        let catastrophic_sl: f64 = 25.0;
 
         for (i, pos) in pos_mgr.positions.iter_mut().enumerate() {
             let held_ms = now - pos.opened_at;
@@ -241,18 +244,23 @@ pub async fn exit_monitor_loop(
             }
 
             let peak = pos.peak_pnl_pct;
-            let in_retrace = held_ms < 30_000;
-            let active_sl = if in_retrace { pos.sl_pct * 2.0 } else { pos.sl_pct };
+            // Minimum hold: 45s breathing room (except catastrophic loss)
+            if held_ms < min_hold_ms && !force_exit {
+                if pnl_pct > -(catastrophic_sl) {
+                    continue; // still breathing, skip exit check
+                }
+            }
+
+            let active_sl = pos.sl_pct;
             let tp = pnl_pct >= pos.tp_pct;
             let sl = pnl_pct <= -active_sl;
 
-            let trail_pct = if peak >= 20.0 { peak * 0.15 }
+            // Trail: wider distances, only activate at +20% (let winners run)
+            let trail_pct = if peak >= 30.0 { peak * 0.12 }
+                else if peak >= 20.0 { peak * 0.15 }
                 else if peak >= 10.0 { peak * 0.20 }
-                else if peak >= 5.0  { peak * 0.25 }
-                else if peak >= 3.0  { peak * 0.35 }
-                else if peak >= 2.0  { peak * 0.40 }
-                else { 999.0 };
-            let trail = peak >= 2.0 && pnl_pct <= (peak - trail_pct);
+                else { 999.0 }; // no trail below +10%
+            let trail = peak >= 10.0 && pnl_pct <= (peak - trail_pct);
 
             if tp || sl || trail || force_exit {
                 let reason = if tp { format!("TP +{:.1}%", pnl_pct) }
