@@ -1247,7 +1247,7 @@ async function main() {
     // Fresh tokens (<2min) naturally have high creator concentration — relax to 70%
     // Older tokens should have distributed more — strict 50%
     const mintAgeSec = velData.ageSec || 0;
-    const MAX_TOP_HOLDER = mintAgeSec < 120 ? 70 : 50;
+    const MAX_TOP_HOLDER = mintAgeSec < 300 ? 70 : 50; // 5min window (detection pipeline adds ~60-120s latency)
     try {
       const conn = new (await import('@solana/web3.js')).Connection(RPC, 'confirmed');
       const mintPk = new (await import('@solana/web3.js')).PublicKey(mint);
