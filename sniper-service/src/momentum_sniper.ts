@@ -97,8 +97,8 @@ if (PAPER_MODE) {
 
 // ── Config ───────────────────────────────────────────────────────────────────
 const BASE_BUY_PCT     = parseFloat(process.env.SNIPER_BUY_PCT  || '0.10'); // 10% of balance — reduced after SL streak
-const MIN_BUY_SOL      = parseFloat(process.env.SNIPER_MIN_BUY  || (PAPER_MODE ? '0.1' : '0.005'));
-const MAX_BUY_SOL      = parseFloat(process.env.SNIPER_MAX_BUY  || (PAPER_MODE ? '0.1' : '0.03'));
+const MIN_BUY_SOL      = parseFloat(process.env.SNIPER_MIN_BUY  || '0.25');
+const MAX_BUY_SOL      = parseFloat(process.env.SNIPER_MAX_BUY  || '0.25');
 const MAX_POSITIONS    = parseInt(process.env.SNIPER_MAX_POS   || '1');    // 1 position — quality over quantity
 const MAX_HOLD_MS      = parseInt(process.env.SNIPER_MAX_HOLD  || '1800000'); // 30min hard cap (trailing stop exits first)
 const RETRACE_SHIELD_MS = 30_000;  // SL doubled for first 30s only — exit bad trades faster
