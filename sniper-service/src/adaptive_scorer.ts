@@ -283,8 +283,40 @@ export function scoreCandidate(metrics: EntryMetrics): {
     };
   }
 
-  const { score, reasons: scoreReasons } = computeScore(metrics);
+  let { score, reasons: scoreReasons } = computeScore(metrics);
   reasons.push(...scoreReasons);
+
+  // ── Data-driven adjustments (from 89-trade analysis) ──────────────────
+
+  // 1. Overconfidence penalty: "strong" signals (score > 0.75) = 0% WR in Artemis data
+  //    High confidence means stacked momentum signals = traps
+  if (score > 0.75) {
+    score -= 0.10;
+    reasons.push('overconfidence penalty -10% (stacked momentum = trap)');
+  }
+
+  // 2. Buy ratio sweet spot: 1.3-1.5x = 83% WR in PCP data
+  //    Below 1.3x = weak. Above 2.0x = whale, not organic.
+  if (metrics.buyRatio >= 1.3 && metrics.buyRatio <= 1.5) {
+    score += 0.05;
+    reasons.push(`buyRatio sweet spot ${metrics.buyRatio.toFixed(1)}x +5%`);
+  } else if (metrics.buyRatio > 2.0) {
+    score -= 0.05;
+    reasons.push(`buyRatio ${metrics.buyRatio.toFixed(1)}x > 2.0 (whale risk) -5%`);
+  }
+
+  // 3. Dip + buy pressure bonus: chg1h < 0 AND ratio > 1.3x = 71% WR, +2597% avg
+  if (metrics.priceChange1h < 0 && metrics.buyRatio > 1.3) {
+    score += 0.08;
+    reasons.push(`dip+pressure bonus (${metrics.priceChange1h.toFixed(0)}% + ${metrics.buyRatio.toFixed(1)}x) +8%`);
+  }
+
+  // 4. Low liquidity bonus: <$10k liq = 67% WR (earlier stage = more upside)
+  if (metrics.liquidity > 0 && metrics.liquidity < 10000) {
+    score += 0.04;
+    reasons.push('low liq <$10k +4%');
+  }
+
   const shouldEnter = score >= model.threshold;
   const confidence = score >= 0.6 ? 'HIGH' : score >= 0.4 ? 'MED' : 'LOW';
 
