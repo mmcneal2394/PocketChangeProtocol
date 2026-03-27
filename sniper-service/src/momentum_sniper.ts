@@ -229,7 +229,7 @@ interface PositionStore {
 
 // ── State ────────────────────────────────────────────────────────────────────
 let store: PositionStore = { positions: [], blacklist: [], recentExits: {}, stats: { wins: 0, losses: 0, totalPnlSol: 0 } };
-const REENTRY_COOLDOWN_MS = 10 * 60_000; // 10 min cooldown after exit (survives restart)
+const REENTRY_COOLDOWN_MS = Infinity; // NEVER re-enter same token (data: SWING 0/5, FREEDOM 1/7, Greg 0/3)
 let exitCheckRunning = false; // prevent concurrent checkExits calls
 const otherBotPositions = new Set<string>(); // mints held by other bots (Artemis)
 loadStore();
@@ -667,20 +667,23 @@ async function checkExits() {
     // ═══════════════════════════════════════════════════════════════════════
     // THREE-PHASE EXIT SYSTEM
     //
-    // THREE-PHASE EXIT (Artemis-informed: let winners develop, cut losers)
-    // Phase 1 (0% to +8%):  Hard SL at -15%. No trail. Give it room to breathe.
-    // Phase 2 (+8% to +20%): SL moves to 0% (breakeven). Lock in no-loss.
-    // Phase 3 (+20%+):       Trail activates — 12% below peak. TP at +50%.
-    // MINIMUM HOLD: 45s before any exit (except -25% catastrophic SL)
+    // VELOCITY-INFORMED EXIT (89-trade analysis: bearish_exit = 73% WR)
+    // Key insight: winners held until momentum died naturally.
+    // Losers hit hard SL. So we: widen SL, let momentum decide.
+    //
+    // Phase 1 (0% to +8%):  Hard SL at -20%. Wide room — 73% of Artemis winners dipped first.
+    // Phase 2 (+8% to +20%): SL moves to breakeven. Lock in no-loss.
+    // Phase 3 (+20%+):       Trail 12% below peak. Full TP at +60%.
+    // VELOCITY EXIT: if buy ratio < 0.25 for 60s+ AND PnL < 0, exit (bearish momentum died)
     // ═══════════════════════════════════════════════════════════════════════
 
-    const MIN_HOLD_MS = 45_000;   // 45s breathing room — memecoins need time
-    const CATASTROPHIC_SL = 30;   // exit during breathing room if -30% (rug)
-    const HARD_SL = 15;           // Phase 1: -15% stop loss (was -10%, too tight)
-    const BREAKEVEN_TRIGGER = 8;  // Phase 2: at +8%, SL moves to 0% (was +5%)
-    const TRAIL_TRIGGER = 20;     // Phase 3: at +20%, trailing stop (was +15%)
-    const TRAIL_DISTANCE = 12;    // Phase 3: trail 12% below peak (was 10%)
-    const FULL_TP = 50;           // +50% full take profit (was +30%, Artemis shows winners run far)
+    const MIN_HOLD_MS = 45_000;   // 45s breathing room
+    const CATASTROPHIC_SL = 30;   // rug protection during breathing
+    const HARD_SL = 20;           // Phase 1: -20% (was -15%, data says winners dip -10 to -15% before recovering)
+    const BREAKEVEN_TRIGGER = 8;  // Phase 2: at +8%, SL moves to 0%
+    const TRAIL_TRIGGER = 20;     // Phase 3: at +20%, trailing stop
+    const TRAIL_DISTANCE = 12;    // Phase 3: trail 12% below peak
+    const FULL_TP = 60;           // +60% full TP (Artemis top winner: +126%, PCP: +15773%)
 
     let activeSl: number;
     let trail = false;
@@ -718,26 +721,28 @@ async function checkExits() {
       console.log(`[SNIPER] 🚨 ${pos.symbol} CATASTROPHIC -${CATASTROPHIC_SL}% hit during breathing room`);
     }
 
-    // Order flow reversal — only after 90s AND only if clearly dumping
-    // (was 0-180s, too aggressive — normal curve volatility triggers false exits)
-    let orderFlowReversal = false;
-    if (heldMs > 90_000 && heldMs < 300_000 && pnlPct < -3 && !forceExit) {
+    // VELOCITY-BASED EXIT: momentum death detection (replaces aggressive order flow reversal)
+    // Artemis data: bearish_exit (73% WR) = hold until momentum naturally dies
+    // Trigger: buy ratio < 0.25 sustained for 60s+ AND negative PnL AND held > 90s
+    let momentumDead = false;
+    if (heldMs > 90_000 && pnlPct < 0 && !forceExit) {
       const vel = loadVelocity(pos.mint);
-      if (vel && vel.buys60s + vel.sells60s >= 5) {
+      if (vel && vel.buys60s + vel.sells60s >= 3) {
         const curRatio = vel.buyRatio60s;
-        if (curRatio < 0.30) { // was 0.40, tightened to only trigger on clear dumps
-          orderFlowReversal = true;
+        // Momentum is dead when sellers clearly dominate AND volume is falling
+        if (curRatio < 0.25 && vel.velocity < 3) {
+          momentumDead = true;
           logOrderFlowReversal(pos.mint);
-          console.log(`[SNIPER] 🚨 ${pos.symbol} ORDER FLOW REVERSED — buy ratio ${(curRatio*100).toFixed(0)}% | PnL:${pnlPct.toFixed(1)}%`);
+          console.log(`[SNIPER] 💀 ${pos.symbol} MOMENTUM DEAD — ratio:${(curRatio*100).toFixed(0)}% vel:${vel.velocity.toFixed(0)}tx/min | PnL:${pnlPct.toFixed(1)}%`);
         }
       }
     }
 
-    if (tp || sl || trail || orderFlowReversal || forceExit || staleExit) {
+    if (tp || sl || trail || momentumDead || forceExit || staleExit) {
       const phaseStr = peak >= TRAIL_TRIGGER ? 'P3-TRAIL' : peak >= BREAKEVEN_TRIGGER ? 'P2-BE' : 'P1-SL';
       const reason = tp                ? `TP +${pnlPct.toFixed(1)}% (full sell)`
                    : trail             ? `TRAIL peak:+${peak.toFixed(1)}% → floor:+${trailFloor.toFixed(1)}% → now:${pnlPct.toFixed(1)}%`
-                   : orderFlowReversal ? `ORDERFLOW-REVERSAL ${pnlPct.toFixed(1)}%`
+                   : momentumDead      ? `MOMENTUM-DEAD ${pnlPct.toFixed(1)}% (buy ratio collapsed + volume died)`
                    : sl                ? `${phaseStr} SL ${pnlPct.toFixed(1)}%`
                    : staleExit         ? `STALE ${pnlPct.toFixed(1)}% (dead token)`
                    :                    `TIME ${(heldMs/60000).toFixed(1)}min`;
