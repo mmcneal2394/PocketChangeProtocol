@@ -1,0 +1,24 @@
+{
+  "generated": "2026-03-27",
+  "source": "8h-backtest-dexscreener-birdeye",
+  "note": "Retroactive backtest of trending candidates. PnL based on mcap change from snapshot to current.",
+  "trades": [
+    {"symbol": "Orca", "won": true, "pnl_pct": 795, "volume_1h": 200000, "price_change_1h": 535, "momentum_5m": 10, "buy_ratio": 1.4, "buys_1h": 3244, "liquidity": 36000, "mcap": 22000, "token_age_sec": 7200},
+    {"symbol": "rise", "won": false, "pnl_pct": -87, "volume_1h": 50000, "price_change_1h": 494, "momentum_5m": 5, "buy_ratio": 1.2, "buys_1h": 3207, "liquidity": 23000, "mcap": 25000, "token_age_sec": 3600},
+    {"symbol": "up", "won": true, "pnl_pct": 281, "volume_1h": 80000, "price_change_1h": -63, "momentum_5m": 2, "buy_ratio": 3.4, "buys_1h": 11239, "liquidity": 10000, "mcap": 9000, "token_age_sec": 14400},
+    {"symbol": "Rise", "won": false, "pnl_pct": -92, "volume_1h": 40000, "price_change_1h": 130, "momentum_5m": 8, "buy_ratio": 1.2, "buys_1h": 1459, "liquidity": 21000, "mcap": 41000, "token_age_sec": 7200},
+    {"symbol": "Theo", "won": false, "pnl_pct": -26, "volume_1h": 30000, "price_change_1h": 31, "momentum_5m": 3, "buy_ratio": 1.5, "buys_1h": 4258, "liquidity": 16000, "mcap": 37000, "token_age_sec": 10800},
+    {"symbol": "BANSTICLE", "won": false, "pnl_pct": -13, "volume_1h": 100000, "price_change_1h": 42, "momentum_5m": 4, "buy_ratio": 1.3, "buys_1h": 2000, "liquidity": 49000, "mcap": 298000, "token_age_sec": 14400},
+    {"symbol": "hiyo", "won": true, "pnl_pct": 9, "volume_1h": 10000, "price_change_1h": 15, "momentum_5m": 2, "buy_ratio": 1.5, "buys_1h": 500, "liquidity": 5000, "mcap": 4000, "token_age_sec": 1800},
+    {"symbol": "THROW", "won": false, "pnl_pct": -20, "volume_1h": 25000, "price_change_1h": 20, "momentum_5m": 3, "buy_ratio": 1.3, "buys_1h": 800, "liquidity": 12000, "mcap": 36000, "token_age_sec": 7200},
+    {"symbol": "Caravel", "won": false, "pnl_pct": -5, "volume_1h": 8000, "price_change_1h": 15, "momentum_5m": 2, "buy_ratio": 1.4, "buys_1h": 60, "liquidity": 9000, "mcap": 14000, "token_age_sec": 10800},
+    {"symbol": "NPC", "won": true, "pnl_pct": 1484, "volume_1h": 30000, "price_change_1h": -5, "momentum_5m": 5, "buy_ratio": 1.8, "buys_1h": 1500, "liquidity": 15000, "mcap": 37000, "token_age_sec": 3600},
+    {"symbol": "Bandido", "won": false, "pnl_pct": -22, "volume_1h": 40000, "price_change_1h": 30, "momentum_5m": 4, "buy_ratio": 1.2, "buys_1h": 1000, "liquidity": 16000, "mcap": 54000, "token_age_sec": 7200},
+    {"symbol": "Oreo", "won": false, "pnl_pct": -31, "volume_1h": 15000, "price_change_1h": -16, "momentum_5m": 1, "buy_ratio": 1.5, "buys_1h": 951, "liquidity": 13000, "mcap": 22000, "token_age_sec": 14400},
+    {"symbol": "FROG", "won": true, "pnl_pct": 405, "volume_1h": 20000, "price_change_1h": -13, "momentum_5m": 2, "buy_ratio": 1.4, "buys_1h": 104, "liquidity": 22000, "mcap": 55000, "token_age_sec": 21600},
+    {"symbol": "Trudy", "won": false, "pnl_pct": -27, "volume_1h": 5000, "price_change_1h": 8, "momentum_5m": 1, "buy_ratio": 1.3, "buys_1h": 200, "liquidity": 3000, "mcap": 4000, "token_age_sec": 3600},
+    {"symbol": "FOMO", "won": true, "pnl_pct": 467, "volume_1h": 60000, "price_change_1h": -64, "momentum_5m": 3, "buy_ratio": 1.4, "buys_1h": 5091, "liquidity": 24000, "mcap": 63000, "token_age_sec": 10800},
+    {"symbol": "Believe", "won": true, "pnl_pct": 15773, "volume_1h": 5000, "price_change_1h": -50, "momentum_5m": 1, "buy_ratio": 2.0, "buys_1h": 300, "liquidity": 5000, "mcap": 8000, "token_age_sec": 1800},
+    {"symbol": "Longdog", "won": true, "pnl_pct": 1312, "volume_1h": 3000, "price_change_1h": -30, "momentum_5m": 2, "buy_ratio": 1.5, "buys_1h": 150, "liquidity": 3000, "mcap": 3000, "token_age_sec": 900}
+  ]
+}
