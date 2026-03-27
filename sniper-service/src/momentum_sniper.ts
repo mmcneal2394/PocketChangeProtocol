@@ -703,18 +703,18 @@ async function checkExits() {
     const tp = pnlPct >= FULL_TP;
     const sl = pnlPct <= -activeSl;
 
-    // MINIMUM HOLD: don't exit in first 45s unless catastrophic loss
-    // Artemis data: all big winners needed time to develop, early exits killed them
+    // MINIMUM HOLD: only suppress DOWNSIDE exits in first 45s
+    // TP, breakeven, and trailing stop fire anytime — never block profits
+    // Only block: hard SL and order flow reversal (those are noise early on)
     const inBreathingRoom = heldMs < MIN_HOLD_MS;
-    if (inBreathingRoom && !forceExit) {
+    if (inBreathingRoom && !forceExit && !tp && !trail) {
+      // During breathing room: allow TP + trail, block SL unless catastrophic
       if (pnlPct > -CATASTROPHIC_SL) {
-        // Still breathing — skip this exit check entirely
         if (heldMs % 10_000 < EXIT_CHECK_MS) {
           console.log(`[SNIPER] ⏳ ${pos.symbol} breathing (${(heldMs/1000).toFixed(0)}s/${MIN_HOLD_MS/1000}s) | PnL:${pnlPct >= 0 ? '+' : ''}${pnlPct.toFixed(1)}%`);
         }
         continue;
       }
-      // Catastrophic loss — exit even during breathing room
       console.log(`[SNIPER] 🚨 ${pos.symbol} CATASTROPHIC -${CATASTROPHIC_SL}% hit during breathing room`);
     }
 
