@@ -3,6 +3,7 @@ pub mod pool_math;
 pub mod scanner;
 pub mod websocket;
 pub mod geyser;
+pub mod decode;
 
 use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
@@ -16,6 +17,7 @@ pub async fn run_pool_monitor(
     rpc: Arc<solana_client::rpc_client::RpcClient>,
     rpc_url: String,
     opportunity_tx: mpsc::Sender<Opportunity>,
+    pool_update_tx: mpsc::Sender<decode::PoolUpdate>,
 ) {
     info!("=== POOL MONITOR STARTING ===");
 
@@ -38,7 +40,27 @@ pub async fn run_pool_monitor(
     // 3. Start streaming — Geyser gRPC preferred, WebSocket fallback
     let use_geyser = geyser::GeyserMonitor::from_env();
 
+    // Initialize Redis for publishing pool updates to sniper
+    let redis_conn = if let Ok(url) = std::env::var("REDIS_URL") {
+        match redis::Client::open(url.as_str()) {
+            Ok(client) => match redis::aio::ConnectionManager::new(client).await {
+                Ok(cm) => { info!("Redis connected — publishing pool updates to pool:updates"); Some(cm) }
+                Err(e) => { warn!("Redis connection failed: {} — pool updates won't be published", e); None }
+            }
+            Err(e) => { warn!("Redis client init failed: {} — pool updates won't be published", e); None }
+        }
+    } else {
+        info!("REDIS_URL not set — pool updates will not be published");
+        None
+    };
+
     if let Some(geyser_monitor) = use_geyser {
+        let mut geyser_monitor = if let Some(conn) = redis_conn {
+            geyser_monitor.with_redis(conn)
+        } else {
+            geyser_monitor
+        };
+        geyser_monitor.set_pool_update_tx(pool_update_tx);
         info!("Using Geyser gRPC for pool monitoring (sub-100ms latency)");
         let g_addrs = pool_addresses.clone();
         let g_map = multi_dex_map.clone();
