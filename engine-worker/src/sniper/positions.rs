@@ -244,13 +244,6 @@ pub async fn exit_monitor_loop(
             }
 
             let peak = pos.peak_pnl_pct;
-            // Minimum hold: 45s breathing room (except catastrophic loss)
-            if held_ms < min_hold_ms && !force_exit {
-                if pnl_pct > -(catastrophic_sl) {
-                    continue; // still breathing, skip exit check
-                }
-            }
-
             let active_sl = pos.sl_pct;
             let tp = pnl_pct >= pos.tp_pct;
             let sl = pnl_pct <= -active_sl;
@@ -261,6 +254,13 @@ pub async fn exit_monitor_loop(
                 else if peak >= 10.0 { peak * 0.20 }
                 else { 999.0 }; // no trail below +10%
             let trail = peak >= 10.0 && pnl_pct <= (peak - trail_pct);
+
+            // Breathing room: only block downside SL in first 45s
+            // TP, trail, force_exit always fire — never block profits
+            let in_breathing = held_ms < min_hold_ms && !force_exit;
+            if in_breathing && sl && !tp && !trail && pnl_pct > -(catastrophic_sl) {
+                continue; // suppress SL during breathing, unless catastrophic
+            }
 
             if tp || sl || trail || force_exit {
                 let reason = if tp { format!("TP +{:.1}%", pnl_pct) }
