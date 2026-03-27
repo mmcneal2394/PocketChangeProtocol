@@ -1246,8 +1246,8 @@ async function main() {
     // Gate 7: Top holder concentration check via Helius RPC
     // Fresh tokens (<2min) naturally have high creator concentration — relax to 70%
     // Older tokens should have distributed more — strict 50%
-    const tokenAgeSec = velData.ageSec || 0;
-    const MAX_TOP_HOLDER = tokenAgeSec < 120 ? 70 : 50;
+    const mintAgeSec = velData.ageSec || 0;
+    const MAX_TOP_HOLDER = mintAgeSec < 120 ? 70 : 50;
     try {
       const conn = new (await import('@solana/web3.js')).Connection(RPC, 'confirmed');
       const mintPk = new (await import('@solana/web3.js')).PublicKey(mint);
@@ -1257,7 +1257,7 @@ async function main() {
         const topHolder = largest.value[0]?.uiAmount || 0;
         const topHolderPct = totalSupply > 0 ? (topHolder / totalSupply) * 100 : 0;
         if (topHolderPct > MAX_TOP_HOLDER) {
-          console.log(`[${source}] ⏭️ ${symbol} — top holder owns ${topHolderPct.toFixed(0)}% > ${MAX_TOP_HOLDER}% (age:${tokenAgeSec.toFixed(0)}s)`);
+          console.log(`[${source}] ⏭️ ${symbol} — top holder owns ${topHolderPct.toFixed(0)}% > ${MAX_TOP_HOLDER}% (age:${mintAgeSec.toFixed(0)}s)`);
           return;
         }
       }
