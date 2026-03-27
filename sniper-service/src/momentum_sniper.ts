@@ -361,7 +361,7 @@ async function jupFetch(path: string, opts: RequestInit = {}): Promise<any> {
 
 async function getQuote(inputMint: string, outputMint: string, amountLamports: number): Promise<any | null> {
   try {
-    const url = `/quote?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amountLamports}&slippageBps=1200`;
+    const url = `/quote?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amountLamports}&slippageBps=1000`;
     const q = await jupFetch(url);
     if (q.error) {
       console.error(`[QUOTE] Jupiter error: ${JSON.stringify(q.error).slice(0, 200)} | ${inputMint.slice(0,8)}→${outputMint.slice(0,8)} amt=${amountLamports}`);
@@ -569,7 +569,7 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
     if (PAPER_MODE) {
       sig = `PAPER_PUMP_${Date.now().toString(36)}`;
     } else {
-      const maxSol = BigInt(Math.floor(buyLamports * 1.15));
+      const maxSol = BigInt(Math.floor(buyLamports * 1.10));
       const liveSig = await liveBuyOnCurve(connection, wallet, mint, curveQuote.tokensOut, maxSol);
       if (!liveSig) { console.log(`[SNIPER] ❌ Live curve buy failed for ${symbol}`); return; }
       sig = liveSig;
@@ -1253,7 +1253,7 @@ async function main() {
         sig = `PAPER_PUMP_${Date.now().toString(36)}`;
       } else {
         // LIVE: build and submit on-chain transaction
-        const maxSolWithSlippage = BigInt(Math.floor(buyLamports * 1.15)); // 15% slippage buffer for momentum tokens
+        const maxSolWithSlippage = BigInt(Math.floor(buyLamports * 1.10)); // 15% slippage buffer for momentum tokens
         const liveSig = await liveBuyOnCurve(connection, wallet, mint, curveQuote.tokensOut, maxSolWithSlippage);
         if (!liveSig) {
           console.log(`[${source}] ❌ Live curve buy TX failed for ${symbol}`);
