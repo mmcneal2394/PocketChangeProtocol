@@ -98,7 +98,7 @@ pub async fn run_pool_monitor(
 
     // 5. Convert spread opportunities to engine Opportunities and forward
     while let Some(spread) = spread_rx.recv().await {
-        let net_profit = spread.spread_pct - 0.05;
+        let net_profit = spread.spread_pct - 0.02; // ~2bps fee estimate for on-chain execution
         if net_profit <= 0.0 {
             continue;
         }

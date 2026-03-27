@@ -47,7 +47,7 @@ pub struct TriangularStrategy {
 impl TriangularStrategy {
     pub fn new(threshold: f64, registry: Arc<TokenRegistry>) -> Self {
         Self {
-            threshold: Decimal::from_f64(threshold).unwrap_or(Decimal::new(3, 1)), // 0.3 default
+            threshold: Decimal::from_f64(threshold).unwrap_or(Decimal::new(5, 2)), // 0.05 default (was 0.3)
             client: reqwest::Client::new(),
             registry,
         }
@@ -64,17 +64,41 @@ impl TriangularStrategy {
     /// High-liquidity pairs that actually exist on multiple DEXes.
     /// Only these are worth cross-DEX checking. Curated to minimize API calls.
     fn generate_routes(&self) -> Vec<(String, String)> {
-        vec![
-            // Major pairs with deep liquidity on Raydium + Orca + Meteora
+        let mut routes = vec![
+            // Major pairs — deep liquidity on Raydium + Orca + Meteora
             ("SOL".into(), "USDC".into()),
             ("RAY".into(), "USDC".into()),
             ("BONK".into(), "USDC".into()),
             ("WIF".into(), "USDC".into()),
             ("JUP".into(), "USDC".into()),
-            // SOL derivative pairs (staking arb)
+            // SOL derivative pairs (staking arb — persistent small spreads)
             ("JitoSOL".into(), "SOL".into()),
             ("mSOL".into(), "SOL".into()),
-        ]
+            // Mid-cap with multi-DEX presence
+            ("ORCA".into(), "USDC".into()),
+            ("MNDE".into(), "USDC".into()),
+            ("POPCAT".into(), "USDC".into()),
+            ("PYTH".into(), "USDC".into()),
+            ("RENDER".into(), "USDC".into()),
+            ("HNT".into(), "USDC".into()),
+            ("MEW".into(), "USDC".into()),
+            ("BOME".into(), "USDC".into()),
+            ("MYRO".into(), "USDC".into()),
+            // SOL-denominated pairs (often have wider spreads)
+            ("BONK".into(), "SOL".into()),
+            ("WIF".into(), "SOL".into()),
+            ("JUP".into(), "SOL".into()),
+            ("POPCAT".into(), "SOL".into()),
+            ("MEW".into(), "SOL".into()),
+        ];
+        // Add any tokens from the dynamic registry that aren't already listed
+        for token in self.registry.all() {
+            let sym = token.symbol.clone();
+            if !routes.iter().any(|(a, _)| a == &sym) {
+                routes.push((sym, "USDC".into()));
+            }
+        }
+        routes
     }
 
     /// Fetch a Jupiter V6 quote for a single swap leg, optionally restricted to a single DEX.
@@ -344,7 +368,15 @@ impl Strategy for TriangularStrategy {
             let mint_b = match self.resolve_mint(token_b) { Some(m) => m, None => continue };
 
             let decimals_a = self.resolve_decimals(token_a);
-            let start_amount: u64 = 10u64.pow(decimals_a); // 1 unit of token A
+            // Use ~$100 worth for realistic spread detection (1 unit distorts prices)
+            let base_unit: u64 = 10u64.pow(decimals_a);
+            let start_amount: u64 = if token_a == "SOL" || token_a == "JitoSOL" || token_a == "mSOL" {
+                base_unit / 2 // ~0.5 SOL ≈ $75
+            } else if token_a == "USDC" {
+                100 * base_unit // $100
+            } else {
+                base_unit * 100 // 100 units of token
+            };
 
             // --- Buy leg: A -> B on each DEX ---
             let buy_quotes = self.fetch_quotes_all_dexes(
