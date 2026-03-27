@@ -34,6 +34,7 @@ uuid = { version = "1", features = ["v4"] }
 # anchor-client removed — we build vault instructions manually via sha2 discriminators
 anyhow = "1"
 bincode = "1"
+bs58 = "0.5"
 tokio-tungstenite = { version = "0.21", features = ["native-tls"] }
 solana-account-decoder = "2.2"
 borsh = "0.10"
@@ -42,6 +43,7 @@ yellowstone-grpc-proto = "12.1"
 tonic = { version = "0.14", features = ["tls-native-roots", "transport"] }
 rustls-native-certs = "0.7"
 rustls-pemfile = "2"
+redis = { version = "0.27", features = ["tokio-comp", "connection-manager"] }
 
 [profile.release]
 opt-level = 3

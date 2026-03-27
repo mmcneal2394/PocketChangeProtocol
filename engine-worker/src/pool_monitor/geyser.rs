@@ -14,10 +14,13 @@ use yellowstone_grpc_proto::geyser::{
     CommitmentLevel,
 };
 use super::types::*;
+use super::decode;
 
 pub struct GeyserMonitor {
     endpoint: String,
     token: String,
+    redis: Option<redis::aio::ConnectionManager>,
+    pool_update_tx: Option<mpsc::Sender<decode::PoolUpdate>>,
 }
 
 impl GeyserMonitor {
@@ -25,6 +28,8 @@ impl GeyserMonitor {
         Self {
             endpoint: endpoint.to_string(),
             token: token.to_string(),
+            redis: None,
+            pool_update_tx: None,
         }
     }
 
@@ -35,6 +40,15 @@ impl GeyserMonitor {
             return None;
         }
         Some(Self::new(&endpoint, &token))
+    }
+
+    pub fn with_redis(mut self, redis: redis::aio::ConnectionManager) -> Self {
+        self.redis = Some(redis);
+        self
+    }
+
+    pub fn set_pool_update_tx(&mut self, tx: mpsc::Sender<decode::PoolUpdate>) {
+        self.pool_update_tx = Some(tx);
     }
 
     pub async fn run(
@@ -131,7 +145,17 @@ impl GeyserMonitor {
             },
         );
 
-        info!("Subscribing to 4 DEX program owners (pool_addresses available: {})", pool_addresses.len());
+        accounts_filter.insert(
+            "pump_curve".to_string(),
+            SubscribeRequestFilterAccounts {
+                account: vec![],
+                owner: vec!["6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P".to_string()],
+                filters: vec![],
+                nonempty_txn_signature: None,
+            },
+        );
+
+        info!("Subscribing to 5 DEX program owners (pool_addresses available: {})", pool_addresses.len());
 
         let (mut subscribe_tx, mut stream) = client.subscribe().await?;
 
@@ -170,6 +194,31 @@ impl GeyserMonitor {
                                         updates += 1;
                                         if updates % 1000 == 1 {
                                             info!("Geyser: {} DEX account updates received so far", updates);
+                                        }
+
+                                        // Decode pool state and publish to Redis + sniper channel
+                                        if !info.owner.is_empty() {
+                                            if let Some(dex) = decode::identify_dex(&info.owner) {
+                                                if let Some(pool_update) = decode::decode_pool_update(&pubkey, dex, &info.data) {
+                                                    // Send to Rust sniper via mpsc channel (zero-copy, <1ms)
+                                                    if let Some(ref tx) = self.pool_update_tx {
+                                                        let _ = tx.try_send(pool_update.clone());
+                                                    }
+                                                    // Publish to Redis for TS sniper
+                                                    if let Some(ref redis) = self.redis {
+                                                        if let Ok(json) = serde_json::to_string(&pool_update) {
+                                                            let mut conn = redis.clone();
+                                                            tokio::spawn(async move {
+                                                                let _: Result<(), _> = redis::cmd("PUBLISH")
+                                                                    .arg("pool:updates")
+                                                                    .arg(&json)
+                                                                    .query_async(&mut conn)
+                                                                    .await;
+                                                            });
+                                                        }
+                                                    }
+                                                }
+                                            }
                                         }
 
                                         let map = multi_dex_map.read().await;

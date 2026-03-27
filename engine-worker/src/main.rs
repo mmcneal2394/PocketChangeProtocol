@@ -10,6 +10,7 @@ mod executor;
 mod engine;
 mod tokens;
 mod pool_monitor;
+mod sniper;
 
 use std::sync::Arc;
 use std::str::FromStr;
@@ -143,18 +144,36 @@ async fn main() -> anyhow::Result<()> {
     // Strategy opportunity channel (shared by poll-based strategies AND pool monitor)
     let (opp_tx, opp_rx) = mpsc::channel::<Opportunity>(128);
 
-    // Pool monitor: WebSocket-based cross-DEX spread detection
+    // Geyser → Sniper pool update channel (created before both tasks)
+    let (pool_update_tx, pool_update_rx) = mpsc::channel::<pool_monitor::decode::PoolUpdate>(4096);
+
+    // Pool monitor: Geyser gRPC streaming + cross-DEX spread detection
     {
         let pm_rpc = rpc.clone();
         let pm_rpc_url = config.rpc_url();
         let pm_opp_tx = opp_tx.clone();
+        let pm_pool_tx = pool_update_tx;
         tasks.spawn(async move {
             info!("Spawning pool monitor task...");
             match std::panic::AssertUnwindSafe(
-                pool_monitor::run_pool_monitor(pm_rpc, pm_rpc_url, pm_opp_tx)
+                pool_monitor::run_pool_monitor(pm_rpc, pm_rpc_url, pm_opp_tx, pm_pool_tx)
             ).catch_unwind().await {
                 Ok(_) => warn!("Pool monitor exited"),
                 Err(e) => error!("Pool monitor PANICKED: {:?}", e),
+            }
+        });
+    }
+
+    // Momentum sniper (Rust-native, Geyser-integrated)
+    {
+        let sniper_config = sniper::SniperConfig::from_env();
+        tasks.spawn(async move {
+            info!("Spawning Rust momentum sniper...");
+            match std::panic::AssertUnwindSafe(
+                sniper::run_sniper(sniper_config, pool_update_rx)
+            ).catch_unwind().await {
+                Ok(_) => warn!("Sniper exited"),
+                Err(e) => error!("Sniper PANICKED: {:?}", e),
             }
         });
     }
