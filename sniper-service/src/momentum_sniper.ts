@@ -675,7 +675,7 @@ async function checkExits() {
     // ═══════════════════════════════════════════════════════════════════════
 
     const MIN_HOLD_MS = 45_000;   // 45s breathing room — memecoins need time
-    const CATASTROPHIC_SL = 25;   // only exit before MIN_HOLD if -25%
+    const CATASTROPHIC_SL = 30;   // exit during breathing room if -30% (rug)
     const HARD_SL = 15;           // Phase 1: -15% stop loss (was -10%, too tight)
     const BREAKEVEN_TRIGGER = 8;  // Phase 2: at +8%, SL moves to 0% (was +5%)
     const TRAIL_TRIGGER = 20;     // Phase 3: at +20%, trailing stop (was +15%)
