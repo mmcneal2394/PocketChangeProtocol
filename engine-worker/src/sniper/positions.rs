@@ -208,7 +208,7 @@ pub async fn exit_monitor_loop(
         let mut exit_infos: Vec<ExitInfo> = Vec::new();
 
         let min_hold_ms: u64 = 45_000; // 45s breathing room
-        let catastrophic_sl: f64 = 25.0;
+        let catastrophic_sl: f64 = 30.0;
 
         for (i, pos) in pos_mgr.positions.iter_mut().enumerate() {
             let held_ms = now - pos.opened_at;
