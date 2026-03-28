@@ -305,6 +305,18 @@ export function scoreCandidate(metrics: EntryMetrics): {
     reasons.push(`buyRatio ${metrics.buyRatio.toFixed(1)}x > 2.0 (whale risk) -5%`);
   }
 
+  // 2b. Extreme velocity penalty: vel > 7 = likely creator self-buying (Clawicular -30% was vel 7.4)
+  if (metrics.velocityScore > 7) {
+    score -= 0.08;
+    reasons.push(`extreme velocity ${metrics.velocityScore.toFixed(1)} > 7 (self-buy trap) -8%`);
+  }
+
+  // 2c. High mcap penalty: >$25k mcap at entry = entering late (Stay -5.7% was $34k)
+  if (metrics.mcap > 25000) {
+    score -= 0.05;
+    reasons.push(`high mcap $${(metrics.mcap/1000).toFixed(0)}k > $25k (late entry) -5%`);
+  }
+
   // 3. Dip + buy pressure bonus: chg1h < 0 AND ratio > 1.3x = 71% WR, +2597% avg
   if (metrics.priceChange1h < 0 && metrics.buyRatio > 1.3) {
     score += 0.08;
