@@ -182,6 +182,20 @@ export async function liveBuyOnCurve(
     });
 
     console.log(`[PUMP-EXEC] BUY submitted: ${sig}`);
+
+    // Confirm tx actually landed — don't record position on failed tx
+    try {
+      const conf = await connection.confirmTransaction(sig, 'confirmed');
+      if (conf.value.err) {
+        console.error(`[PUMP-EXEC] BUY confirmed but FAILED on-chain: ${JSON.stringify(conf.value.err)}`);
+        return null;
+      }
+      console.log(`[PUMP-EXEC] BUY confirmed: ${sig}`);
+    } catch (e: any) {
+      console.error(`[PUMP-EXEC] BUY confirmation timeout: ${e.message}`);
+      return null;
+    }
+
     return sig;
   } catch (e: any) {
     console.error(`[PUMP-EXEC] BUY failed: ${e.message}`);
@@ -229,6 +243,19 @@ export async function liveSellOnCurve(
     });
 
     console.log(`[PUMP-EXEC] SELL submitted: ${sig}`);
+
+    try {
+      const conf = await connection.confirmTransaction(sig, 'confirmed');
+      if (conf.value.err) {
+        console.error(`[PUMP-EXEC] SELL confirmed but FAILED: ${JSON.stringify(conf.value.err)}`);
+        return null;
+      }
+      console.log(`[PUMP-EXEC] SELL confirmed: ${sig}`);
+    } catch (e: any) {
+      console.error(`[PUMP-EXEC] SELL confirmation timeout: ${e.message}`);
+      return null;
+    }
+
     return sig;
   } catch (e: any) {
     console.error(`[PUMP-EXEC] SELL failed: ${e.message}`);
