@@ -680,7 +680,7 @@ async function checkExits() {
     const MIN_HOLD_MS = 15_000;   // 15s breathing room (was 45s — too long, missed -20% SL)
     const CATASTROPHIC_SL = 12.5;  // matches hard SL — no gap
     const HARD_SL = 12.5;         // Phase 1: -12.5% (tighter — cut losers fast)
-    const BREAKEVEN_TRIGGER = 8;  // Phase 2: at +8%, SL moves to 0%
+    const BREAKEVEN_TRIGGER = 12; // Phase 2: at +12%, SL moves to 0% (was +8%, both P2-BE losses were premature)
     const TRAIL_TRIGGER = 20;     // Phase 3: at +20%, trailing stop
     const TRAIL_DISTANCE = 12;    // Phase 3: trail 12% below peak
     const FULL_TP = 60;           // +60% full TP (Artemis top winner: +126%, PCP: +15773%)
