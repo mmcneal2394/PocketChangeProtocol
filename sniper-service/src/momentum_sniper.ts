@@ -838,6 +838,8 @@ async function checkExits() {
       }
       exits.push(pos);
       publishPosition(pos.mint, 'exit');
+      // Schedule post-exit monitoring
+      schedulePostExitCheck(pos.mint, pos.symbol, pnlPctFinal, pos.entryPriceSol || 0, reason);
     } else {
       const phase = peak >= TRAIL_TRIGGER ? `P3 trail:+${trailFloor.toFixed(0)}%`
                   : peak >= BREAKEVEN_TRIGGER ? 'P2 SL:0%'
@@ -850,6 +852,92 @@ async function checkExits() {
   if (exits.length > 0) {
     saveStore();
     console.log(`[SNIPER] 📈 Session stats | Wins: ${store.stats.wins} | Losses: ${store.stats.losses} | PnL: ${store.stats.totalPnlSol >= 0 ? '+' : ''}${store.stats.totalPnlSol.toFixed(4)} SOL`);
+  }
+}
+
+// ── Post-exit monitor — track what happened after we sold ─────────────────────
+// Checks price at 30s, 1m, 3m, 5m after exit to learn if we sold too early
+interface PostExitCheck {
+  mint: string;
+  symbol: string;
+  exitPnlPct: number;
+  exitPriceSol: number;
+  exitReason: string;
+  exitAt: number;
+  checks: { delay: number; label: string }[];
+  checkedAt: Set<number>;
+}
+const postExitQueue: PostExitCheck[] = [];
+
+function schedulePostExitCheck(mint: string, symbol: string, exitPnlPct: number, exitPriceSol: number, exitReason: string) {
+  postExitQueue.push({
+    mint, symbol, exitPnlPct, exitPriceSol, exitReason,
+    exitAt: Date.now(),
+    checks: [
+      { delay: 30_000, label: '30s' },
+      { delay: 60_000, label: '1m' },
+      { delay: 180_000, label: '3m' },
+      { delay: 300_000, label: '5m' },
+    ],
+    checkedAt: new Set(),
+  });
+  // Keep queue bounded
+  if (postExitQueue.length > 20) postExitQueue.shift();
+}
+
+async function runPostExitChecks() {
+  const now = Date.now();
+  const WSOL = 'So11111111111111111111111111111111111111112';
+
+  for (const check of postExitQueue) {
+    for (const { delay, label } of check.checks) {
+      if (check.checkedAt.has(delay)) continue;
+      if (now - check.exitAt < delay) continue;
+      check.checkedAt.add(delay);
+
+      // Get current price via Jupiter quote
+      try {
+        const buyLamports = Math.floor(0.1 * 1e9); // quote 0.1 SOL worth
+        const quote = await getQuote(WSOL, check.mint, buyLamports);
+        if (!quote) continue;
+        const tokensNow = Number(quote.outAmount);
+        // Compare: at exit we got exitPriceSol per token
+        // Now 0.1 SOL gets tokensNow tokens, so price per token = 0.1/tokensNow
+        const priceNow = 0.1 / tokensNow;
+        const pricePctChange = ((priceNow - check.exitPriceSol) / check.exitPriceSol) * 100;
+
+        const tag = pricePctChange > 10 ? 'MISSED' : pricePctChange < -10 ? 'GOOD EXIT' : 'FLAT';
+        console.log(`[POST-EXIT] ${check.symbol} @ ${label}: ${pricePctChange >= 0 ? '+' : ''}${pricePctChange.toFixed(1)}% since exit (${tag})`);
+
+        // Alert on Telegram if we missed a big move
+        if (label === '5m' && pricePctChange > 30) {
+          await sendTelegram(
+            `⚠️ <b>MISSED GAIN</b> ${check.symbol}\n` +
+            `Sold at ${check.exitPnlPct >= 0 ? '+' : ''}${check.exitPnlPct.toFixed(1)}% (${check.exitReason})\n` +
+            `Now +${pricePctChange.toFixed(0)}% higher after 5min\n` +
+            `Exit may have been premature`
+          );
+        }
+
+        // Feed back to scorer: if token ran 30%+ after exit, record as "early exit" learning
+        if (label === '3m' && pricePctChange > 20) {
+          try {
+            const { saveTradetoDB } = require('./scorer_db');
+            await saveTradetoDB({
+              mint: check.mint + '_postexit', symbol: check.symbol, source: 'post-exit-learning',
+              metrics: { volume1h: 0, priceChange1h: 0, momentum5m: 0, buyRatio: 0, buys1h: 0, liquidity: 0, mcap: 0, tokenAgeSec: 0, velocityScore: 0, detectionSource: 0, source: 'post-exit' },
+              won: true, pnlPct: pricePctChange, exitReason: 'post-exit-missed-' + check.exitReason,
+            });
+          } catch {}
+        }
+      } catch {}
+    }
+  }
+
+  // Clean completed checks
+  const cutoff = now - 360_000; // 6 min
+  while (postExitQueue.length > 0 && postExitQueue[0].exitAt < cutoff) {
+    postExitQueue.shift();
   }
 }
 
@@ -1383,6 +1471,11 @@ async function main() {
   setInterval(async () => {
     try { await checkShadowCandidates(JUP_KEY); } catch { /* non-fatal */ }
   }, 30_000);
+
+  // Post-exit monitor — checks sold tokens at 30s/1m/3m/5m to learn from early exits
+  setInterval(async () => {
+    try { await runPostExitChecks(); } catch { /* non-fatal */ }
+  }, 10_000);
 
   process.on('SIGTERM', () => {
     saveStore();
