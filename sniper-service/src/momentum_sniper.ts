@@ -913,13 +913,12 @@ async function checkExits() {
               dbPnl = `\n<b>All-time (live):</b> ${stats.liveCount} trades (${stats.wins}W/${stats.losses}L) | WR: ${(stats.winRate*100).toFixed(0)}%`;
             }
           } catch {}
-          await sendTelegram(
-            `${tag} <b>SELL ${pos.symbol}</b> ${icon}\n` +
+          // Queue message — send AFTER position is removed so balance is accurate
+          (pos as any)._exitMsg = `${tag} <b>SELL ${pos.symbol}</b> ${icon}\n` +
             `PnL: ${pnlPctFinal >= 0 ? '+' : ''}${pnlPctFinal.toFixed(1)}% (${pnlSol >= 0 ? '+' : ''}${pnlSol.toFixed(4)} SOL)\n` +
             `Peak: +${pos.peakPnlPct.toFixed(1)}% | Reason: ${reason}\n` +
             `Held: ${(heldMs/60000).toFixed(1)}min | ${latencyStr}` +
-            dbPnl
-          );
+            dbPnl;
       } else {
         console.warn(`[SNIPER] ⚠️  No sell quote for ${pos.symbol} (curve:${onCurve}) — holding`);
         continue;
@@ -939,6 +938,11 @@ async function checkExits() {
   store.positions = store.positions.filter(p => !exits.find(e => e.mint === p.mint));
   if (exits.length > 0) {
     saveStore();
+    // Send exit messages AFTER position removal so wallet/positions are accurate
+    for (const pos of exits) {
+      const msg = (pos as any)._exitMsg;
+      if (msg) await sendTelegram(msg);
+    }
     console.log(`[SNIPER] 📈 Session stats | Wins: ${store.stats.wins} | Losses: ${store.stats.losses} | PnL: ${store.stats.totalPnlSol >= 0 ? '+' : ''}${store.stats.totalPnlSol.toFixed(4)} SOL`);
   }
 }

@@ -12,7 +12,7 @@ export const exitParams = {
   catastrophicSL: 12.5,
   breakevenTrigger: 12,
   trailTrigger: 20,
-  trailDistance: 12,
+  trailDistance: 5,
   fullTP: 60,
   minHoldMs: 15_000,
   lastTuned: 0,
