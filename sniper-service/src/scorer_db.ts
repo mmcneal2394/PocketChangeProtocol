@@ -171,6 +171,7 @@ export async function getTradeStats(): Promise<{
   const p = await getPool();
   if (!p) return null;
   try {
+    // Only count LIVE trades (exclude backtest/artemis training data)
     const res = await p.query(`
       SELECT
         count(*) as total,
@@ -178,16 +179,20 @@ export async function getTradeStats(): Promise<{
         count(*) FILTER (WHERE NOT won) as losses,
         avg(pnl_pct) FILTER (WHERE won) as avg_win,
         avg(pnl_pct) FILTER (WHERE NOT won) as avg_loss,
-        count(*) FILTER (WHERE source NOT LIKE 'backtest%' AND source NOT LIKE 'artemis%' AND source NOT LIKE 'pcp-backtest%') as live_count,
-        count(*) FILTER (WHERE source LIKE 'backtest%' OR source LIKE 'artemis%' OR source LIKE 'pcp-backtest%') as backtest_count
+        coalesce(sum(pnl_sol), 0) as total_pnl_sol
       FROM sniper_trades
+      WHERE source NOT LIKE 'backtest%'
+        AND source NOT LIKE 'artemis%'
+        AND source NOT LIKE 'pcp-backtest%'
     `);
     const r = res.rows[0];
+    const total = +r.total;
+    const wins = +r.wins;
     return {
-      total: +r.total, wins: +r.wins, losses: +r.losses,
-      winRate: r.total > 0 ? r.wins / r.total : 0,
+      total, wins, losses: +r.losses,
+      winRate: total > 0 ? wins / total : 0,
       avgWinPnl: +(r.avg_win || 0), avgLossPnl: +(r.avg_loss || 0),
-      liveCount: +r.live_count, backtestCount: +r.backtest_count,
+      liveCount: total, backtestCount: 0,
     };
   } catch (e: any) {
     console.warn(`[SCORER-DB] Failed to get stats: ${e.message}`);
