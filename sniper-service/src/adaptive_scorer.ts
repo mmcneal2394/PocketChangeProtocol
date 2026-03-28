@@ -312,15 +312,19 @@ export function scoreCandidate(metrics: EntryMetrics): {
   }
 
   // 2b. Extreme velocity penalty: vel > 7 = likely creator self-buying (Clawicular -30% was vel 7.4)
-  if (metrics.velocityScore > 7) {
-    score -= 0.08;
-    reasons.push(`extreme velocity ${metrics.velocityScore.toFixed(1)} > 7 (self-buy trap) -8%`);
+  // HARD REJECT: vel > 6 = 100% loss rate in 26 live trades (Shoebill 8.1, Clawicular 7.4, NPC 6.1)
+  if (metrics.velocityScore > 6) {
+    return { score: 0, confidence: 'REJECT', reasons: [`HARD REJECT: velocity ${metrics.velocityScore.toFixed(1)} > 6 (100% loss rate)`], shouldEnter: false };
   }
 
-  // 2c. High mcap penalty: >$25k mcap at entry = entering late (Stay -5.7% was $34k)
-  if (metrics.mcap > 25000) {
-    score -= 0.05;
-    reasons.push(`high mcap $${(metrics.mcap/1000).toFixed(0)}k > $25k (late entry) -5%`);
+  // HARD REJECT: ratio > 5x = trap signal (Shoebill 8.9x, NPC 6.9x, Game 6.0x all lost)
+  if (metrics.buyRatio > 5) {
+    return { score: 0, confidence: 'REJECT', reasons: [`HARD REJECT: ratio ${metrics.buyRatio.toFixed(1)}x > 5x (whale/bot trap)`], shouldEnter: false };
+  }
+
+  // HARD REJECT: mcap > $20k = every trade above this lost money
+  if (metrics.mcap > 20000) {
+    return { score: 0, confidence: 'REJECT', reasons: [`HARD REJECT: mcap $${(metrics.mcap/1000).toFixed(0)}k > $20k (too late)`], shouldEnter: false };
   }
 
   // 3. Dip + buy pressure bonus: chg1h < 0 AND ratio > 1.3x = 71% WR, +2597% avg
