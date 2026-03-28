@@ -42,6 +42,9 @@ const FEATURES: FeatureDef[] = [
   { name: 'tokenAgeSec',     buckets: [120, 600],       defaultWeight: 2.0 },
   { name: 'velocityScore',   buckets: [2, 8],           defaultWeight: 1.8 },
   { name: 'detectionSource', buckets: [0, 1],           defaultWeight: 1.5 },
+  { name: 'topHolderPct',    buckets: [30, 70],         defaultWeight: 1.5 },  // Helius: low=distributed, high=rug risk
+  { name: 'holderCount',     buckets: [3, 10],          defaultWeight: 1.0 },  // Helius: more holders = more organic
+  { name: 'curvePct',        buckets: [20, 60],         defaultWeight: 0.8 },  // curve progress
 ];
 
 export interface EntryMetrics {
@@ -56,6 +59,9 @@ export interface EntryMetrics {
   velocityScore:   number;
   detectionSource: number;
   source:          string;
+  topHolderPct?:   number; // Helius: top holder concentration (0-100)
+  holderCount?:    number; // Helius: number of token holders
+  curvePct?:       number; // bonding curve progress (0-100)
 }
 
 interface BucketStats {
