@@ -1371,27 +1371,26 @@ async function main() {
       }
     }
 
-    // Gate 7: Top holder concentration check via Helius RPC
-    // Fresh tokens (<2min) naturally have high creator concentration — relax to 70%
-    // Older tokens should have distributed more — strict 50%
-    const mintAgeSec = velData.ageSec || 0;
-    const MAX_TOP_HOLDER = mintAgeSec < 300 ? 80 : 50; // 80% for <5min (pump.fun creator starts with ~80%), strict 50% after
+    // ── Helius enrichment: soft scoring instead of hard gates ────────────────
+    // Fetch holder distribution and feed to scorer as features, not gates
+    let topHolderPct = 0;
+    let holderCount = 0;
     try {
-      const conn = new (await import('@solana/web3.js')).Connection(RPC, 'confirmed');
-      const mintPk = new (await import('@solana/web3.js')).PublicKey(mint);
-      const largest = await conn.getTokenLargestAccounts(mintPk);
+      const largest = await connection.getTokenLargestAccounts(new (await import('@solana/web3.js')).PublicKey(mint));
       if (largest.value.length > 0) {
         const totalSupply = largest.value.reduce((s, a) => s + (a.uiAmount || 0), 0);
-        const topHolder = largest.value[0]?.uiAmount || 0;
-        const topHolderPct = totalSupply > 0 ? (topHolder / totalSupply) * 100 : 0;
-        if (topHolderPct > MAX_TOP_HOLDER) {
-          console.log(`[${source}] ⏭️ ${symbol} — top holder owns ${topHolderPct.toFixed(0)}% > ${MAX_TOP_HOLDER}% (age:${mintAgeSec.toFixed(0)}s)`);
-          return;
-        }
+        topHolderPct = totalSupply > 0 ? (largest.value[0]?.uiAmount || 0) / totalSupply * 100 : 0;
+        holderCount = largest.value.filter(a => (a.uiAmount || 0) > 0).length;
       }
-    } catch { /* non-fatal — skip check if RPC fails */ }
+    } catch { /* non-fatal */ }
 
-    console.log(`[${source}] ✅ ALL GATES PASSED: ${symbol} | ${onCurve ? 'curve:'+estCurvePct.toFixed(0)+'%' : 'GRADUATED'} | ${velData.buys60s}B/${velData.sells60s}S | accel:${velData.isAccelerating}`);
+    // Only HARD reject if top holder > 95% (literally just the creator, zero distribution)
+    if (topHolderPct > 95) {
+      console.log(`[${source}] ⏭️ ${symbol} — top holder owns ${topHolderPct.toFixed(0)}% (no distribution at all)`);
+      return;
+    }
+
+    console.log(`[${source}] ✅ ENTERING: ${symbol} | ${onCurve ? 'curve:'+estCurvePct.toFixed(0)+'%' : 'GRADUATED'} | ${velData.buys60s}B/${velData.sells60s}S | top1:${topHolderPct.toFixed(0)}% holders:${holderCount} | accel:${velData.isAccelerating}`);
 
     {
       const buySol = await calcBuySize();
@@ -1451,6 +1450,7 @@ async function main() {
         velocityScore: velData.buys60s * velData.buyRatio60s,
         detectionSource: source === 'NEW-MINT' ? 1 : 2,
         source,
+        topHolderPct, holderCount, curvePct: estCurvePct,
       };
 
       const pos: Position = {
