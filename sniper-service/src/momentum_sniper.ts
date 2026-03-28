@@ -916,8 +916,7 @@ async function checkExits() {
             `${tag} <b>SELL ${pos.symbol}</b> ${icon}\n` +
             `PnL: ${pnlPctFinal >= 0 ? '+' : ''}${pnlPctFinal.toFixed(1)}% (${pnlSol >= 0 ? '+' : ''}${pnlSol.toFixed(4)} SOL)\n` +
             `Peak: +${pos.peakPnlPct.toFixed(1)}% | Reason: ${reason}\n` +
-            `Held: ${(heldMs/60000).toFixed(1)}min | ${latencyStr}\n` +
-            `Session: W${store.stats.wins}/L${store.stats.losses} | ${store.stats.totalPnlSol >= 0 ? '+' : ''}${store.stats.totalPnlSol.toFixed(4)} SOL` +
+            `Held: ${(heldMs/60000).toFixed(1)}min | ${latencyStr}` +
             dbPnl
           );
       } else {
