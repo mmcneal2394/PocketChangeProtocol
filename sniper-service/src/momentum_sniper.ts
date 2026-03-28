@@ -840,7 +840,7 @@ async function checkExits() {
       exits.push(pos);
       publishPosition(pos.mint, 'exit');
       // Schedule post-exit monitoring
-      schedulePostExitCheck(pos.mint, pos.symbol, pnlPctFinal, pos.entryPriceSol || 0, reason);
+      schedulePostExitCheck(pos.mint, pos.symbol, pnlPct, pos.entryPriceSol || 0, reason);
     } else {
       const phase = peak >= TRAIL_TRIGGER ? `P3 trail:+${trailFloor.toFixed(0)}%`
                   : peak >= BREAKEVEN_TRIGGER ? 'P2 SL:0%'
@@ -1429,9 +1429,9 @@ async function main() {
   velocityTracker.onNewMint(async (mint, velData) => {
     // Observe ALL new mints for learning — regardless of whether we trade them
     observe({
-      mint, symbol: velData.symbol || mint.slice(0, 8),
+      mint, symbol: mint.slice(0, 8),
       source: 'new-mint',
-      mcap: velData.mcap || 0,
+      mcap: 0,
       velocity: velData.velocity || 0,
       buyRatio: velData.buyRatio60s || 0,
       buys: velData.buys60s || 0,
