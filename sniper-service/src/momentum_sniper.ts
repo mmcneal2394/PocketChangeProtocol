@@ -1371,8 +1371,7 @@ async function main() {
       }
     }
 
-    // ── Helius enrichment: soft scoring instead of hard gates ────────────────
-    // Fetch holder distribution and feed to scorer as features, not gates
+    // ── Helius enrichment: holder data for scoring ──────────────────────────
     let topHolderPct = 0;
     let holderCount = 0;
     try {
@@ -1384,9 +1383,11 @@ async function main() {
       }
     } catch { /* non-fatal */ }
 
-    // Only HARD reject if top holder > 95% (literally just the creator, zero distribution)
-    if (topHolderPct > 95) {
-      console.log(`[${source}] ⏭️ ${symbol} — top holder owns ${topHolderPct.toFixed(0)}% (no distribution at all)`);
+    // Top holder gate: 80% for fresh (<5min), 50% for older
+    const mintAgeSec = velData.ageSec || 0;
+    const MAX_TOP_HOLDER = mintAgeSec < 300 ? 80 : 50;
+    if (topHolderPct > MAX_TOP_HOLDER) {
+      console.log(`[${source}] ⏭️ ${symbol} — top holder owns ${topHolderPct.toFixed(0)}% > ${MAX_TOP_HOLDER}% (age:${mintAgeSec.toFixed(0)}s)`);
       return;
     }
 

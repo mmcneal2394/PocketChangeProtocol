@@ -290,10 +290,25 @@ export class VelocityTracker {
       const trackingSecs = (now - data.firstSeen) / 1000;
       const hasSells = data.sells60s >= 1;
       if (!this.notifiedNewMints.has(mint) && data.buys60s >= 3 && data.buyRatio60s >= 0.50 && trackingSecs >= 5 && hasSells) {
-        // Don't add to notifiedNewMints yet — only after validation succeeds
-        // This allows retry if pump.fun API is flaky
         const ageSec = (now - data.firstSeen) / 1000;
-        this.validateAndNotifyNewMint(mint, data, ageSec);
+
+        // Fast path: pump.fun mints (end with "pump") — fire callback IMMEDIATELY
+        // Skip 3-5s API validation. The mint format IS the proof it's a pump.fun token.
+        if (mint.endsWith('pump')) {
+          this.notifiedNewMints.add(mint);
+          this.validatedMints.add(mint);
+          console.log(`[VELOCITY] NEW MINT (fast): ${mint.slice(0,8)} | ${data.buys60s}B/${data.sells60s}S | tracked ${ageSec.toFixed(0)}s`);
+          for (const cb of this.onNewMintCallbacks) {
+            try { cb(mint, data); } catch (e: any) {
+              console.error('[VELOCITY] NewMint callback error:', e.message);
+            }
+          }
+          // Fetch symbol async in background (for Telegram display, non-blocking)
+          this.publishToRedis(mint, mint.slice(0, 8), 0, data).catch(() => {});
+        } else {
+          // Non-pump mints: need API validation to confirm it's tradeable
+          this.validateAndNotifyNewMint(mint, data, ageSec);
+        }
       }
 
       // ACCELERATION detection — fires when existing mint velocity increases
