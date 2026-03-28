@@ -1207,34 +1207,27 @@ async function main() {
     // ENTRY QUALITY GATES — every gate addresses a specific loss pattern
     // ═══════════════════════════════════════════════════════════════════════
 
-    // Gate 1: Must be on bonding curve (check all mints, not just ones ending in "pump")
+    // Gate 1: Check bonding curve status (but don't reject graduated tokens — use Jupiter)
     const onCurve = await isOnBondingCurve(mint);
     if (!onCurve) {
-      console.log(`[${source}] ⏭️ ${symbol} — not on bonding curve`);
-      return;
+      console.log(`[${source}] 🔄 ${symbol} — graduated, trying Jupiter path`);
+      // Fall through to Jupiter buy below (skip curve-specific gates)
     }
 
-    // Gate 3+4+5 removed — velocity tracker already enforces 5B/1S/55%/10s
-    // Adding more gates here was blocking tokens that passed velocity validation
-    // The velocity tracker IS the quality filter
-
-    // Gate 6: Curve position — sweet spot 3-85%
-    const curveState = await getBondingCurveState(mint);
-    if (!curveState) {
-      console.log(`[${source}] ❌ Can't read curve state for ${symbol}`);
-      return;
-    }
-    const MIN_CURVE_PCT = 3;
-    const MAX_CURVE_PCT = 85;
-    const realSolInCurve = Number(curveState.realSolReserves) / 1e9;
-    const estCurvePct = Math.min(100, (realSolInCurve / 85) * 100);
-    if (estCurvePct < MIN_CURVE_PCT) {
-      console.log(`[${source}] ⏭️ ${symbol} — curve ${estCurvePct.toFixed(0)}% < ${MIN_CURVE_PCT}%`);
-      return;
-    }
-    if (estCurvePct > MAX_CURVE_PCT) {
-      console.log(`[${source}] ⏭️ ${symbol} — curve ${estCurvePct.toFixed(0)}% > ${MAX_CURVE_PCT}%`);
-      return;
+    // Curve-specific gates (only if on bonding curve)
+    let estCurvePct = 0;
+    if (onCurve) {
+      const curveState = await getBondingCurveState(mint);
+      if (!curveState) {
+        console.log(`[${source}] ❌ Can't read curve state for ${symbol}`);
+        return;
+      }
+      const realSolInCurve = Number(curveState.realSolReserves) / 1e9;
+      estCurvePct = Math.min(100, (realSolInCurve / 85) * 100);
+      if (estCurvePct < 3) {
+        console.log(`[${source}] ⏭️ ${symbol} — curve ${estCurvePct.toFixed(0)}% < 3%`);
+        return;
+      }
     }
 
     // Gate 7: Top holder concentration check via Helius RPC
@@ -1257,38 +1250,50 @@ async function main() {
       }
     } catch { /* non-fatal — skip check if RPC fails */ }
 
-    console.log(`[${source}] ✅ ALL GATES PASSED: ${symbol} | curve:${estCurvePct.toFixed(0)}% | ${velData.buys60s}B/${velData.sells60s}S | accel:${velData.isAccelerating}`);
+    console.log(`[${source}] ✅ ALL GATES PASSED: ${symbol} | ${onCurve ? 'curve:'+estCurvePct.toFixed(0)+'%' : 'GRADUATED'} | ${velData.buys60s}B/${velData.sells60s}S | accel:${velData.isAccelerating}`);
 
     {
       const buySol = await calcBuySize();
       const buyLamports = Math.floor(buySol * 1e9);
+      let tokenAmount = 0;
+      let sig = '';
 
-      // Get quote first
-      const curveQuote = quoteTokensForSol(curveState, BigInt(buyLamports));
-      if (!curveQuote || curveQuote.tokensOut === 0n) {
-        console.log(`[${source}] ❌ Bonding curve quote failed for ${symbol}`);
-        return;
-      }
-
-      let sig: string;
-      if (PAPER_MODE) {
-        sig = `PAPER_PUMP_${Date.now().toString(36)}`;
-      } else {
-        // LIVE: build and submit on-chain transaction
-        const maxSolWithSlippage = BigInt(Math.floor(buyLamports * 1.10)); // 15% slippage buffer for momentum tokens
-        const liveSig = await liveBuyOnCurve(connection, wallet, mint, curveQuote.tokensOut, maxSolWithSlippage);
-        if (!liveSig) {
-          console.log(`[${source}] ❌ Live curve buy TX failed for ${symbol}`);
+      if (onCurve) {
+        // BONDING CURVE BUY
+        const curveState = await getBondingCurveState(mint);
+        const curveQuote = curveState ? quoteTokensForSol(curveState, BigInt(buyLamports)) : null;
+        if (!curveQuote || curveQuote.tokensOut === 0n) {
+          console.log(`[${source}] ❌ Bonding curve quote failed for ${symbol}`);
           return;
         }
-        sig = liveSig;
+        tokenAmount = Number(curveQuote.tokensOut);
+
+        if (PAPER_MODE) {
+          sig = `PAPER_PUMP_${Date.now().toString(36)}`;
+        } else {
+          const maxSolWithSlippage = BigInt(Math.floor(buyLamports * 1.10));
+          const liveSig = await liveBuyOnCurve(connection, wallet, mint, curveQuote.tokensOut, maxSolWithSlippage);
+          if (!liveSig) { console.log(`[${source}] ❌ Live curve buy TX failed for ${symbol}`); return; }
+          sig = liveSig;
+        }
+        console.log(`[${source}] 🎯 CURVE BUY ${symbol} | curve:${estCurvePct.toFixed(0)}% | ${buySol} SOL → ${(tokenAmount/1e6).toFixed(0)}M tokens | ${velData.buys60s}B/${velData.sells60s}S`);
+      } else {
+        // JUPITER BUY — graduated token (on PumpSwap/Raydium)
+        const WSOL = 'So11111111111111111111111111111111111111112';
+        const quote = await getQuote(WSOL, mint, buyLamports);
+        if (!quote) { console.log(`[${source}] ❌ No Jupiter quote for graduated ${symbol}`); return; }
+        tokenAmount = Number(quote.outAmount);
+        if (PAPER_MODE) {
+          sig = `PAPER_JUP_${Date.now().toString(36)}`;
+        } else {
+          sig = await executeSwap(quote, 30000) || '';
+          if (!sig) { console.log(`[${source}] ❌ Jupiter swap failed for ${symbol}`); return; }
+        }
+        console.log(`[${source}] 🎯 JUPITER BUY ${symbol} | graduated | ${buySol} SOL → ${tokenAmount} tokens | ${velData.buys60s}B/${velData.sells60s}S`);
       }
 
-      const tokenAmount = Number(curveQuote.tokensOut);
       const entryPriceSol = buySol / tokenAmount;
       const { tp: tpPct, sl: slPct } = calcExitTargets(0);
-
-      console.log(`[${source}] 🎯 CURVE BUY ${symbol} | curve:${estCurvePct.toFixed(0)}% | ${buySol} SOL → ${(tokenAmount/1e6).toFixed(0)}M tokens | ${velData.buys60s}B/${velData.sells60s}S`);
 
       const entryMetrics: EntryMetrics = {
         volume1h: vol1h, priceChange1h: 0, momentum5m: 0, buyRatio,
