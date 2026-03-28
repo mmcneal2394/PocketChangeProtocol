@@ -44,6 +44,7 @@ import { getBondingCurveState, paperBuyOnCurve, getCurrentValueSol as getCurveVa
 import { liveBuyOnCurve, liveSellOnCurve } from './pump_executor';
 import { observe, runObserverChecks, getObserverStats } from './market_observer';
 import * as birdeye from './birdeye';
+import { initPostmortemTable, runPostmortems, getPostmortemSummary } from './postmortem';
 import { exitParams, recordExitOutcome, getTunerStatus } from './live_tuner';
 
 let poolState: PoolStateSubscriber | null = null;
@@ -1612,6 +1613,12 @@ async function main() {
     const stats = getObserverStats();
     if (stats) console.log(`[SNIPER] ${stats}`);
   }, 300_000);
+
+  // Post-mortem analysis — checks past trades at 1h/6h/24h, auto-tunes scorer
+  await initPostmortemTable().catch(() => {});
+  setInterval(async () => {
+    try { await runPostmortems(); } catch { /* non-fatal */ }
+  }, 60_000); // check every 60s for trades needing post-mortem
 
   process.on('SIGTERM', () => {
     saveStore();
