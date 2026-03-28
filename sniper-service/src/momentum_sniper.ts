@@ -1305,6 +1305,7 @@ async function main() {
 
     // Curve-specific gates (only if on bonding curve)
     let estCurvePct = 0;
+    let useJupiter = !onCurve; // graduated tokens always use Jupiter
     if (onCurve) {
       const curveState = await getBondingCurveState(mint);
       if (!curveState) {
@@ -1316,6 +1317,11 @@ async function main() {
       if (estCurvePct < 3) {
         console.log(`[${source}] ⏭️ ${symbol} — curve ${estCurvePct.toFixed(0)}% < 3%`);
         return;
+      }
+      // Curve > 80% = about to graduate, bonding curve tx will fail
+      if (estCurvePct > 80) {
+        console.log(`[${source}] 🔄 ${symbol} — curve ${estCurvePct.toFixed(0)}% > 80%, using Jupiter (near graduation)`);
+        useJupiter = true;
       }
     }
 
@@ -1347,8 +1353,8 @@ async function main() {
       let tokenAmount = 0;
       let sig = '';
 
-      if (onCurve) {
-        // BONDING CURVE BUY
+      if (!useJupiter) {
+        // BONDING CURVE BUY (only if curve < 80%)
         const curveState = await getBondingCurveState(mint);
         const curveQuote = curveState ? quoteTokensForSol(curveState, BigInt(buyLamports)) : null;
         if (!curveQuote || curveQuote.tokensOut === 0n) {
