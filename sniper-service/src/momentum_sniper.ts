@@ -1368,11 +1368,20 @@ async function main() {
         } else {
           const maxSolWithSlippage = BigInt(Math.floor(buyLamports * 1.10));
           const liveSig = await liveBuyOnCurve(connection, wallet, mint, curveQuote.tokensOut, maxSolWithSlippage);
-          if (!liveSig) { console.log(`[${source}] ❌ Live curve buy TX failed for ${symbol}`); return; }
-          sig = liveSig;
+          if (!liveSig) {
+            // Curve buy failed — likely graduated. Fallback to Jupiter.
+            console.log(`[${source}] 🔄 Curve buy failed for ${symbol}, falling back to Jupiter`);
+            useJupiter = true;
+          } else {
+            sig = liveSig;
+          }
         }
-        console.log(`[${source}] 🎯 CURVE BUY ${symbol} | curve:${estCurvePct.toFixed(0)}% | ${buySol} SOL → ${(tokenAmount/1e6).toFixed(0)}M tokens | ${velData.buys60s}B/${velData.sells60s}S`);
-      } else {
+        if (!useJupiter && sig) {
+          console.log(`[${source}] 🎯 CURVE BUY ${symbol} | curve:${estCurvePct.toFixed(0)}% | ${buySol} SOL → ${(tokenAmount/1e6).toFixed(0)}M tokens | ${velData.buys60s}B/${velData.sells60s}S`);
+        }
+      }
+
+      if (useJupiter && !sig) {
         // JUPITER BUY — graduated token (on PumpSwap/Raydium)
         const WSOL = 'So11111111111111111111111111111111111111112';
         const quote = await getQuote(WSOL, mint, buyLamports);
