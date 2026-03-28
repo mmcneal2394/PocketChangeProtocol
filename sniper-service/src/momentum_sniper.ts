@@ -43,6 +43,7 @@ import { PoolStateSubscriber } from './pool_state_subscriber';
 import { getBondingCurveState, paperBuyOnCurve, getCurrentValueSol as getCurveValueSol, isOnBondingCurve, quoteTokensForSol, quoteSolForTokens } from './pump_trader';
 import { liveBuyOnCurve, liveSellOnCurve } from './pump_executor';
 import { observe, runObserverChecks, getObserverStats } from './market_observer';
+import { exitParams, recordExitOutcome, getTunerStatus } from './live_tuner';
 
 let poolState: PoolStateSubscriber | null = null;
 
@@ -678,13 +679,14 @@ async function checkExits() {
     // VELOCITY EXIT: if buy ratio < 0.25 for 60s+ AND PnL < 0, exit (bearish momentum died)
     // ═══════════════════════════════════════════════════════════════════════
 
-    const MIN_HOLD_MS = 15_000;   // 15s breathing room (was 45s — too long, missed -20% SL)
-    const CATASTROPHIC_SL = 12.5;  // matches hard SL — no gap
-    const HARD_SL = 12.5;         // Phase 1: -12.5% (tighter — cut losers fast)
-    const BREAKEVEN_TRIGGER = 12; // Phase 2: at +12%, SL moves to 0% (was +8%, both P2-BE losses were premature)
-    const TRAIL_TRIGGER = 20;     // Phase 3: at +20%, trailing stop
-    const TRAIL_DISTANCE = 12;    // Phase 3: trail 12% below peak
-    const FULL_TP = 60;           // +60% full TP (Artemis top winner: +126%, PCP: +15773%)
+    // Live-tunable exit params — auto-adjusted by post-exit monitor + observer
+    const MIN_HOLD_MS = exitParams.minHoldMs;
+    const CATASTROPHIC_SL = exitParams.catastrophicSL;
+    const HARD_SL = exitParams.hardSL;
+    const BREAKEVEN_TRIGGER = exitParams.breakevenTrigger;
+    const TRAIL_TRIGGER = exitParams.trailTrigger;
+    const TRAIL_DISTANCE = exitParams.trailDistance;
+    const FULL_TP = exitParams.fullTP;
 
     let activeSl: number;
     let trail = false;
@@ -910,26 +912,23 @@ async function runPostExitChecks() {
         const tag = pricePctChange > 10 ? 'MISSED' : pricePctChange < -10 ? 'GOOD EXIT' : 'FLAT';
         console.log(`[POST-EXIT] ${check.symbol} @ ${label}: ${pricePctChange >= 0 ? '+' : ''}${pricePctChange.toFixed(1)}% since exit (${tag})`);
 
-        // Alert on Telegram if we missed a big move
-        if (label === '5m' && pricePctChange > 30) {
-          await sendTelegram(
-            `⚠️ <b>MISSED GAIN</b> ${check.symbol}\n` +
-            `Sold at ${check.exitPnlPct >= 0 ? '+' : ''}${check.exitPnlPct.toFixed(1)}% (${check.exitReason})\n` +
-            `Now +${pricePctChange.toFixed(0)}% higher after 5min\n` +
-            `Exit may have been premature`
-          );
-        }
+        // Collect price change for live tuner
+        if (!check.priceChanges) (check as any).priceChanges = [];
+        (check as any).priceChanges.push({ label, pctChange: pricePctChange });
 
-        // Feed back to scorer: if token ran 30%+ after exit, record as "early exit" learning
-        if (label === '3m' && pricePctChange > 20) {
-          try {
-            const { saveTradetoDB } = require('./scorer_db');
-            await saveTradetoDB({
-              mint: check.mint + '_postexit', symbol: check.symbol, source: 'post-exit-learning',
-              metrics: { volume1h: 0, priceChange1h: 0, momentum5m: 0, buyRatio: 0, buys1h: 0, liquidity: 0, mcap: 0, tokenAgeSec: 0, velocityScore: 0, detectionSource: 0, source: 'post-exit' },
-              won: true, pnlPct: pricePctChange, exitReason: 'post-exit-missed-' + check.exitReason,
-            });
-          } catch {}
+        // On final check (5m): feed to live tuner + alert
+        if (label === '5m') {
+          // Feed to live tuner — closes the learning loop
+          recordExitOutcome(check.exitReason, check.exitPnlPct, (check as any).priceChanges || []);
+
+          if (pricePctChange > 30) {
+            await sendTelegram(
+              `⚠️ <b>MISSED GAIN</b> ${check.symbol}\n` +
+              `Sold at ${check.exitPnlPct >= 0 ? '+' : ''}${check.exitPnlPct.toFixed(1)}% (${check.exitReason})\n` +
+              `Now +${pricePctChange.toFixed(0)}% higher after 5min\n` +
+              `Tuner: ${getTunerStatus()}`
+            );
+          }
         }
       } catch {}
     }
