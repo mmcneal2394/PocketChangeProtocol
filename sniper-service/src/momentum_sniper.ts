@@ -677,9 +677,9 @@ async function checkExits() {
     // VELOCITY EXIT: if buy ratio < 0.25 for 60s+ AND PnL < 0, exit (bearish momentum died)
     // ═══════════════════════════════════════════════════════════════════════
 
-    const MIN_HOLD_MS = 45_000;   // 45s breathing room
-    const CATASTROPHIC_SL = 30;   // rug protection during breathing
-    const HARD_SL = 20;           // Phase 1: -20% (was -15%, data says winners dip -10 to -15% before recovering)
+    const MIN_HOLD_MS = 15_000;   // 15s breathing room (was 45s — too long, missed -20% SL)
+    const CATASTROPHIC_SL = 20;   // matches hard SL — no gap
+    const HARD_SL = 20;           // Phase 1: -20%
     const BREAKEVEN_TRIGGER = 8;  // Phase 2: at +8%, SL moves to 0%
     const TRAIL_TRIGGER = 20;     // Phase 3: at +20%, trailing stop
     const TRAIL_DISTANCE = 12;    // Phase 3: trail 12% below peak
