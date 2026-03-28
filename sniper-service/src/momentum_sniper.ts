@@ -43,6 +43,7 @@ import { PoolStateSubscriber } from './pool_state_subscriber';
 import { getBondingCurveState, paperBuyOnCurve, getCurrentValueSol as getCurveValueSol, isOnBondingCurve, quoteTokensForSol, quoteSolForTokens } from './pump_trader';
 import { liveBuyOnCurve, liveSellOnCurve } from './pump_executor';
 import { observe, runObserverChecks, getObserverStats } from './market_observer';
+import * as birdeye from './birdeye';
 import { exitParams, recordExitOutcome, getTunerStatus } from './live_tuner';
 
 let poolState: PoolStateSubscriber | null = null;
@@ -573,22 +574,27 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
     }
   } catch { /* Helius down — continue without */ }
 
-  // Birdeye token overview (price, holders, liquidity)
-  try {
-    const birdRes = await fetch(`https://public-api.birdeye.so/defi/token_overview?address=${mint}`, {
-      headers: { 'X-Chain': 'solana', 'Accept': 'application/json' },
-      signal: AbortSignal.timeout(3000),
-    });
-    if (birdRes.ok) {
-      const birdData: any = await birdRes.json();
-      const d = birdData.data || {};
-      birdeyeLiq = d.liquidity || 0;
-      birdeyeMcap = d.mc || 0;
-      if (d.holder && d.holder > holderCount) holderCount = d.holder;
-    }
-  } catch { /* Birdeye down — continue without */ }
+  // Birdeye enrichment: overview + security scan
+  const birdData = await birdeye.enrichToken(mint);
+  if (birdData.overview) {
+    birdeyeLiq = birdData.overview.liquidity;
+    birdeyeMcap = birdData.overview.mcap;
+    if (birdData.overview.holders > holderCount) holderCount = birdData.overview.holders;
+  }
 
-  console.log(`[SNIPER] 📊 ${symbol} enriched: top1:${topHolderPct.toFixed(0)}% holders:${holderCount} liq:$${(birdeyeLiq/1000).toFixed(0)}k mcap:$${((birdeyeMcap || 0)/1000).toFixed(0)}k`);
+  // Security scan — hard reject honeypots and freeze authority tokens
+  if (birdData.security) {
+    if (birdData.security.isHoneypot) {
+      console.log(`[SNIPER] 🚫 ${symbol} — HONEYPOT detected by Birdeye`);
+      return;
+    }
+    if (birdData.security.hasFreezeAuthority) {
+      console.log(`[SNIPER] 🚫 ${symbol} — has freeze authority (can lock tokens)`);
+      return;
+    }
+  }
+
+  console.log(`[SNIPER] 📊 ${symbol} enriched: top1:${topHolderPct.toFixed(0)}% holders:${holderCount} liq:$${(birdeyeLiq/1000).toFixed(0)}k mcap:$${((birdeyeMcap || 0)/1000).toFixed(0)}k${birdData.security ? ` safe:${!birdData.security.isHoneypot}` : ''}`);
 
   // ── Adaptive scoring gate ─────────────────────────────────────────────────
   const entryMetrics: EntryMetrics = {
@@ -1218,6 +1224,20 @@ async function poll() {
 
       return true;
     });
+
+    // Track ALL trending candidates in observer for passive learning
+    for (const c of (raw.mints as any[]).slice(0, 10)) {
+      observe({
+        mint: c.mint, symbol: c.symbol || c.mint?.slice(0, 8) || '?',
+        source: 'trending',
+        mcap: c.marketCap || 0,
+        velocity: 0,
+        buyRatio: c.buyRatio || 0,
+        buys: c.buys1h || c.txns?.h1?.buys || 0,
+        liquidity: c.liquidity || 0,
+        tokenAgeSec: c._ageMin ? c._ageMin * 60 : 0,
+      });
+    }
 
     if (candidates.length === 0) {
       const accCount = accelerating.length;
