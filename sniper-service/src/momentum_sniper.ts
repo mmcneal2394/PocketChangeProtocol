@@ -58,16 +58,62 @@ const TG_TOKEN   = process.env.TELEGRAM_BOT_TOKEN || '';
 const TG_CHAT    = process.env.TELEGRAM_CHAT_ID || '';
 const PAPER_BALANCE = parseFloat(process.env.PAPER_BALANCE || '1.0'); // simulated SOL balance
 
+const INITIAL_BALANCE = parseFloat(process.env.INITIAL_BALANCE_SOL || '0.9902'); // starting SOL for PnL calc
+
+async function getWalletStatus(): Promise<string> {
+  try {
+    const balResp = await fetch(RPC, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getBalance', params: [wallet.publicKey.toBase58()] }),
+      signal: AbortSignal.timeout(3000),
+    });
+    const balData: any = await balResp.json();
+    const native = (balData.result?.value || 0) / 1e9;
+
+    // Get WSOL balance
+    const tokenResp = await fetch(RPC, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'getTokenAccountsByOwner',
+        params: [wallet.publicKey.toBase58(), { programId: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' }, { encoding: 'jsonParsed' }] }),
+      signal: AbortSignal.timeout(3000),
+    });
+    const tokenData: any = await tokenResp.json();
+    let wsol = 0;
+    for (const acct of (tokenData.result?.value || [])) {
+      const info = acct.account?.data?.parsed?.info;
+      if (info?.mint === 'So11111111111111111111111111111111111111112') {
+        wsol = parseFloat(info.tokenAmount?.uiAmountString || '0');
+      }
+    }
+
+    const total = native + wsol;
+    const pnl = total - INITIAL_BALANCE;
+    const pnlPct = (pnl / INITIAL_BALANCE) * 100;
+    const posCount = store.positions.length;
+    const posStr = posCount > 0
+      ? `\nPositions: ${store.positions.map(p => p.symbol).join(', ')} (${posCount}/${MAX_POSITIONS})`
+      : '';
+
+    return `\n💰 Balance: ${total.toFixed(4)} SOL (PnL: ${pnl >= 0 ? '+' : ''}${pnl.toFixed(4)} / ${pnlPct >= 0 ? '+' : ''}${pnlPct.toFixed(1)}%)${posStr}`;
+  } catch {
+    return '';
+  }
+}
+
 async function sendTelegram(msg: string) {
   if (!TG_TOKEN || !TG_CHAT || TG_CHAT === 'disabled') {
     console.log('[TG] Skipped — no token/chat configured');
     return;
   }
   try {
+    // Append live wallet status to every message
+    const status = await getWalletStatus();
+    const fullMsg = msg + status;
+
     const res = await fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: TG_CHAT, text: msg, parse_mode: 'HTML' }),
+      body: JSON.stringify({ chat_id: TG_CHAT, text: fullMsg, parse_mode: 'HTML' }),
       signal: AbortSignal.timeout(5000),
     });
     if (!res.ok) {
