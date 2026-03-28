@@ -290,6 +290,7 @@ export class VelocityTracker {
       const trackingSecs = (now - data.firstSeen) / 1000;
       const hasSells = data.sells60s >= 1;
       if (!this.notifiedNewMints.has(mint) && data.buys60s >= 3 && data.buyRatio60s >= 0.50 && trackingSecs >= 5 && hasSells) {
+        this.notifiedNewMints.add(mint); // always mark as notified to prevent retry spam
         const ageSec = (now - data.firstSeen) / 1000;
 
         // Fast path: pump.fun mints (end with "pump") — fire callback IMMEDIATELY
