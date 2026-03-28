@@ -126,7 +126,7 @@ export async function runPostmortems() {
 
     // Run analysis if we have enough data
     const pmCount = await p.query('SELECT count(*) FROM trade_postmortems');
-    if (+pmCount.rows[0].count >= 25 && +pmCount.rows[0].count % 25 === 0) {
+    if (+pmCount.rows[0].count >= 10 && +pmCount.rows[0].count % 10 === 0) {
       await runFeatureAnalysis(p);
     }
   } catch (e: any) {
