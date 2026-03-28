@@ -558,6 +558,38 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
     console.log(`[SNIPER] ℹ️  ${symbol} — velocity.json not available, using DexScreener 5m data`);
   }
 
+  // ── Helius + Birdeye enrichment before scoring ────────────────────────────
+  let topHolderPct = 0;
+  let holderCount = 0;
+  let birdeyeLiq = 0;
+  let birdeyeMcap = 0;
+  try {
+    const mintPk = new (await import('@solana/web3.js')).PublicKey(mint);
+    const largest = await connection.getTokenLargestAccounts(mintPk);
+    if (largest.value.length > 0) {
+      const totalSupply = largest.value.reduce((s, a) => s + (a.uiAmount || 0), 0);
+      topHolderPct = totalSupply > 0 ? (largest.value[0]?.uiAmount || 0) / totalSupply * 100 : 0;
+      holderCount = largest.value.filter(a => (a.uiAmount || 0) > 0).length;
+    }
+  } catch { /* Helius down — continue without */ }
+
+  // Birdeye token overview (price, holders, liquidity)
+  try {
+    const birdRes = await fetch(`https://public-api.birdeye.so/defi/token_overview?address=${mint}`, {
+      headers: { 'X-Chain': 'solana', 'Accept': 'application/json' },
+      signal: AbortSignal.timeout(3000),
+    });
+    if (birdRes.ok) {
+      const birdData: any = await birdRes.json();
+      const d = birdData.data || {};
+      birdeyeLiq = d.liquidity || 0;
+      birdeyeMcap = d.mc || 0;
+      if (d.holder && d.holder > holderCount) holderCount = d.holder;
+    }
+  } catch { /* Birdeye down — continue without */ }
+
+  console.log(`[SNIPER] 📊 ${symbol} enriched: top1:${topHolderPct.toFixed(0)}% holders:${holderCount} liq:$${(birdeyeLiq/1000).toFixed(0)}k mcap:$${((birdeyeMcap || 0)/1000).toFixed(0)}k`);
+
   // ── Adaptive scoring gate ─────────────────────────────────────────────────
   const entryMetrics: EntryMetrics = {
     volume1h,
@@ -565,12 +597,13 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
     momentum5m: momentum5m ?? 0,
     buyRatio,
     buys1h,
-    liquidity: 0,
-    mcap: 0,
+    liquidity: birdeyeLiq || 0,
+    mcap: birdeyeMcap || 0,
     tokenAgeSec: tokenAgeSec ?? 9999,
     velocityScore: vel ? vel.buys60s * vel.buyRatio60s : 0,
-    detectionSource: vel?.isAccelerating ? 2 : vel ? 1 : 0, // 0=dexscreener, 1=velocity, 2=accel
+    detectionSource: vel?.isAccelerating ? 2 : vel ? 1 : 0,
     source: vel?.isAccelerating ? 'velocity-first' : 'dexscreener',
+    topHolderPct, holderCount, curvePct: 0,
   };
 
   // Log detection with full context
@@ -1522,11 +1555,10 @@ async function main() {
     await poll();
   };
 
-  // DexScreener poll DISABLED — data shows it only finds post-pump tokens that lose money
-  // All profitable trades come from velocity NEW-MINT curve buys
-  // await doPoll();
-  // setInterval(doPoll, POLL_MS);
-  console.log('[SNIPER] DexScreener poll disabled — curve-only mode');
+  // DexScreener poll RE-ENABLED — velocity-only was missing active tokens
+  await doPoll();
+  setInterval(doPoll, POLL_MS);
+  console.log('[SNIPER] DexScreener + Velocity dual-path active');
 
   // Cross-bot position deconfliction
   await initPositionSharing();
