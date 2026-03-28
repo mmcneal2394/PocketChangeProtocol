@@ -153,12 +153,12 @@ export class VelocityTracker {
     try {
       const res = await fetch(`https://frontend-api-v3.pump.fun/coins/${mint}`, {
         headers: { 'Accept': 'application/json' },
-        signal: AbortSignal.timeout(3000),
+        signal: AbortSignal.timeout(5000),
       });
       if (!res.ok) {
         // Not on pump.fun — try DexScreener as fallback
         const dexRes = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${mint}`, {
-          signal: AbortSignal.timeout(3000),
+          signal: AbortSignal.timeout(5000),
         });
         if (dexRes.ok) {
           const dexData: any = await dexRes.json();
@@ -166,6 +166,7 @@ export class VelocityTracker {
             const pair = dexData.pairs[0];
             if (pair.chainId === 'solana') {
               this.validatedMints.add(mint);
+              this.notifiedNewMints.add(mint);
               const symbol = pair.baseToken?.symbol || mint.slice(0, 8);
               console.log(`[VELOCITY] NEW MINT (DexScreener): ${symbol} | ${data.buys60s}B/${data.sells60s}S | tracked ${ageSec.toFixed(0)}s`);
               for (const cb of this.onNewMintCallbacks) {
@@ -178,17 +179,20 @@ export class VelocityTracker {
           }
         }
         // Neither pump.fun nor DexScreener — not a real tradeable token
+        this.notifiedNewMints.add(mint); // don't retry non-tokens
         console.log(`[VELOCITY] SKIP ${mint.slice(0,8)}... — not found on pump.fun or DexScreener`);
         return;
       }
 
       const pumpData: any = await res.json();
       if (!pumpData.symbol) {
+        this.notifiedNewMints.add(mint);
         console.log(`[VELOCITY] SKIP ${mint.slice(0,8)}... — pump.fun returned no symbol`);
         return;
       }
 
       this.validatedMints.add(mint);
+      this.notifiedNewMints.add(mint);
       const symbol = pumpData.symbol;
       const mcap = pumpData.usd_market_cap || 0;
       console.log(`[VELOCITY] NEW MINT: ${symbol} (${mint.slice(0,8)}) | mcap:$${(mcap/1000).toFixed(1)}k | ${data.buys60s}B/${data.sells60s}S | tracked ${ageSec.toFixed(0)}s`);
@@ -286,11 +290,9 @@ export class VelocityTracker {
       const trackingSecs = (now - data.firstSeen) / 1000;
       const hasSells = data.sells60s >= 1;
       if (!this.notifiedNewMints.has(mint) && data.buys60s >= 3 && data.buyRatio60s >= 0.50 && trackingSecs >= 5 && hasSells) {
-        this.notifiedNewMints.add(mint);
+        // Don't add to notifiedNewMints yet — only after validation succeeds
+        // This allows retry if pump.fun API is flaky
         const ageSec = (now - data.firstSeen) / 1000;
-
-        // Pre-validate: check pump.fun API to confirm it's a real token
-        // (async — fire and forget, callback handles the result)
         this.validateAndNotifyNewMint(mint, data, ageSec);
       }
 
