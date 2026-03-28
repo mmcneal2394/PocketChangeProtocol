@@ -97,8 +97,8 @@ if (PAPER_MODE) {
 
 // ── Config ───────────────────────────────────────────────────────────────────
 const BASE_BUY_PCT     = parseFloat(process.env.SNIPER_BUY_PCT  || '0.10'); // 10% of balance — reduced after SL streak
-const MIN_BUY_SOL      = parseFloat(process.env.SNIPER_MIN_BUY  || '0.25');
-const MAX_BUY_SOL      = parseFloat(process.env.SNIPER_MAX_BUY  || '0.25');
+const MIN_BUY_SOL      = parseFloat(process.env.SNIPER_MIN_BUY  || '0.3');
+const MAX_BUY_SOL      = parseFloat(process.env.SNIPER_MAX_BUY  || '0.3');
 const MAX_POSITIONS    = parseInt(process.env.SNIPER_MAX_POS   || '1');    // 1 position — quality over quantity
 const MAX_HOLD_MS      = parseInt(process.env.SNIPER_MAX_HOLD  || '1800000'); // 30min hard cap (trailing stop exits first)
 const RETRACE_SHIELD_MS = 30_000;  // SL doubled for first 30s only — exit bad trades faster
@@ -813,17 +813,24 @@ async function checkExits() {
           // Telegram exit alert
           const tag = PAPER_MODE ? '[PAPER]' : '[LIVE]';
           const icon = pnlPctFinal >= 0 ? '+++' : '---';
-          const modelInfo = getModelSummary();
-          const analyticsInfo = getAnalyticsSummary();
           const openTrade = getOpenTrade(pos.mint);
           const latencyStr = openTrade ? `Latency: ${openTrade.entry.signalToEntryMs}ms` : '';
+          // Get live PnL from Postgres (source of truth)
+          let dbPnl = '';
+          try {
+            const { getTradeStats } = require('./scorer_db');
+            const stats = await getTradeStats();
+            if (stats && stats.liveCount > 0) {
+              dbPnl = `\n<b>All-time (live):</b> ${stats.liveCount} trades (${stats.wins}W/${stats.losses}L) | WR: ${(stats.winRate*100).toFixed(0)}%`;
+            }
+          } catch {}
           await sendTelegram(
             `${tag} <b>SELL ${pos.symbol}</b> ${icon}\n` +
             `PnL: ${pnlPctFinal >= 0 ? '+' : ''}${pnlPctFinal.toFixed(1)}% (${pnlSol >= 0 ? '+' : ''}${pnlSol.toFixed(4)} SOL)\n` +
             `Peak: +${pos.peakPnlPct.toFixed(1)}% | Reason: ${reason}\n` +
             `Held: ${(heldMs/60000).toFixed(1)}min | ${latencyStr}\n` +
-            `Session: W${store.stats.wins}/L${store.stats.losses} | ${store.stats.totalPnlSol >= 0 ? '+' : ''}${store.stats.totalPnlSol.toFixed(4)} SOL\n` +
-            `\n<b>Analytics:</b> ${analyticsInfo}`
+            `Session: W${store.stats.wins}/L${store.stats.losses} | ${store.stats.totalPnlSol >= 0 ? '+' : ''}${store.stats.totalPnlSol.toFixed(4)} SOL` +
+            dbPnl
           );
       } else {
         console.warn(`[SNIPER] ⚠️  No sell quote for ${pos.symbol} (curve:${onCurve}) — holding`);
