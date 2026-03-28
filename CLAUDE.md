@@ -122,6 +122,16 @@ Lessons start at confidence 0.6 and adjust aggressively:
 
 When making significant code changes, update any relevant documentation in the project (architecture docs, install guides, API docs, READMEs, etc.). Keep docs in sync with the code. Do NOT update todo.md or any TODO files — those are managed separately.
 
+### Sniper Learnings
+
+`SNIPER_LEARNINGS.md` contains data-proven rules, entry/exit parameters, trap signals, and architecture details for the momentum sniper. **Always update this file** when:
+- Analyzing past trade data and finding new patterns
+- Changing entry gates, exit parameters, or scorer weights
+- Discovering new trap signals or confirmed winning patterns
+- Running post-mortem analysis on trades
+
+This file will be shared with other projects (Artemis) for cross-project learning. Keep it factual, data-backed, and up to date.
+
 ### Disable Memory
 
 To disable memory for this project, create a file called `.no-memory` in the project root.
