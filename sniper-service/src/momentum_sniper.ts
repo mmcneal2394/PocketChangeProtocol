@@ -869,6 +869,7 @@ interface PostExitCheck {
   exitAt: number;
   checks: { delay: number; label: string }[];
   checkedAt: Set<number>;
+  priceChanges: { label: string; pctChange: number }[];
 }
 const postExitQueue: PostExitCheck[] = [];
 
@@ -883,6 +884,7 @@ function schedulePostExitCheck(mint: string, symbol: string, exitPnlPct: number,
       { delay: 300_000, label: '5m' },
     ],
     checkedAt: new Set(),
+    priceChanges: [],
   });
   // Keep queue bounded
   if (postExitQueue.length > 20) postExitQueue.shift();
@@ -913,13 +915,12 @@ async function runPostExitChecks() {
         console.log(`[POST-EXIT] ${check.symbol} @ ${label}: ${pricePctChange >= 0 ? '+' : ''}${pricePctChange.toFixed(1)}% since exit (${tag})`);
 
         // Collect price change for live tuner
-        if (!check.priceChanges) (check as any).priceChanges = [];
-        (check as any).priceChanges.push({ label, pctChange: pricePctChange });
+        check.priceChanges.push({ label, pctChange: pricePctChange });
 
         // On final check (5m): feed to live tuner + alert
         if (label === '5m') {
           // Feed to live tuner — closes the learning loop
-          recordExitOutcome(check.exitReason, check.exitPnlPct, (check as any).priceChanges || []);
+          recordExitOutcome(check.exitReason, check.exitPnlPct, check.priceChanges);
 
           if (pricePctChange > 30) {
             await sendTelegram(
