@@ -1207,31 +1207,18 @@ async function main() {
       return;
     }
 
-    // Gate 3: Minimum buy pressure (matched to velocity tracker thresholds)
-    const MIN_TRACKING_SECS = 10;
-    if (velData.buys60s < 5 || velData.sells60s < 1 || velData.buyRatio60s < 0.55 || velData.ageSec < MIN_TRACKING_SECS) {
-      console.log(`[${source}] ⏭️ ${symbol} — weak signal: ${velData.buys60s}B/${velData.sells60s}S ${(velData.buyRatio60s*100).toFixed(0)}% ${velData.ageSec}s`);
-      return;
-    }
+    // Gate 3+4+5 removed — velocity tracker already enforces 5B/1S/55%/10s
+    // Adding more gates here was blocking tokens that passed velocity validation
+    // The velocity tracker IS the quality filter
 
-    // Gate 4: Buy count — 5+ buys with 65%+ ratio already required by velocity tracker
-    // The 30s observation window is the real quality filter
-    // No additional count gate needed here
-
-    // Gate 5: Minimum velocity — at least some activity (acceleration not required)
-    if (velData.velocity < 3) {
-      console.log(`[${source}] ⏭️ ${symbol} — velocity too low (${velData.velocity.toFixed(0)} tx/min)`);
-      return;
-    }
-
-    // Gate 6: Curve position — sweet spot 5-60%
+    // Gate 6: Curve position — sweet spot 3-85%
     const curveState = await getBondingCurveState(mint);
     if (!curveState) {
       console.log(`[${source}] ❌ Can't read curve state for ${symbol}`);
       return;
     }
-    const MIN_CURVE_PCT = 5;
-    const MAX_CURVE_PCT = 60;
+    const MIN_CURVE_PCT = 3;
+    const MAX_CURVE_PCT = 85;
     const realSolInCurve = Number(curveState.realSolReserves) / 1e9;
     const estCurvePct = Math.min(100, (realSolInCurve / 85) * 100);
     if (estCurvePct < MIN_CURVE_PCT) {
