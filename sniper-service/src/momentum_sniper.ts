@@ -42,6 +42,7 @@ import {
 import { PoolStateSubscriber } from './pool_state_subscriber';
 import { getBondingCurveState, paperBuyOnCurve, getCurrentValueSol as getCurveValueSol, isOnBondingCurve, quoteTokensForSol, quoteSolForTokens } from './pump_trader';
 import { liveBuyOnCurve, liveSellOnCurve } from './pump_executor';
+import { observe, runObserverChecks, getObserverStats } from './market_observer';
 
 let poolState: PoolStateSubscriber | null = null;
 
@@ -1426,6 +1427,17 @@ async function main() {
 
   // PRIMARY: New mint detection — catches fresh pump.fun launches in seconds
   velocityTracker.onNewMint(async (mint, velData) => {
+    // Observe ALL new mints for learning — regardless of whether we trade them
+    observe({
+      mint, symbol: velData.symbol || mint.slice(0, 8),
+      source: 'new-mint',
+      mcap: velData.mcap || 0,
+      velocity: velData.velocity || 0,
+      buyRatio: velData.buyRatio60s || 0,
+      buys: velData.buys60s || 0,
+      liquidity: 0,
+      tokenAgeSec: velData.ageSec || 0,
+    });
     await velocitySnipe(mint, velData, 'NEW-MINT');
   });
 
@@ -1476,6 +1488,17 @@ async function main() {
   setInterval(async () => {
     try { await runPostExitChecks(); } catch { /* non-fatal */ }
   }, 10_000);
+
+  // Market observer — tracks ALL detected tokens for passive learning
+  setInterval(async () => {
+    try { await runObserverChecks(getQuote); } catch { /* non-fatal */ }
+  }, 15_000);
+
+  // Log observer stats every 5 min
+  setInterval(() => {
+    const stats = getObserverStats();
+    if (stats) console.log(`[SNIPER] ${stats}`);
+  }, 300_000);
 
   process.on('SIGTERM', () => {
     saveStore();
