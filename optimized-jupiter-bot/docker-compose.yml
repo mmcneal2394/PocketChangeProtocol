@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  # Persistent In-Memory Database
+  redis:
+    image: redis:7-alpine
+    container_name: pcp-redis
+    volumes:
+      - ./redis-data:/data
+    command: ["redis-server", "--appendonly", "yes"]
+
+  # Paper Trading Sandbox (MOCKS NATIVE SWAP EXECUTION)
+  pcp-paper:
+    build: .
+    container_name: pcp-engine-paper
+    profiles:
+      - paper
+    depends_on:
+      - redis
+    env_file:
+      - .env
+    environment:
+      - PAPER_MODE=true
+      - REDIS_URL=redis://redis:6379
+    volumes:
+      - ./logs:/root/.pm2/logs
+      - ./signals:/app/signals
+
+  # Live Production Environment (BROADCASTS NATIVE GAS)
+  pcp-live:
+    build: .
+    container_name: pcp-engine-live
+    profiles:
+      - live
+    depends_on:
+      - redis
+    env_file:
+      - .env
+    environment:
+      - REDIS_URL=redis://redis:6379
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./logs:/root/.pm2/logs
+      - ./signals:/app/signals
