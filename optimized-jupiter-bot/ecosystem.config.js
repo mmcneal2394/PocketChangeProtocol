@@ -62,6 +62,13 @@ module.exports = {
       interpreter: "node",
       interpreter_args: "--require ts-node/register",
       env: { NODE_ENV: "production" }
+    },
+    {
+      name: "pcp-trainer",
+      script: "scripts/maintain/pcp_trainer.ts",
+      interpreter: "node",
+      interpreter_args: "--require ts-node/register",
+      env: { NODE_ENV: "production" }
     }
   ]
 };
