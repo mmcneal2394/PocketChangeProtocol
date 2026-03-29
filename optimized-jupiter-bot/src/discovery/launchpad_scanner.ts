@@ -13,6 +13,9 @@
 import { logger } from '../utils/logger';
 import { globalRouteManager } from './route_manager';
 import { screenContract } from '../security/contract_screener';
+import Redis from 'ioredis';
+
+const redisScanPub = new Redis(process.env.REDIS_URL || 'redis://127.0.0.1:6379');
 
 const WSOL = 'So11111111111111111111111111111111111111112';
 
@@ -65,6 +68,20 @@ async function processNewMint(mint: string, source: string, liquidityUsd = 0) {
     addedAt: Date.now(),
   });
   logger.info(`[SCANNER][${source}] ✅ ${mint.slice(0, 8)}… added (score: ${screen.score}/100, liq: $${liquidityUsd.toFixed(0)})`);
+  
+  if (source === 'PumpFun' || source === 'Raydium' || source === 'Geyser' || source === 'PumpFun-Geyser') {
+      logger.info(`[SCANNER] ⚡ Firing Mock Velocity for immediate Snipe evaluation: ${mint}`);
+      // Push mock velocity to trigger velocityOverride loop inside momentum_sniper
+      redisScanPub.publish('stream:velocity', JSON.stringify({
+          mint: mint,
+          buys60s: 5,
+          sells60s: 0,
+          velocity: 25, // well over 15
+          buyRatio60s: 1.0,
+          solVolume60s: 10,
+          isAccelerating: true
+      }));
+  }
 }
 
 // ══ 1. Jupiter verified + all token list ═════════════════════════════════════

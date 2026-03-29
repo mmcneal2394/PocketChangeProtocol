@@ -19,6 +19,7 @@
 import fs   from 'fs';
 import path from 'path';
 const Database = require('better-sqlite3');
+import RedisBus from '../../src/utils/redis_bus';
 
 const FAST_ONLY = process.argv.includes('--fast');
 const SLOW_ONLY = process.argv.includes('--slow');
@@ -162,7 +163,7 @@ function main() {
 
   if (Object.keys(updates).length === 0) {
     console.log('[TUNE] No parameter changes — insufficient trade data or no updates needed');
-    process.exit(0);
+    return; // Instead of process.exit(0), just return since we are a Redis daemon now
   }
 
   const newParams = { ...current, ...updates };
@@ -186,4 +187,30 @@ function main() {
   }
 }
 
-main();
+// Redis Pub/Sub Daemon
+function startOptimizerDaemon() {
+  console.log(`[OPTIMIZER] 🛠️ Initializing Redis Subscriber Daemon...`);
+  const subscriber = RedisBus.getSubscriber();
+
+  subscriber.subscribe('optimizer:update', (err, count) => {
+    if (err) console.error(`[OPTIMIZER] ❌ Redis Subscribe Error:`, err);
+    else console.log(`[OPTIMIZER] ✅ Listening for AI Critic updates tightly via Memory...`);
+  });
+
+  subscriber.on('message', (channel, message) => {
+    if (channel === 'optimizer:update') {
+      console.log(`[OPTIMIZER] 📥 Target received from Critic via Redis! Processing immediately...`);
+      main(); // triggers the tuning logic precisely on command
+    }
+  });
+
+  // Start initial tune naturally on boot
+  main();
+
+  // Heartbeat system every 30 seconds
+  setInterval(() => {
+    RedisBus.publish('heartbeat:agent', { agent: 'pcp-optimizer', timestamp: Date.now() });
+  }, 30000);
+}
+
+startOptimizerDaemon();

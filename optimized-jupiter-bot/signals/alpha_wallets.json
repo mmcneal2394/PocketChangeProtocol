@@ -1,0 +1,23 @@
+{
+  "updated_at": "2026-03-27T12:00:00.000Z",
+  "tracked_wallets": [
+    {
+      "address": "2tgUbS9UMoQD6GkDZBiqKYCURnGrSb6ocYwRABrSJUvY",
+      "win_rate_gmgn": 0.95,
+      "score": 1.0,
+      "source": "manual_entry_1"
+    },
+    {
+      "address": "Ar2Y6o1QmrRAskjii1cRfijeKugHH13ycxW5cd7rro1x",
+      "win_rate_gmgn": 0.95,
+      "score": 1.0,
+      "source": "manual_entry_2"
+    },
+    {
+      "address": "5aLY85pyxiuX3fd4RgM3Yc1e3MAL6b7UgaZz6MS3JUfG",
+      "win_rate_gmgn": 0.95,
+      "score": 1.0,
+      "source": "manual_entry_3"
+    }
+  ]
+}
