@@ -122,9 +122,9 @@ let MIN_MOMENTUM_5M  = guardParam('MIN_MOMENTUM_5M');
 const POLL_MS          = 60_000; // Increased from 20s to drop RPC background sweep load
 const SIGNALS_DIR      = path.join(process.cwd(), 'signals');
 const TRENDING_FILE    = path.join(SIGNALS_DIR, 'trending.json');
-const SNIPER_LOG       = path.join(SIGNALS_DIR, 'sniper_positions.json');
+const SNIPER_LOG       = path.join(SIGNALS_DIR, process.env.PAPER_MODE === 'true' ? 'sniper_positions_paper.json' : 'sniper_positions.json');
 const STRATEGY_FILE    = path.join(SIGNALS_DIR, 'chart_strategy.json');
-const JOURNAL_FILE     = path.join(SIGNALS_DIR, 'trade_journal.jsonl');
+const JOURNAL_FILE     = path.join(SIGNALS_DIR, process.env.PAPER_MODE === 'true' ? 'trade_journal_paper.jsonl' : 'trade_journal.jsonl');
 const ALLOCATION_FILE  = path.join(SIGNALS_DIR, 'allocation.json');  // HarmonyAgent capital weight
 const VELOCITY_FILE    = path.join(SIGNALS_DIR, 'velocity.json');     // pcp-velocity real-time swap feed
 const WALLET_SIG_FILE  = path.join(SIGNALS_DIR, 'wallet_signals.json'); // pcp-wallet-tracker alpha signals
@@ -649,13 +649,15 @@ async function checkExits() {
       const slippageBps = isEmergencyExit ? 1500 : 500; // 15% slippage on dumps/force closes
       
       let exactBalanceLamports = Number(pos.tokenAmount);
-      try {
-        const pub = RedisBus.getPublisher();
-        await pub.incr('rpc:calls:total');
-        const balAcct = await connection.getTokenAccountBalance(new PublicKey(pos.ata));
-        exactBalanceLamports = Number(balAcct.value.amount);
-      } catch (e: any) {
-        console.warn(`[SNIPER] ⚠️ Could not fetch live balance for ${pos.symbol}, using cached entry amount`);
+      if (process.env.PAPER_MODE !== 'true') {
+        try {
+          const pub = RedisBus.getPublisher();
+          await pub.incr('rpc:calls:total');
+          const balAcct = await connection.getTokenAccountBalance(new PublicKey(pos.ata));
+          exactBalanceLamports = Number(balAcct.value.amount);
+        } catch (e: any) {
+          console.warn(`[SNIPER] ⚠️ Could not fetch live balance for ${pos.symbol}, using cached entry amount`);
+        }
       }
 
       if (exactBalanceLamports <= 0) {

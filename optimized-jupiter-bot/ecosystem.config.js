@@ -48,6 +48,13 @@ module.exports = {
       interpreter: "node",
       interpreter_args: "--require ts-node/register",
       env: { NODE_ENV: "production", WALLET_INDEX: "1" }
+    },
+    {
+      name: "pcp-sniper-paper",
+      script: "scripts/maintain/momentum_sniper.ts",
+      interpreter: "node",
+      interpreter_args: "--require ts-node/register",
+      env: { NODE_ENV: "production", PAPER_MODE: "true" }
     }
     // {
     //   name: "pcp-sniper-2",
