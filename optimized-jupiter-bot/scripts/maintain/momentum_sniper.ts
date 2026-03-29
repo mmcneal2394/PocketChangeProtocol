@@ -119,6 +119,11 @@ let MIN_PRICE_CHG_1H = guardParam('MIN_PRICE_CHG_1H');
 let MIN_BUY_RATIO    = guardParam('MIN_BUY_RATIO');
 const MAX_TOKEN_AGE_MIN= parseFloat(process.env.SNIPER_MAX_AGE || '9999');
 let MIN_MOMENTUM_5M  = guardParam('MIN_MOMENTUM_5M');
+
+let GLOBAL_TP_PCT    = parseFloat(process.env.MAX_TP_PERCENT || '20') / 100;
+let GLOBAL_SL_PCT    = parseFloat(process.env.STOP_LOSS_PERCENT || '50') / 100;
+let GLOBAL_HOLD_MIN  = parseFloat(process.env.MAX_HOLD_MINUTES || '10');
+
 const POLL_MS          = 60_000; // Increased from 20s to drop RPC background sweep load
 const SIGNALS_DIR      = path.join(process.cwd(), 'signals');
 const TRENDING_FILE    = path.join(SIGNALS_DIR, 'trending.json');
@@ -525,9 +530,9 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
     tokenAgeSec, momentum5m, momentum1m, pairCreatedAt, ata } as any);
 
   // Fetch dynamically precomputed bounds from Market Data Daemon
-  let maxTPpct = parseFloat(process.env.MAX_TP_PERCENT || '20') / 100;
-  let maxHoldMinutes = parseFloat(process.env.MAX_HOLD_MINUTES || '10');
-  let stopLossPct = parseFloat(process.env.STOP_LOSS_PERCENT || '50') / 100;
+  let maxTPpct = GLOBAL_TP_PCT;
+  let maxHoldMinutes = GLOBAL_HOLD_MIN;
+  let stopLossPct = GLOBAL_SL_PCT;
 
   try {
       const pub = RedisBus.getPublisher();
@@ -1061,7 +1066,9 @@ async function main() {
         if (overrides.MIN_BUY_SOL) MIN_BUY_SOL = overrides.MIN_BUY_SOL;
         if (overrides.MAX_BUY_SOL) MAX_BUY_SOL = overrides.MAX_BUY_SOL;
         if (overrides.MAX_POSITIONS) MAX_POSITIONS = overrides.MAX_POSITIONS;
-        if (overrides.MAX_HOLD_MS) MAX_HOLD_MS = overrides.MAX_HOLD_MS;
+        if (overrides.maxHoldMinutes) { GLOBAL_HOLD_MIN = overrides.maxHoldMinutes; MAX_HOLD_MS = overrides.maxHoldMinutes * 60000; }
+        if (overrides.maxTPpct) GLOBAL_TP_PCT = overrides.maxTPpct;
+        if (overrides.stopLossPct) GLOBAL_SL_PCT = overrides.stopLossPct;
       } catch (e: any) {
         console.error('[SNIPER/ADJUSTER] Override Parse Error:', e.message);
       }
