@@ -55,9 +55,13 @@ module.exports = {
       interpreter: "node",
       interpreter_args: "--require ts-node/register",
       env: { NODE_ENV: "production", PAPER_MODE: "true" }
+    },
+    {
+      name: "pcp-discovery-engine",
+      script: "scripts/maintain/discovery_engine.ts",
+      interpreter: "node",
+      interpreter_args: "--require ts-node/register",
+      env: { NODE_ENV: "production" }
     }
-    // {
-    //   name: "pcp-sniper-2",
-    //   script: "scripts/maintain/momentum_sniper.ts", ...
   ]
 };
