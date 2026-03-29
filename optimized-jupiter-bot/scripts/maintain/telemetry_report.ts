@@ -141,6 +141,11 @@ Generated: ${now} | Period: Last ${DAYS} days
 |-------|-------|------|------|---------|-------------|-----|
 ${rows_md}
 
+## 🦅 Apex Predator Performance (Crime Analytics Thesis)
+${routeStats.filter(r => r.route.includes('APEX')).length > 0
+  ? routeStats.filter(r => r.route.includes('APEX')).map(r => `**${r.route}**: ${r.executed} Trades | Win Rate: ${(r.winRate*100).toFixed(1)}% | Net P&L: ${r.totalProfitSol > 0 ? '+' : ''}${r.totalProfitSol} SOL`).join('\n')
+  : '_No Apex Predator trades executed in this window._'}
+
 ## 🔴 Dead Routes (recommend pruning)
 ${degraded.length > 0
   ? degraded.map(r => `- **${r.route}**: ${r.scans} scans, 0 executed, avg ${r.avgProfitBps} BPS`).join('\n')
