@@ -1,9 +1,15 @@
 {
   "positions": [],
-  "blacklist": [],
+  "blacklist": [
+    "Hdxv1MpXKVsJPoJ1AiocFX58Ry18yk2ybWZXtYJMpump",
+    "BKbmugTWPBFbuSzqf2EURHYNpMNGnKFFedGkD5Gipump",
+    "ECy9wQZ24eY43Bq1gn3874vH3V1gnVhWSzPJyr4kpump",
+    "FxtFm6peRSecXwFYD181Ndig8FpgCNzQFucyn1Aspump",
+    "5nLHLRZx1SE9EERR4SoPP42xDLvUoXfM9pugiZK8pump"
+  ],
   "stats": {
-    "wins": 1,
-    "losses": 2,
-    "totalPnlSol": -0.000034033999999997025
+    "wins": 12,
+    "losses": 13,
+    "totalPnlSol": -0.051303131999999974
   }
 }

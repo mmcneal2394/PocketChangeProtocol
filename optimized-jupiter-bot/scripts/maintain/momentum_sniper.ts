@@ -30,11 +30,13 @@
 
 import fs   from 'fs';
 import path from 'path';
+import { randomUUID } from 'crypto';
 import bs58 from 'bs58';
 import { Connection, Keypair, VersionedTransaction, PublicKey } from '@solana/web3.js';
 import dotenv from 'dotenv';
 import { getWsolBalance, autoRefillWsol, ensureWsolAta } from '../../src/utils/wsol_manager';
 import RedisBus from '../../src/utils/redis_bus';
+import { callRpcGateway } from '../../src/utils/rpc_client';
 import { REDIS_KEYS, STREAMS, CHANNELS, PARAM_NAMES } from '../../src/shared/redis_config';
 import { validateTradeCandidate } from '../../src/shared/trade_validator';
 
@@ -71,8 +73,8 @@ if (walletIndex && process.env[`PRIVATE_KEY_${walletIndex}`]) {
 interface ParamBound { env: string; def: number; min: number; max: number; unit: string; }
 const PARAM_BOUNDS: Record<string, ParamBound> = {
   BASE_BUY_PCT:     { env: 'SNIPER_BUY_PCT',  def: 0.10,   min: 0.01,  max: 0.30,   unit: 'fraction'       },
-  MIN_BUY_SOL:      { env: 'SNIPER_MIN_BUY',  def: 0.005,  min: 0.001, max: 0.05,   unit: 'SOL'            },
-  MAX_BUY_SOL:      { env: 'SNIPER_MAX_BUY',  def: 0.03,   min: 0.005, max: 0.10,   unit: 'SOL'            },
+  MIN_BUY_SOL:      { env: 'SNIPER_MIN_BUY',  def: 0.05,   min: 0.001, max: 0.20,   unit: 'SOL'            },
+  MAX_BUY_SOL:      { env: 'SNIPER_MAX_BUY',  def: 0.15,   min: 0.005, max: 1.00,   unit: 'SOL'            },
   MAX_POSITIONS:    { env: 'SNIPER_MAX_POS',  def: 1,      min: 1,     max: 5,      unit: 'slots'          },
   MAX_HOLD_MS:      { env: 'SNIPER_MAX_HOLD', def: 360000, min: 60000, max: 600000, unit: 'ms (max 10min)' },
   MIN_VOLUME_1H:    { env: 'SNIPER_MIN_VOL',  def: 8000,   min: 1000,  max: 500000, unit: 'USD'            },
@@ -149,7 +151,7 @@ function loadVelocity(mint: string): {
 
 // Load ALL velocity-tracked mints — used for velocity-first discovery
 function loadAllVelocityMints(): Array<{
-  mint: string; buys60s: number; sells60s: number; buyRatio60s: number;
+  mint: string; symbol?: string; buys60s: number; sells60s: number; buyRatio60s: number;
   velocity: number; isAccelerating: boolean; solVolume60s: number;
 }> {
   try {
@@ -175,6 +177,7 @@ export function appendTrade(record: {
   agent: string; action: 'BUY' | 'SELL';
   mint: string; symbol: string;
   amountSol: number; pnlSol?: number;
+  tradeId?: string; parentBuyId?: string;
   sig: string; reason?: string;
   taSig?: string; taConf?: number;
   holdMs?: number;
@@ -206,6 +209,15 @@ export function appendTrade(record: {
   } catch { /* never crash on journal write */ }
 }
 
+const MISSED_TARGETS_FILE = path.join(SIGNALS_DIR, 'missed_targets.jsonl');
+export function logMissedTarget(record: any) {
+  try {
+    if (!fs.existsSync(SIGNALS_DIR)) fs.mkdirSync(SIGNALS_DIR, { recursive: true });
+    let payload = JSON.stringify({ ...record, fallbackTimestamp: Date.now() }) + '\n';
+    fs.appendFileSync(MISSED_TARGETS_FILE, payload, 'utf-8');
+  } catch { }
+}
+
 // Load TA signal for a mint (soft gate — doesn't block if no data)
 function loadSignal(mint: string): { signal: string; confidence: number; reasons: string[] } | null {
   try {
@@ -219,6 +231,7 @@ function loadSignal(mint: string): { signal: string; confidence: number; reasons
 
 // ── Types ────────────────────────────────────────────────────────────────────
 interface Position {
+  tradeId:        string;
   mint:           string;
   ata:            string;   // Associated Token Account
   symbol:         string;
@@ -276,9 +289,14 @@ async function jupFetch(path: string, opts: RequestInit = {}): Promise<any> {
 export async function getQuote(inputMint: string, outputMint: string, amountLamports: number, slippageBps = 500): Promise<any | null> {
   try {
     const q = await jupFetch(`/quote?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amountLamports}&slippageBps=${slippageBps}`);
-    if (q.error || !q.outAmount) return null;
+    if (q.error || !q.outAmount) {
+        if (q.error && q.error !== 'Could not find any route' && q.errorCode !== 'TOKEN_NOT_TRADABLE') {
+            console.log(`[JUP API] Quote error for ${outputMint}: ${JSON.stringify(q)}`);
+        }
+        return null;
+    }
     return q;
-  } catch { return null; }
+  } catch (e) { return null; }
 }
 
 export async function executeSwap(quote: any, tipLamports = 25000): Promise<string | null> {
@@ -339,7 +357,7 @@ function calcExitTargets(priceChg1h: number): { tp: number; sl: number } {
 async function calcBuySize(): Promise<number> {
   try {
     const wsolBal = await getWsolBalance(connection, wallet.publicKey);
-    const bal     = wsolBal > 0 ? wsolBal : (await connection.getBalance(wallet.publicKey)) / 1e9;
+    const bal     = wsolBal > 0 ? wsolBal : (await callRpcGateway('getBalance', [wallet.publicKey])) / 1e9;
     const raw     = bal * BASE_BUY_PCT;
     const weight  = loadSniperWeight();
     
@@ -349,10 +367,10 @@ async function calcBuySize(): Promise<number> {
         const p = RedisBus.getPublisher();
         const perf = await p.hgetall(REDIS_KEYS.CONFIG_PERFORMANCE);
         if (perf && Object.keys(perf).length > 0) {
-            if (perf.circuitBreaker === 'true') {
-                 console.log(`[SNIPER] 🔴 CIRCUIT BREAKER ACTIVE — Halting all new entries!`);
-                 return 0; // Absolute block
-            }
+            // if (perf.circuitBreaker === 'true') {
+            //      console.log(`[SNIPER] 🔴 CIRCUIT BREAKER ACTIVE — Halting all new entries!`);
+            //      return 0; // Absolute block
+            // }
             throttleMult = parseFloat(perf.positionSizeMultiplier) || 1.0;
         }
     } catch(e) {}
@@ -384,19 +402,61 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
 
   const pub = RedisBus.getPublisher();
   
-  // ── Duplicate Action Prevention (30s Cooldown) ─────────────────────────
+  // ── Duplicate Action Prevention (60s Cooldown) ─────────────────────────
   const isInCooldown = await pub.get(REDIS_KEYS.cooldown(mint));
   if (isInCooldown) {
       console.log(`[SNIPER] ⏳ Skipping ${symbol} — actively cooling down post-trade.`);
       return;
   }
+
+  // ── Global Rug-Ticker Shield ──────────────────────────────────────────────
+  const cleanSymbol = symbol.toUpperCase().trim();
+  if (!symbol.includes('...')) {
+      const isRugged = await pub.get(`shield:ruggedTicker:${cleanSymbol}`);
+      if (isRugged) {
+          console.log(`[SNIPER] 🛡️ RUG TICKER SHIELD: Rejected ${symbol}. A variant recently rugged us! Protecting capital.`);
+          return;
+      }
+  }
+  
+  // ── Hive-Mind Dynamic Bounds Check ──────────────────────────────────────
+  const dynamicMinMom = (global as any).DYNAMIC_MIN_MOM_1M;
+  if (dynamicMinMom !== undefined && momentum1m !== undefined && momentum1m < dynamicMinMom) {
+      console.log(`[SNIPER] 🐜 HIVE REJECT: ${symbol} momentum (${momentum1m.toFixed(1)}%) < min required (${dynamicMinMom.toFixed(1)}%)`);
+      return;
+  }
+  const dynamicMaxAge = (global as any).DYNAMIC_MAX_AGE_MIN;
+  if (dynamicMaxAge !== undefined && tokenAgeSec !== undefined && (tokenAgeSec / 60) > dynamicMaxAge) {
+      console.log(`[SNIPER] 🐜 HIVE REJECT: ${symbol} age (${(tokenAgeSec / 60).toFixed(1)}m) > max allowed (${dynamicMaxAge.toFixed(1)}m)`);
+      return;
+  }
   
   // ── Mathematical Expectations Pre-Validation ───────────────────────────
   // Rejects EV < 0 and tokens marked with Apex Manipulation flags synchronously
-  const validationPassed = await validateTradeCandidate(mint);
-  // TEMPORARY BYPASS:
+  const validationPassed = await validateTradeCandidate(mint, symbol);
+  // BYPASS VALIDATION TEMPORARILY AS REQUESTED
   // if (!validationPassed) {
-  //     return;
+  // ── Target Qualifier Logic ───────────────────────────────────────────────
+  // We compute a formal confidence score and validate liquidity constraints before routing.
+  const mom = await pub.hgetall(REDIS_KEYS.momentum(mint));
+  const poolLiq = mom?.liquidityUsd ? parseFloat(mom.liquidityUsd) : 0;
+  
+  // Synthesize confidence index
+  const baseConf = taConf || (buyRatio / 10);
+  const confidenceScore = Math.min(1.0, baseConf + (volume1h > 50000 ? 0.2 : 0) + (buys1h > 200 ? 0.3 : 0));
+  
+  if (confidenceScore < 0.45) {
+     console.log(`[SNIPER] 🐜 QUALIFIER REJECT: ${symbol} failed confidence threshold (${(confidenceScore * 100).toFixed(1)}% < 45%)`);
+     logMissedTarget({ mint, symbol, reason: "Target Qualifier Confidence Too Low", confidence: confidenceScore, poolLiq });
+     return;
+  }
+  
+  if (poolLiq > 0 && poolLiq < 3000) { // Extremely low liquidity = slippage death
+     console.log(`[SNIPER] 🐜 QUALIFIER REJECT: ${symbol} has insufficient liquidity ($${poolLiq.toFixed(0)})`);
+     logMissedTarget({ mint, symbol, reason: "Insufficient Dex Liquidity", poolLiq });
+     return;
+  }
+
   // }
 
   // ── Dynamic Penalty Blacklist Cooling-Off ────────────────────────────────────
@@ -412,7 +472,7 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
   const vel = loadVelocity(mint);
   let velocityOverride = false;
   if (vel) {
-    const MIN_VEL_BUYS   = 2 * penaltyFactor;    
+    const MIN_VEL_BUYS   = MIN_BUYS_1H * penaltyFactor;    
     const MIN_VEL_RATIO  = 0.50 * penaltyFactor; 
     
     // VELOCITY OVERRIDE: If a token has massive speed right now (15+ tx/min and 3+ buys in 60s), 
@@ -443,6 +503,19 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
   if (buys1h < reqBuys && !velocityOverride) {
     console.log(`[SNIPER] ⏭️  ${symbol} skipped — only ${buys1h} buys in 1h (min ${reqBuys})`);
     return;
+  }
+
+  // ── Volume-to-Liquidity Validation (Anticipation Filter) ───────────────
+  const momData = await pub.hgetall(REDIS_KEYS.momentum(mint));
+  if (momData && momData.liquidityUsd) {
+     const poolLiq = parseFloat(momData.liquidityUsd);
+     if (poolLiq > 1000) { // Exclude newly born zero-liq pools from math fail
+         // 1h Volume must be at least 2x the total pool liquidity to prove heavy accumulation vs float
+         if (volume1h < poolLiq * 2.0 && !velocityOverride) {
+             console.log(`[SNIPER] ⏭️  ${symbol} skipped — Volume/Liquidity Divergence Failure: $${Math.floor(volume1h)} Vol < 2.0x Liquidity ($${Math.floor(poolLiq * 2.0)})`);
+             return;
+         }
+     }
   }
 
   // ── EV and Slippage Firewall ───────────────────────────────────────────────
@@ -479,8 +552,9 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
 
   const quote = await getQuote(WSOL, mint, buyLamports);
   if (!quote) {
-    console.log(`[SNIPER] ❌ No route via Jupiter yet for ${symbol} — retrying in 5s (indexer lag)`);
-    await pub.setex(REDIS_KEYS.cooldown(mint), 5, '1'); // 5 second flat cooldown, no penalty!
+    console.log(`[SNIPER] ❌ No route via Jupiter yet for ${symbol} — retrying in 30s (indexer lag)`);
+    logMissedTarget({ mint, symbol, reason: "No route on Jupiter", price: buySol });
+    await pub.setex(REDIS_KEYS.cooldown(mint), 30, '1'); // 30 second cooldown to avoid deadlock
     return;
   }
 
@@ -497,6 +571,7 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
       if (currentPriceUSD > maxUSD && currentPriceUSD < maxUSD * 1000) { 
           // (sanity check to avoid broken decimal false positives rejecting all)
           console.log(`[SNIPER] 🚨 SLIPPAGE GUARD: ${symbol} quoted at ~$${currentPriceUSD.toFixed(4)} > Max Threshold $${maxUSD.toFixed(4)} — aborting`);
+          logMissedTarget({ mint, symbol, reason: "Slippage / BuyPrice limit exceeded", price: currentPriceUSD, limit: maxUSD });
           await pub.setex(REDIS_KEYS.tempBlacklist(mint), 300, '1.5'); // 5 min penalty
           return;
       }
@@ -506,6 +581,7 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
   const sig = await executeSwap(quote, 250_000); // buy: aggressive priority (0.00025 SOL)
   if (!sig) {
       console.log(`[SNIPER] ❌ Swap execution failed for ${symbol} — blacklisting temporarily`);
+      logMissedTarget({ mint, symbol, reason: "Simulation or Execution Failed on Chain", amountSol: buySol });
       await pub.setex(REDIS_KEYS.tempBlacklist(mint), 300, '2.0'); // 5 min penalty
       return;
   }
@@ -524,8 +600,11 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
   const { getAssociatedTokenAddressSync } = await import('@solana/spl-token');
   const ata = getAssociatedTokenAddressSync(new PublicKey(mint), wallet.publicKey).toBase58();
 
+  // Generate unified map identifier
+  const tradeId = randomUUID();
+
   // Journal: BUY entry — include freshness metadata + ATA for AnalyzerAgent
-  appendTrade({ agent: 'pcp-sniper', action: 'BUY', mint, symbol, amountSol: buySol, sig,
+  appendTrade({ agent: 'pcp-sniper', action: 'BUY', mint, symbol, amountSol: buySol, sig, tradeId,
     reason: `${priceChg1h.toFixed(0)}%/1h ${buys1h}B/${sells1h}S`, taSig, taConf,
     tokenAgeSec, momentum5m, momentum1m, pairCreatedAt, ata } as any);
 
@@ -545,7 +624,7 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
   } catch (e) { }
 
   const pos: Position = {
-    mint, ata, symbol, buyPriceSol: buySol, tokenAmount,
+    tradeId, mint, ata, symbol, buyPriceSol: buySol, tokenAmount,
     openedAt: Date.now(), entryPriceSol, signature: sig,
     peakPnlPct: 0, entryBuyRatio: buyRatio,
     maxTPpct, maxHoldMinutes, stopLossPct
@@ -587,11 +666,15 @@ async function checkExits() {
     const analysisStr = await pub.get(REDIS_KEYS.apexAnalysis(pos.mint));
     let isHighConviction = true; // Assume innocent until proven manipulated
     let apexCancelReason = '';
+    let apexRedFlags = -1; // -1 means un-analyzed
     
     if (analysisStr) {
         try {
             const analysis = JSON.parse(analysisStr);
             isHighConviction = analysis.is_high_conviction;
+            if (analysis.red_flag_count !== undefined) {
+                 apexRedFlags = analysis.red_flag_count;
+            }
             if (isHighConviction === false) {
                  console.log(`[SNIPER] 🚨 APEX PREDATOR RETRO-FIRE-SELL: ${pos.symbol} flagged for CRIME (Score ≤ 3) — DUMPING IMMEDIATELY!`);
                  forceExit = true; 
@@ -629,10 +712,31 @@ async function checkExits() {
         }
     }
 
-    // ── Triple-Layer Hard Exit Constraints ───────────────────────────────────────────
-    const targetTP = pos.maxTPpct || 0.20;
-    const targetSL = pos.stopLossPct || 0.50;
+    // ── Triple-Layer Hard Exit Constraints & Dynamic Trailing Stop ─────────────────
+    let targetTP = pos.maxTPpct || 0.20;
+    let targetSL = pos.stopLossPct || 0.50;
     const targetTime = pos.maxHoldMinutes || 10;
+
+    // APEX: Widen initial Stop Loss (-SL) for flawless Smart Money tokens by 10%
+    if (apexRedFlags === 0 && isHighConviction && peak < 15) {
+         targetSL += 0.10; // e.g. SL drops from -50% to -60% to breathe
+    }
+
+    // DYNAMIC TRAILING TAKE-PROFIT (Profit Maximizing Model)
+    // The higher the token pumps, the wider the trailing gap to survive massive whale-wick retracements.
+    if (peak >= 200) {
+        targetSL = -((peak - 50) / 100); // 50% wick survivor room
+        targetTP = 999;
+    } else if (peak >= 100) {
+        targetSL = -((peak - 30) / 100); // 30% wick survivor room
+        targetTP = 999;
+    } else if (peak >= 50) {
+        targetSL = -((peak - 20) / 100); // 20% wick survivor room
+        targetTP = 999;
+    } else if (peak >= 20) {
+        targetSL = -((peak - 10) / 100); // 10% tight lock (guarantee 10% profit!)
+        targetTP = 999; 
+    }
 
     const elapsedMinutes = heldMs / 60000;
     const tpHit = pnlPct >= (targetTP * 100);
@@ -643,7 +747,7 @@ async function checkExits() {
       const reason = apexCancelReason ? apexCancelReason
                    : forceExit        ? `FORCE_EXIT (Apex / Emergency)`
                    : tpHit            ? `MAX_TP_HIT +${pnlPct.toFixed(1)}%`
-                   : slHit            ? `STOP_LOSS -${Math.abs(pnlPct).toFixed(1)}%`
+                   : slHit            ? `TRAIL/STOP_HIT ${pnlPct > 0 ? '+' : ''}${pnlPct.toFixed(1)}%`
                    :                    `TIME_EXIT (${elapsedMinutes.toFixed(1)}m)`;
       
       console.log(`[SNIPER] 🔄 Exiting ${pos.symbol} — ${reason}`);
@@ -651,14 +755,14 @@ async function checkExits() {
       const sellFraction = 1.0; // Rigid 100% exit
       // Aggressive execution for stop-loss and time-based force exits to prevent hold-over
       const isEmergencyExit = slHit || forceExit;
-      const slippageBps = isEmergencyExit ? 1500 : 500; // 15% slippage on dumps/force closes
+      const slippageBps = isEmergencyExit ? 5000 : 1000; // 50% slippage on dumps to guarantee escape
       
       let exactBalanceLamports = Number(pos.tokenAmount);
       if (process.env.PAPER_MODE !== 'true') {
         try {
           const pub = RedisBus.getPublisher();
           await pub.incr('rpc:calls:total');
-          const balAcct = await connection.getTokenAccountBalance(new PublicKey(pos.ata));
+          const balAcct = await callRpcGateway('getTokenAccountBalance', [new PublicKey(pos.ata)]);
           exactBalanceLamports = Number(balAcct.value.amount);
         } catch (e: any) {
           console.warn(`[SNIPER] ⚠️ Could not fetch live balance for ${pos.symbol}, using cached entry amount`);
@@ -667,6 +771,7 @@ async function checkExits() {
 
       if (exactBalanceLamports <= 0) {
         console.warn(`[SNIPER] 👻 Token ${pos.symbol} balance is zero/dust on-chain! Dropping from memory to prevent infinite sell loop.`);
+        store.blacklist.push(pos.mint);
         exits.push(pos);
         continue;
       }
@@ -676,32 +781,35 @@ async function checkExits() {
 
       const sellQuote = await getQuote(pos.mint, WSOL, activeSwapBal, slippageBps);
       if (sellQuote) {
-      const priorityFee = tpHit ? 150_000 : isEmergencyExit ? 450_000 : 250_000;
+      const priorityFee = tpHit ? 150_000 : isEmergencyExit ? 5_000_000 : 250_000; // 0.005 SOL tip for emergency dumps!
       const sellSig = await executeSwap(sellQuote, priorityFee);
         if (sellSig) {
           const realizedSol = Number(sellQuote.outAmount) / 1e9;
           
           const pnlSol = realizedSol - pos.buyPriceSol; // Estimate PnL across total lifecycle vs remaining
-          appendTrade({ agent: 'pcp-sniper', action: 'SELL', mint: pos.mint, symbol: pos.symbol, amountSol: realizedSol, pnlSol, sig: sellSig, reason, holdMs: heldMs });
+          const tradeId = randomUUID();
+          appendTrade({ agent: 'pcp-sniper', action: 'SELL', mint: pos.mint, symbol: pos.symbol, amountSol: realizedSol, pnlSol, sig: sellSig, reason, holdMs: heldMs, parentBuyId: pos.tradeId, tradeId });
           
           store.stats.totalPnlSol += pnlSol;
           if (pnlSol >= 0) store.stats.wins++; else store.stats.losses++;
           
-          // Dynamic Cooling Off instead of permanent Array Blacklist
-          if (slHit || forceExit) {
-               const pubPublisher = RedisBus.getPublisher();
-               console.log(`[SNIPER] 🧊 Blacklisted ${pos.symbol} strictly for 30 minutes! (2.0x Penalty)`);
-               await pubPublisher.setex(REDIS_KEYS.tempBlacklist(pos.mint), 1800, '2.0');
-          } else if (timeHit) {
-               const pubPublisher = RedisBus.getPublisher();
-               console.log(`[SNIPER] 🧊 Timeout minor penalty ${pos.symbol} for 10 minutes! (1.5x Penalty)`);
-               await pubPublisher.setex(REDIS_KEYS.tempBlacklist(pos.mint), 600, '1.5');
+          if (pnlSol < 0) {
+              console.log(`[SNIPER] 🛡️ RUGGED on ${pos.symbol}. Adding mint to permanent blacklist and locking Tickers strings.`);
+              store.blacklist.push(pos.mint); // block specific mint forever locally
+              
+              if (!pos.symbol.includes('...')) {
+                  const pubPublisher = RedisBus.getPublisher();
+                  await pubPublisher.setex(`shield:ruggedTicker:${pos.symbol.toUpperCase().trim()}`, 86400, 'LOCKED');
+              }
+          } else {
+              console.log(`[SNIPER] ♻️ WIN on ${pos.symbol}. Setting 60s cooldown, but allowing future re-entries if momentum sustains!`);
+              const pubPublisher = RedisBus.getPublisher();
+              await pubPublisher.setex(REDIS_KEYS.cooldown(pos.mint), 60, 'LOCKED');
           }
           
-          // Unset position lock and set post-trade generic cooldown
+          // Unset position lock
           const outerPub = RedisBus.getPublisher();
           await outerPub.del(REDIS_KEYS.position(pos.mint));
-          await outerPub.setex(REDIS_KEYS.cooldown(pos.mint), 30, 'LOCKED');
 
           exits.push(pos);
         } else {
@@ -719,9 +827,29 @@ async function checkExits() {
       }
     } else {
       // Status line
-      const targetTP = pos.maxTPpct || 0.20;
-      const targetSL = pos.stopLossPct || 0.50;
-      console.log(`[SNIPER] 📊 ${pos.symbol} | PnL: ${pnlPct >= 0 ? '+' : ''}${pnlPct.toFixed(1)}% | held: ${(heldMs/60000).toFixed(1)}min | target: +${(targetTP * 100).toFixed(0)}% | SL: -${(targetSL * 100).toFixed(0)}%`);
+      let dynamicTP = pos.maxTPpct || 0.20;
+      let dynamicSL = pos.stopLossPct || 0.50;
+
+      if (apexRedFlags === 0 && isHighConviction && peak < 15) dynamicSL += 0.10;
+      
+      if (peak >= 200) {
+          dynamicSL = -((peak - 50) / 100);
+          dynamicTP = 999;
+      } else if (peak >= 100) {
+          dynamicSL = -((peak - 30) / 100);
+          dynamicTP = 999;
+      } else if (peak >= 50) {
+          dynamicSL = -((peak - 20) / 100);
+          dynamicTP = 999;
+      } else if (peak >= 20) {
+          dynamicSL = -((peak - 10) / 100);
+          dynamicTP = 999;
+      }
+
+      const tpStr = dynamicTP === 999 ? 'OPEN' : `+${(dynamicTP * 100).toFixed(0)}%`;
+      const slStr = dynamicSL <= 0 ? `+${Math.abs(dynamicSL * 100).toFixed(0)}%` : `-${(dynamicSL * 100).toFixed(0)}%`;
+
+      console.log(`[SNIPER] 📊 ${pos.symbol} | PnL: ${pnlPct >= 0 ? '+' : ''}${pnlPct.toFixed(1)}% | Peak: +${peak.toFixed(1)}% | target: ${tpStr} | SL: ${slStr} | held: ${(heldMs/60000).toFixed(1)}m`);
     }
   }
 
@@ -751,9 +879,9 @@ async function recoverOrphans() {
       try {
         const pub = RedisBus.getPublisher();
         await pub.incr('rpc:calls:total');
-        const accts = await connection.getParsedTokenAccountsByOwner(
+        const accts = await callRpcGateway('getParsedTokenAccountsByOwner', [
           wallet.publicKey, { programId: prog }, 'finalized'
-        );
+        ]);
         for (const a of accts.value) {
           const info = a.account.data.parsed.info;
           if (info.tokenAmount.uiAmount > 0) seen.set(info.mint, info.tokenAmount);
@@ -788,8 +916,9 @@ async function recoverOrphans() {
       if (sig) {
         const solOut = Number(q.outAmount) / 1e9;
         console.log(`[SNIPER] ♻️ Orphan sold → +${solOut.toFixed(5)} SOL`);
+        const tradeId = randomUUID();
         appendTrade({ agent:'pcp-sniper', action:'SELL', mint, symbol:'ORPHAN',
-          amountSol:solOut, sig, reason:'orphan-recovery' });
+          amountSol:solOut, sig, reason:'orphan-recovery', tradeId });
       }
     }
     if (seen.size > 0) console.log(`[SNIPER] Orphan scan complete (${seen.size} non-zero tokens found)`);
@@ -814,8 +943,9 @@ async function poll() {
           if (sig) {
             const solOut = Number(q.outAmount) / 1e9;
             console.log(`[SNIPER] ♻️ ORPHAN_SWEEP ${s.mint.slice(0,12)}... → +${solOut.toFixed(5)} SOL`);
+            const tradeId = randomUUID();
             appendTrade({ agent:'pcp-sniper', action:'SELL', mint:s.mint, symbol:'ORPHAN',
-              amountSol:solOut, pnlSol:0, sig, reason:'ORPHAN_SWEEP', holdMs:0 });
+              amountSol:solOut, pnlSol:0, sig, reason:'ORPHAN_SWEEP', holdMs:0, tradeId });
             store.stats.totalPnlSol += solOut;
           }
         } catch (e: any) { console.error(`[SNIPER] Force-sell error ${s.mint.slice(0,12)}: ${e.message}`); }
@@ -843,8 +973,9 @@ async function poll() {
             const pnlSol      = realizedSol - pos.buyPriceSol;
             const pnlPct      = ((realizedSol - pos.buyPriceSol) / pos.buyPriceSol) * 100;
             console.log(`[SNIPER] ${pnlSol >= 0 ? '✅ WIN' : '❌ LOSS'} ${pos.symbol} | PnL: ${pnlSol >= 0 ? '+' : ''}${pnlSol.toFixed(4)} SOL (${pnlPct.toFixed(1)}%) | ALPHA_SELL_TRIGGER`);
+            const tradeId = randomUUID();
             appendTrade({ agent: 'pcp-sniper', action: 'SELL', mint: pos.mint, symbol: pos.symbol,
-              amountSol: realizedSol, pnlSol, sig: sellSigTx, reason: `ALPHA_SELL wallet:${sellSig.walletAddr?.slice(0,8)}`, holdMs: Date.now() - pos.openedAt });
+              amountSol: realizedSol, pnlSol, sig: sellSigTx, reason: `ALPHA_SELL wallet:${sellSig.walletAddr?.slice(0,8)}`, holdMs: Date.now() - pos.openedAt, parentBuyId: pos.tradeId, tradeId });
             store.stats.totalPnlSol += pnlSol;
             if (pnlSol >= 0) store.stats.wins++; else store.stats.losses++;
             store.positions = store.positions.filter(p => p.mint !== pos.mint);
@@ -925,13 +1056,12 @@ async function poll() {
     const velMints = loadAllVelocityMints();
 
     const accelerating = velMints.filter(v =>
-      v.buys60s >= 2 &&               // Dropped to 2 buys max capture
-      v.buyRatio60s >= 0.50 &&        // Dropped to 50%
-      v.solVolume60s >= 0 &&          // Dropped to 0 (velocity natively outputs 0 solAmt)
+      v.buys60s >= MIN_BUYS_1H &&
+      v.buyRatio60s >= 0.50 &&
+      v.solVolume60s >= 0 &&
       !store.blacklist.includes(v.mint) &&
       !store.positions.find(p => p.mint === v.mint)
-    ).sort((a, b) => b.solVolume60s - a.solVolume60s);
-
+    ).sort((a, b) => (b.solVolume60s - a.solVolume60s) || (b.buys60s - a.buys60s));
 
     if (accelerating.length > 0 && store.positions.length < MAX_POSITIONS) {
       console.log(`[SNIPER] ⚡ VELOCITY-FIRST: ${accelerating.length} accelerating mint(s) detected`);
@@ -945,7 +1075,7 @@ async function poll() {
         } catch {}
       }
 
-      for (const v of accelerating.slice(0, 5)) {
+      for (const v of accelerating.slice(0, 30)) {
         if (store.positions.length >= MAX_POSITIONS) break;
         const trending = trendingMap.get(v.mint);
 
@@ -955,7 +1085,7 @@ async function poll() {
           continue;
         }
 
-        const symbol   = trending?.symbol   || v.mint.slice(0, 8) + '...';
+        const symbol   = v.symbol || trending?.symbol || v.mint.slice(0, 8) + '...';
         const vol1h    = trending?.volume1h  || v.solVolume60s * 60; // estimate from 60s SOL vol
         const pc1h     = trending?.priceChange1h ?? 0;
         const buys1h   = trending?.buys1h    || v.buys60s * 60;
@@ -1032,6 +1162,11 @@ async function main() {
   // Initial poll
   await pollWithRefill();
 
+  // Async continuous Orphan Sweeper to reclaim dropped bugs (every 5 mins)
+  setInterval(() => {
+     recoverOrphans().catch(() => {});
+  }, 300_000);
+
   // Network Event Loop
   const sub = RedisBus.getSubscriber();
   sub.subscribe(CHANNELS.VELOCITY_SPIKE);
@@ -1069,6 +1204,8 @@ async function main() {
         if (overrides.maxHoldMinutes) { GLOBAL_HOLD_MIN = overrides.maxHoldMinutes; MAX_HOLD_MS = overrides.maxHoldMinutes * 60000; }
         if (overrides.maxTPpct) GLOBAL_TP_PCT = overrides.maxTPpct;
         if (overrides.stopLossPct) GLOBAL_SL_PCT = overrides.stopLossPct;
+        if (overrides.dynamicMinMom1m) (global as any).DYNAMIC_MIN_MOM_1M = overrides.dynamicMinMom1m;
+        if (overrides.dynamicMaxAgeMin) (global as any).DYNAMIC_MAX_AGE_MIN = overrides.dynamicMaxAgeMin;
       } catch (e: any) {
         console.error('[SNIPER/ADJUSTER] Override Parse Error:', e.message);
       }

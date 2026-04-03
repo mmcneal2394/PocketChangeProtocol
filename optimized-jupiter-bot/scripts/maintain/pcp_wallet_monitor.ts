@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
 import RedisBus from '../../src/utils/redis_bus';
+import { callRpcGateway } from '../../src/utils/rpc_client';
 
 dotenv.config({ path: path.join(process.cwd(), '.env') });
 
@@ -55,17 +56,17 @@ async function fetchTokenPrices(mints: string[]): Promise<Record<string, number>
 async function scanWallet() {
     try {
         // 1. SOL Balance (Native Gas)
-        const solBalanceLamports = await connection.getBalance(walletPubkey);
+        const solBalanceLamports = await callRpcGateway('getBalance', [walletPubkey]);
         const solBalance = solBalanceLamports / 1e9;
 
         // 3. Scan for other Altcoins/Spl-Tokens (and transient WSOL accounts)
         const [tokenAccounts, token2022Accounts] = await Promise.all([
-            connection.getParsedTokenAccountsByOwner(walletPubkey, {
+            callRpcGateway('getParsedTokenAccountsByOwner', [walletPubkey, {
                 programId: new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
-            }),
-            connection.getParsedTokenAccountsByOwner(walletPubkey, {
+            }]),
+            callRpcGateway('getParsedTokenAccountsByOwner', [walletPubkey, {
                 programId: new PublicKey('TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb')
-            })
+            }])
         ]);
 
         const allAccounts = [...tokenAccounts.value, ...token2022Accounts.value];
@@ -154,8 +155,8 @@ async function main() {
     console.log(`[MONITOR] 🛡️ Starting Capital Accumulation Monitor on ${walletPubkey.toBase58()}`);
     // Boot scan
     await scanWallet();
-    // 30s interval
-    setInterval(scanWallet, 30000);
+    // 5m interval (to reduce RPC limit pressure heavily)
+    setInterval(scanWallet, 300_000);
 }
 
 main();

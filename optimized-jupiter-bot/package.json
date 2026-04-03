@@ -11,6 +11,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@google/genai": "^1.47.0",
     "@jup-ag/api": "^6.0.48",
     "@solana/spl-token": "^0.4.14",
     "@solana/web3.js": "^1.98.4",
@@ -20,14 +21,22 @@
     "better-sqlite3": "^12.8.0",
     "bottleneck": "^2.19.5",
     "bs58": "^5.0.0",
+    "cors": "^2.8.6",
     "dotenv": "^17.3.1",
+    "express": "^5.2.1",
     "ioredis": "^5.10.1",
+    "limiter": "^3.0.0",
+    "node-cron": "^4.2.1",
     "node-fetch": "^2.7.0",
+    "ollama": "^0.6.3",
     "twitter-api-v2": "^1.29.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
     "@types/node": "^25.5.0",
+    "@types/node-cron": "^3.0.11",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
   }

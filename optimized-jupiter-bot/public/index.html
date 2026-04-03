@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S W A R M // Trap Network</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400&display=swap');
+
+        :root {
+            --bg-base: #020205;
+            --glass-bg: rgba(10, 10, 15, 0.4);
+            --glass-border: rgba(255, 255, 255, 0.05);
+            --primary: #5eff00; /* Neon Hacker Green */
+            --danger: #ff003c;
+            --text-main: #dfdfe6;
+            --text-dim: #707080;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            font-family: 'Space Grotesk', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-image: radial-gradient(circle at 50% 0%, rgba(94, 255, 0, 0.05) 0%, transparent 60%);
+            overflow: hidden;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 900px;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 24px;
+            padding: 24px;
+            z-index: 10;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--glass-border);
+            padding-bottom: 16px;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            margin: 0;
+            font-weight: 700;
+            letter-spacing: 4px;
+            color: white;
+            text-transform: uppercase;
+            text-shadow: 0 0 20px rgba(255,255,255,0.2);
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: 4px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--glass-border);
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .pulse {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: var(--text-dim);
+            transition: all 0.3s ease;
+        }
+        
+        .pulse.active {
+            background-color: var(--primary);
+            box-shadow: 0 0 10px var(--primary);
+            animation: pulse-anim 2s infinite;
+        }
+
+        @keyframes pulse-anim {
+            0% { box-shadow: 0 0 0 0 rgba(94, 255, 0, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(94, 255, 0, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(94, 255, 0, 0); }
+        }
+
+        .card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            padding: 24px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        button {
+            background: transparent;
+            color: var(--text-main);
+            border: 1px solid var(--glass-border);
+            padding: 16px;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+
+        button:hover {
+            background: rgba(255,255,255,0.02);
+            border-color: rgba(255,255,255,0.2);
+            transform: translateY(-2px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .btn-override {
+            border-color: rgba(255, 0, 60, 0.3);
+            color: #ffb3c1;
+        }
+
+        .btn-override:hover {
+            background: rgba(255, 0, 60, 0.05);
+            border-color: var(--danger);
+            text-shadow: 0 0 8px rgba(255,0,60,0.5);
+        }
+
+        .terminal {
+            background: #000;
+            border: 1px solid var(--glass-border);
+            border-radius: 8px;
+            padding: 16px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            height: 300px;
+            overflow-y: auto;
+            line-height: 1.6;
+            margin-top: 16px;
+        }
+
+        .terminal-line { margin: 0; }
+        .log-success { color: var(--primary); }
+        .log-warn { color: #ffd700; }
+        .log-error { color: var(--danger); }
+        .log-prompt { color: #fff; opacity: 0.5; }
+
+        /* Grid Background Pattern */
+        .grid-bg {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-image: 
+                linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+            background-size: 30px 30px;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="grid-bg"></div>
+    <div class="container">
+        
+        <header>
+            <h1>S W A R M</h1>
+            <div class="status-badge" id="auto-status">
+                <div class="pulse" id="pulse-indicator"></div>
+                <span id="status-text">SYSTEM IDLE</span>
+            </div>
+        </header>
+
+        <div class="controls">
+            <button class="btn-override" onclick="triggerManual()">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                MANUAL EXTRACTION
+            </button>
+            <button id="toggle-btn" onclick="toggleSchedule()">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                <span id="toggle-text">ENGAGE AUTO-PILOT</span>
+            </button>
+        </div>
+
+        <div class="card">
+            <div style="font-size: 0.8rem; letter-spacing: 2px; text-transform: uppercase; color: var(--text-dim); margin-bottom: 8px;">> LIVE SECURE TERMINAL TTY1</div>
+            <div class="terminal" id="terminal-feed">
+                <!-- Logs injected here -->
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const terminal = document.getElementById('terminal-feed');
+        const statusText = document.getElementById('status-text');
+        const pulse = document.getElementById('pulse-indicator');
+        const toggleBtnText = document.getElementById('toggle-text');
+        
+        let autopilot = false;
+
+        function addLog(text) {
+            const el = document.createElement('div');
+            el.className = 'terminal-line';
+            
+            // Syntax Highlight
+            if(text.includes('✅') || text.includes('SUCCESSFULLY')) el.classList.add('log-success');
+            else if(text.includes('⚠️')) el.classList.add('log-warn');
+            else if(text.includes('❌') || text.includes('Error')) el.classList.add('log-error');
+            
+            el.innerHTML = `<span class="log-prompt">></span> ${text}`;
+            terminal.appendChild(el);
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+
+        async function pollStatus() {
+            try {
+                const res = await fetch('/api/status');
+                const data = await res.json();
+                
+                // Update UI State
+                autopilot = data.autoPilotEnabled;
+                if (autopilot) {
+                    statusText.innerText = "CRON: 4-HOUR WAKE CYCLE";
+                    statusText.style.color = "var(--primary)";
+                    pulse.classList.add('active');
+                    toggleBtnText.innerText = "DISENGAGE AUTO-PILOT";
+                } else {
+                    statusText.innerText = "SYSTEM IDLE";
+                    statusText.style.color = "var(--text-main)";
+                    pulse.classList.remove('active');
+                    toggleBtnText.innerText = "ENGAGE AUTO-PILOT";
+                }
+
+                // Append new logs
+                terminal.innerHTML = '';
+                data.logs.forEach(log => addLog(log));
+                
+            } catch (e) {
+                console.error("Failed to fetch server state");
+            }
+        }
+
+        async function triggerManual() {
+            if(!confirm("Are you sure you want to trigger a manual launch sequence? This will consume 0.05 SOL.")) return;
+            addLog("Executing manual override protocol...");
+            await fetch('/api/deploy/manual', { method: 'POST' });
+        }
+
+        async function toggleSchedule() {
+            await fetch('/api/schedule/toggle', { method: 'POST' });
+            pollStatus(); // Instantly visually refresh
+        }
+
+        // Poll every 2 seconds
+        setInterval(pollStatus, 2000);
+        pollStatus();
+    </script>
+</body>
+</html>

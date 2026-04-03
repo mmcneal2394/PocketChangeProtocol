@@ -120,7 +120,7 @@ async function preloadMarketData() {
         }
 
         const priceRes = await fetch(`https://api.jup.ag/price/v3?ids=${ids}`, { headers });
-        const priceData = await priceRes.json();
+        const priceData = await priceRes.json().catch(() => null);
         
         if (priceData && priceData.data) {
             const dataObj = priceData.data;
@@ -149,7 +149,7 @@ async function preloadMarketData() {
             const chunk = mints.slice(i, i + chunkSize);
             try {
                 const dexRes = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${chunk.join(',')}`);
-                const dexData = await dexRes.json();
+                const dexData = await dexRes.json().catch(() => null);
                 
                 if (dexData && dexData.pairs) {
                     // Collect strongest pool for momentum
@@ -160,8 +160,10 @@ async function preloadMarketData() {
                             processed.add(baseMint);
                             const chg5m = pair.priceChange?.m5 || pair.priceChange?.h1 || 0; // Fallback h1 if m5 absent
                             const vol24h = pair.volume?.h24 || 0;
+                            const liqUsd = pair.liquidity?.usd || 0;
                             await redis.hset(REDIS_KEYS.momentum(baseMint), 'chg5m', chg5m.toString());
                             await redis.hset(REDIS_KEYS.momentum(baseMint), 'vol24h', vol24h.toString());
+                            await redis.hset(REDIS_KEYS.momentum(baseMint), 'liquidityUsd', liqUsd.toString());
                         }
                     }
                 }

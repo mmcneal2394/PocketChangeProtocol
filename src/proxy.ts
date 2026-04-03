@@ -25,7 +25,7 @@ if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) 
   });
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   if (request.nextUrl.pathname.startsWith('/api')) {
     const forwardedFor = request.headers.get('x-forwarded-for');
     const ip = request.headers.get('x-real-ip') || (forwardedFor ? forwardedFor.split(',').pop()?.trim() : null) || '127.0.0.1'; 

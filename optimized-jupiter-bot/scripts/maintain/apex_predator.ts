@@ -33,7 +33,7 @@ async function processForensics(candidateStr: string) {
         if (forensics.anomalousHolderGrowth) console.log(`   └─ 🚨 ANOMALOUS_HOLDER_GROWTH`);
 
         // Map strictly to the new PRD spec fields
-        const isHighConviction = forensics.convictionScore >= 3;
+        const isHighConviction = forensics.convictionScore === 4;
         const analysisData = {
             holder_distribution_flag: forensics.holderUniformity ? 1 : 0,
             bot_activity_flag: forensics.botPresence ? 1 : 0,

@@ -1,6 +1,13 @@
 module.exports = {
   apps: [
     {
+      name: "pcp-rpc-gateway",
+      script: "scripts/maintain/pcp_rpc_gateway.ts",
+      interpreter: "node",
+      interpreter_args: "--require ts-node/register",
+      env: { NODE_ENV: "production" }
+    },
+    {
       name: "pcp-wallet-monitor",
       script: "scripts/maintain/wallet_monitor.ts",
       interpreter: "node",
@@ -66,6 +73,34 @@ module.exports = {
     {
       name: "pcp-trainer",
       script: "scripts/maintain/pcp_trainer.ts",
+      interpreter: "node",
+      interpreter_args: "--require ts-node/register",
+      env: { NODE_ENV: "production" }
+    },
+    {
+      name: "pcp-social",
+      script: "scripts/maintain/social_manager.ts",
+      interpreter: "node",
+      interpreter_args: "--require ts-node/register",
+      env: { NODE_ENV: "production" }
+    },
+    {
+      name: "pcp-hive-mind",
+      script: "scripts/maintain/hive_learning_agent.ts",
+      interpreter: "node",
+      interpreter_args: "--require ts-node/register",
+      env: { NODE_ENV: "production" }
+    },
+    {
+      name: "pcp-velocity-stream",
+      script: "scripts/maintain/velocity_stream.ts",
+      interpreter: "node",
+      interpreter_args: "--require ts-node/register",
+      env: { NODE_ENV: "production" }
+    },
+    {
+      name: "pcp-gas-monitor",
+      script: "scripts/maintain/pcp_gas_monitor.ts",
       interpreter: "node",
       interpreter_args: "--require ts-node/register",
       env: { NODE_ENV: "production" }

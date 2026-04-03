@@ -1,135 +1,98 @@
-import { Connection, PublicKey, Keypair } from '@solana/web3.js';
-import bs58 from 'bs58';
-import fs from 'fs';
-import path from 'path';
-import dotenv from 'dotenv';
-import RedisBus from '../../src/utils/redis_bus';
-import { REDIS_KEYS, CHANNELS } from '../../src/shared/redis_config';
+import { Connection, PublicKey } from '@solana/web3.js';
+import { getAssociatedTokenAddress } from '@solana/spl-token';
+import Redis from 'ioredis';
+import { config } from 'dotenv';
 
-dotenv.config();
+config();
 
-const RPC_ENDPOINT = process.env.RPC_ENDPOINT || 'https://api.mainnet-beta.solana.com';
-const connection = new Connection(RPC_ENDPOINT, 'confirmed');
+const RPC_URL = (process.env.RPC_ENDPOINT || process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com').trim();
+const REDIS_URL = (process.env.REDIS_URL || 'redis://127.0.0.1:6379').trim();
+const WALLET_ADDRESSES = JSON.parse(process.env.ALPHA_WALLETS || '[]') as string[];
 
-// Boot strictly the Master Funding Wallet
-let walletPubkey: PublicKey;
-if (process.env.PRIVATE_KEY_1) {
-    const kp = Keypair.fromSecretKey(bs58.decode(process.env.PRIVATE_KEY_1!));
-    walletPubkey = kp.publicKey;
-} else {
-    // Legacy mapping
-    const walletPath = process.env.WALLET_KEYPAIR_PATH || './wallet.json';
-    const resolvedPath = fs.existsSync(walletPath) ? walletPath : './wallet.json';
-    const walletJson = JSON.parse(fs.readFileSync(resolvedPath, 'utf-8'));
-    const kp = Keypair.fromSecretKey(new Uint8Array(walletJson));
-    walletPubkey = kp.publicKey;
+const redis = new Redis(REDIS_URL);
+const connection = new Connection(RPC_URL, 'confirmed');
+
+// Helper to normalize any address-like thing to base58 string
+function toBase58(addr: PublicKey | string | any): string {
+  if (addr instanceof PublicKey) return addr.toBase58();
+  if (typeof addr === 'string') return addr;
+  // If it's an object with a toBase58 method (e.g., from older libs)
+  if (addr && typeof addr.toBase58 === 'function') return addr.toBase58();
+  // Last resort: try to convert
+  return new PublicKey(addr).toBase58();
 }
 
-console.log(`[MONITOR] 🔭 Tracking Total Swarm Equity on Master Wallet: ${walletPubkey.toBase58()}`);
+async function monitorWallet(walletAddress: string) {
+  try {
+    const pubkey = new PublicKey(walletAddress);
+    const tokenAccounts = await connection.getTokenAccountsByOwner(pubkey, {
+      programId: new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
+    });
 
-async function getAllTokenBalances() {
-    const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
-        walletPubkey,
-        { programId: new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA') }
-    );
-    
-    const token2022Accounts = await connection.getParsedTokenAccountsByOwner(
-        walletPubkey,
-        { programId: new PublicKey('TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb') }
-    );
-
-    const mergedAccounts = [...tokenAccounts.value, ...token2022Accounts.value];
-
-    const balances = [];
-    for (const account of mergedAccounts) {
-        const parsed = account.account.data.parsed;
-        if (parsed?.info?.tokenAmount?.uiAmount > 0) {
-            balances.push({
-                mint: parsed.info.mint,
-                amount: parsed.info.tokenAmount.uiAmount,
-                decimals: parsed.info.tokenAmount.decimals,
-            });
-        }
-    }
-    return balances;
-}
-
-async function monitorWallet() {
-    try {
-        const pub = RedisBus.getPublisher();
-
-        // 1. Native SOL balance
-        const solBalanceLamports = await connection.getBalance(walletPubkey);
-        const solBalance = solBalanceLamports / 1e9;
-        
-        // Tracking outbound RPC usage natively
-        await pub.incrby('rpc:calls:total', 3); // 1 balance + 2 getParsedTokenAccountsByOwner
-
-        // 2. All SPL token balances (including wSOL)
-        const tokenBalances = await getAllTokenBalances();
-
-        // 3. Collect unique mint addresses for price lookup
-        const mints = tokenBalances.map(t => t.mint);
-        if (solBalance > 0) mints.push('So11111111111111111111111111111111111111112'); // wSOL mint for exact price pricing
-
-        // 4. Fetch prices from Jupiter
-        let prices: Record<string, any> = {};
-        if (mints.length > 0) {
-            // deduplicate mints list
-            const uniqueMints = Array.from(new Set(mints));
-            const ids = uniqueMints.join(',');
-            // Jup v3 price expects max 100 ids typically but our wallet usually has << 100
-            const response = await fetch(`https://api.jup.ag/price/v3?ids=${ids}`, {
-                headers: { 'x-api-key': process.env.JUPITER_API_KEY || '' }
-            });
-            const data = await response.json();
-            if (data) {
-                prices = data.data || data;
+    const balances: Record<string, number> = {};
+    for (const account of tokenAccounts.value) {
+      try {
+        const parsedData = await connection.getParsedAccountInfo(account.pubkey);
+        const data = parsedData.value?.data as any; // Cast as ANY to bypass solana web3 types
+        if (data && data.parsed) {
+            const info = data.parsed.info;
+            if (info && info.tokenAmount && parseFloat(info.tokenAmount.amount) > 0) {
+              const mint = info.mint;
+              const amount = parseFloat(info.tokenAmount.uiAmount);
+              balances[mint] = (balances[mint] || 0) + amount;
             }
         }
-
-        // 5. Compute total USD value
-        let totalValueUSD = 0;
-
-        // Native SOL: price from wSOL mint
-        const wsolId = 'So11111111111111111111111111111111111111112';
-        const solPrice = prices[wsolId]?.price || prices[wsolId]?.usdPrice || parseFloat(await pub.hget(`price:${wsolId}`, 'usd') || '0');
-        totalValueUSD += solBalance * solPrice;
-
-        // Token balances
-        const enrichedBalances = tokenBalances.map(token => {
-            const price = prices[token.mint]?.price || prices[token.mint]?.usdPrice || 0;
-            const valueUSD = token.amount * price;
-            totalValueUSD += valueUSD;
-            return { ...token, price, valueUSD };
-        });
-
-        // 6. Prepare wallet state
-        const walletState = {
-            timestamp: Date.now(),
-            solBalance,
-            solPrice,
-            totalValueUSD,
-            tokens: enrichedBalances,
-        };
-
-        // 7. Store in Redis (persistent strings)
-        await pub.set(REDIS_KEYS.WALLET_CURRENT, JSON.stringify(walletState));
-        await pub.set(REDIS_KEYS.WALLET_TOTAL_USD, totalValueUSD.toString());
-
-        // 8. Publish to channel for real-time updates
-        await pub.publish(CHANNELS.WALLET_STATE, JSON.stringify(walletState));
-
-        console.log(`[MONITOR] 💰 Total Swarm Equity: $${totalValueUSD.toFixed(2)} (SOL: ${solBalance.toFixed(4)}, Sub-Tokens: ${enrichedBalances.length})`);
-    } catch (error: any) {
-        console.error('[MONITOR] ❌ Wallet monitor generic loop error:', error.message);
+      } catch (innerErr) {
+        console.error(`[MONITOR] Error parsing account ${account.pubkey.toBase58()}:`, innerErr);
+      }
     }
+
+    if (Object.keys(balances).length > 0) {
+      await redis.publish('ALPHA_WALLET_UPDATE', JSON.stringify({
+        wallet: walletAddress,
+        balances,
+        timestamp: Date.now()
+      }));
+      console.log(`[MONITOR] Published balances for ${walletAddress}`);
+    }
+  } catch (err) {
+    console.error(`[MONITOR] Error monitoring wallet ${walletAddress}:`, err);
+  }
 }
 
-async function startDaemon() {
-    console.log('[MONITOR] 🚀 Booting Comprehensive Swarm Wallet Metrics Daemon... (Rate Limited)');
-    await monitorWallet();
-    setInterval(monitorWallet, 120_000); 
+async function mainLoop() {
+  if (WALLET_ADDRESSES.length === 0) {
+    console.warn('[MONITOR] No ALPHA_WALLETS defined in .env! Using failover legacy wallet boot.');
+    // Failover
+    try {
+      const fs = require('fs');
+      const bs58 = require('bs58');
+      const kpString = process.env.PRIVATE_KEY_1 || fs.readFileSync('./wallet.json', 'utf8');
+      import('@solana/web3.js').then(({ Keypair }) => {
+        const kp = process.env.PRIVATE_KEY_1 
+           ? Keypair.fromSecretKey(bs58.decode(kpString))
+           : Keypair.fromSecretKey(new Uint8Array(JSON.parse(kpString)));
+        WALLET_ADDRESSES.push(kp.publicKey.toBase58());
+      });
+    } catch(e) {}
+  }
+
+  console.log(`[MONITOR] Starting wallet monitor for ${WALLET_ADDRESSES.length} wallets`);
+  while (true) {
+    for (const wallet of WALLET_ADDRESSES) {
+      if (wallet) await monitorWallet(wallet);
+    }
+    await new Promise(resolve => setTimeout(resolve, 30000)); // 30 sec interval
+  }
 }
 
-startDaemon();
+mainLoop().catch(console.error);
+
+// Heartbeat
+setInterval(() => {
+  redis.publish('HEARTBEAT', JSON.stringify({
+    agent: 'wallet-monitor',
+    status: 'alive',
+    walletsTracked: WALLET_ADDRESSES.length
+  }));
+}, 10000);

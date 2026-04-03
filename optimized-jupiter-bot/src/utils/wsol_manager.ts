@@ -25,6 +25,7 @@ import {
   NATIVE_MINT,
 } from '@solana/spl-token';
 import { sendAndConfirmTransaction } from '@solana/web3.js';
+import { callRpcGateway } from './rpc_client';
 
 // ── Constants ──────────────────────────────────────────────────────────────
 export const WSOL_MINT = 'So11111111111111111111111111111111111111112';
@@ -84,6 +85,8 @@ export async function getWsolBalanceLamports(
       connection.getTokenAccountBalance(ata),
       timeout
     ]) as any;
+    // For when ATA doesn't exist
+    if (!info || !info.value) return 0;
     return Number(info.value.amount);
   } catch (e: any) { 
     if (e.message !== 'RPC_TIMEOUT') console.warn(`[WSOL] Balance read error: ${e.message}`);
@@ -117,7 +120,7 @@ export async function getTotalSpendableBalance(
     const results = await Promise.race([
       Promise.all([
         getWsolBalanceLamports(connection, owner),
-        connection.getBalance(owner)
+        callRpcGateway('getBalance', [owner])
       ]),
       timeout
     ]) as [number, number];
@@ -212,14 +215,8 @@ export async function unwrapAllSol(
 export async function autoRefillWsol(
   connection: Connection,
   wallet: Keypair,
-  minWsolSol = 0.01  // trigger refill if WSOL < this amount
+  minWsolSol = 0.01
 ): Promise<void> {
-  const { wsolSol, nativeSol } = await getTotalSpendableBalance(connection, wallet.publicKey);
-  if (wsolSol >= minWsolSol) return; // already enough WSOL
-
-  const wrapAmt = nativeSol - MIN_NATIVE_SOL_RESERVE;
-  if (wrapAmt > 0.001) {
-    console.log(`[WSOL] 🔁 Auto-refill: WSOL ${wsolSol.toFixed(4)} < ${minWsolSol} — wrapping ${wrapAmt.toFixed(4)} SOL`);
-    await wrapSol(connection, wallet, wrapAmt);
-  }
+  // Disabled per user request to stop burning fees via constant wraps
+  return;
 }

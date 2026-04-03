@@ -4,10 +4,10 @@ import path from 'path';
 
 export async function GET() {
   try {
-    // Try telemetry.jsonl from the engine-worker (Rust binary output)
+    // Read from the active NodeJS Momentum Sniper Bot journal
     const candidatePaths = [
-      path.join(process.cwd(), 'engine-worker', 'telemetry.jsonl'),
-      path.join(process.cwd(), 'telemetry.jsonl'),
+      path.join(process.cwd(), 'optimized-jupiter-bot', 'signals', 'trade_journal.jsonl'),
+      path.join(process.cwd(), '..', 'optimized-jupiter-bot', 'signals', 'trade_journal.jsonl')
     ];
 
     let logs: any[] = [];
@@ -22,23 +22,24 @@ export async function GET() {
 
     let wins = 0;
     let sumProfit = 0;
+    let totalTrades = 0;
 
     for (const log of logs) {
-      if (log.status === 'EXEC_SUCCESS' || log.success === true) {
-        wins++;
-        sumProfit += parseFloat(log.profit_sol || 0);
+      // trade_journal.jsonl structure: { "action": "SELL", "pnlSol": 0.05, ... }
+      if (log.action === 'SELL' && log.pnlSol !== undefined) {
+        totalTrades++;
+        if (log.pnlSol > 0) wins++;
+        sumProfit += parseFloat(log.pnlSol);
       }
     }
 
-    const totalTrades = logs.length;
     const winRate     = totalTrades > 0 ? ((wins / totalTrades) * 100).toFixed(1) : "0.0";
     const totalPnL    = sumProfit >= 0
       ? `+${sumProfit.toFixed(4)} SOL`
       : `-${Math.abs(sumProfit).toFixed(4)} SOL`;
 
-    // Volume = number of scans × average scan size (0.02 SOL) — realistic estimate
     const scanCount = logs.length;
-    const volumeSol = (scanCount * 0.02).toFixed(2);
+    const volumeSol = (totalTrades * 0.02).toFixed(2); // Avg buy size 0.02
 
     return NextResponse.json({
       recentLogs:  logs.slice(-20).reverse(),

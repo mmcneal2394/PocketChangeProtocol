@@ -81,8 +81,8 @@ export async function checkBotPresence(mint: string, rpcUrl: string): Promise<bo
             // We'll mock the signature parser for now to avoid rapid 429 RPC bans.
         }
         
-        // Mock: 65% chance of detecting bot presence in low mcap manipulated tokens
-        return Math.random() > 0.35; 
+        // Mock: 15% chance of detecting bot presence
+        return Math.random() > 0.85; 
     } catch {
         return false;
     }
@@ -101,7 +101,7 @@ export function calculateVolumeConsistency(tokenData: any): boolean {
     const v5m = parseFloat(tokenData.v5m || tokenData.volume?.m5 || 0);
     const v1h = parseFloat(tokenData.v1h || tokenData.volume?.h1 || 0);
     
-    if (v1h === 0) return false;
+    if (v1h === 0) return true;
     
     const spikeRatio = v5m / v1h;
     
@@ -140,10 +140,10 @@ export async function runForensics(mint: string, tokenData: any, rpcUrl: string)
     const holderGrowth = anomalyHolderGrowth(tokenData);
     
     let score = 0;
-    if (uniformity) score++;
-    if (bots) score++;
+    if (!uniformity) score++;
+    if (!bots) score++;
     if (volConsistency) score++;
-    if (holderGrowth) score++;
+    if (!holderGrowth) score++;
     
     return {
         holderUniformity: uniformity,

@@ -4,10 +4,14 @@ import path from "path";
 
 export async function GET() {
     try {
-        // Find the Rust worker's telemetry output file locally
-        const telemetryPath = path.join(process.cwd(), "engine-worker", "telemetry.jsonl");
+        const candidatePaths = [
+          path.join(process.cwd(), "optimized-jupiter-bot", "signals", "trade_journal.jsonl"),
+          path.join(process.cwd(), "..", "optimized-jupiter-bot", "signals", "trade_journal.jsonl")
+        ];
 
-        if (!fs.existsSync(telemetryPath)) {
+        let telemetryPath = candidatePaths.find(p => fs.existsSync(p));
+
+        if (!telemetryPath) {
             return NextResponse.json([{ id: 0, route: "No active swaps yet...", status: "PENDING", profit: "-", ok: true, hash: "..." }], {
                 headers: { "Cache-Control": "no-store" }
             });
@@ -26,36 +30,27 @@ export async function GET() {
                 // New telemetry schema (event-based) vs legacy schema
                 const isNewFormat = "event" in row;
 
-                const route = isNewFormat
-                    ? (row.route || row.strategy || row.event)
-                    : row.route;
+                const isLoss = row.pnlSol !== undefined && row.pnlSol < 0;
+                
+                const route = row.action === 'SELL' 
+                    ? `Sniper Close ${row.mint?.slice(0, 4)}... (Held ${row.holdTimeMin}m)`
+                    : row.action === 'BUY'
+                        ? `Velocity Entry ${row.mint?.slice(0,4)}...`
+                        : (row.action || "SWAP");
 
-                const status = isNewFormat
-                    ? (row.status || row.event?.toUpperCase() || "UNKNOWN")
-                    : row.status;
-
-                const profitVal = isNewFormat
-                    ? (row.execution_profit ?? row.expected_profit_pct ?? row.profit_sol ?? 0)
-                    : (row.profit_sol ?? 0);
-
+                const status = row.isLossCut ? 'STOP LOSS' : 'EXECUTED';
+                
+                const profitVal = row.pnlSol || 0;
                 const profit = profitVal > 0
-                    ? `+$${profitVal.toFixed(6)} USDC`
-                    : `-$${Math.abs(profitVal).toFixed(6)} USDC`;
+                    ? `+$${(profitVal * 150).toFixed(6)}` // Approximate USDC mapping
+                    : `-$${Math.abs(profitVal * 150).toFixed(6)}`;
 
-                const ok = isNewFormat
-                    ? (row.success !== undefined ? row.success : row.status === "EXECUTED" || row.status === "SUCCESS")
-                    : row.success;
-
-                const hash = isNewFormat
-                    ? (row.execution_tx_hash || row.tx_signature || null)
-                    : row.tx_signature;
-
-                const timestamp = isNewFormat
-                    ? (row.detected_at || row.timestamp_sec || idx)
-                    : (row.timestamp_sec || idx);
+                const ok = !isLoss;
+                const hash = row.tradeId ? `${row.tradeId.split('-')[0]} // ${row.sig || row.signature}` : (row.sig || row.signature);
+                const timestamp = row.ts || row.timestamp || idx;
 
                 return {
-                    id: typeof timestamp === "string" ? Date.parse(timestamp) + idx : timestamp + idx,
+                    id: row.tradeId || (timestamp + idx),
                     route,
                     status,
                     profit,
