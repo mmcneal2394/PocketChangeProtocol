@@ -28,10 +28,14 @@ const Z_SCORE_THRESHOLD = 2.5; // Trigger divergence at 2.5 standard deviations
 
 const history: Record<string, number[]> = {};
 
+const JUP_HEADERS: Record<string, string> = process.env.JUPITER_API_KEY ? { 'x-api-key': process.env.JUPITER_API_KEY } : {};
+
 async function fetchPriceUSD(mint: string, baseUnit: number): Promise<number | null> {
     try {
         const usdcMint = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
-        const res = await fetch(`${JUPITER_API}/quote?inputMint=${mint}&outputMint=${usdcMint}&amount=${baseUnit}`);
+        const res = await fetch(`${JUPITER_API}/quote?inputMint=${mint}&outputMint=${usdcMint}&amount=${baseUnit}`, {
+            headers: JUP_HEADERS
+        });
         const data = await res.json();
         if (data && data.outAmount) {
             return Number(data.outAmount) / 1e6; // USDC has 6 decimals
@@ -60,12 +64,27 @@ async function monitorPairs() {
         if (priceA && priceB && priceB > 0) {
             const ratio = priceA / priceB;
 
-            if (!history[pair.name]) history[pair.name] = [];
+            if (!history[pair.name]) {
+                const storedValue = await redis.get(`arb:history:${pair.name}`);
+                if (storedValue) {
+                    try {
+                        history[pair.name] = JSON.parse(storedValue);
+                        console.log(`[STAT-ARB] Hydrated ${history[pair.name].length} memory ticks from Redis for ${pair.name}`);
+                    } catch (e) {
+                        history[pair.name] = [];
+                    }
+                } else {
+                    history[pair.name] = [];
+                }
+            }
             history[pair.name].push(ratio);
 
             if (history[pair.name].length > WINDOW_SIZE) {
                 history[pair.name].shift(); // Restrict memory window
             }
+            
+            // Persist the sliding window buffer natively back to Redis
+            await redis.set(`arb:history:${pair.name}`, JSON.stringify(history[pair.name]));
 
             if (history[pair.name].length >= 30) { // Require at least a 15-minute warmup window
                 const currentHistory = history[pair.name];

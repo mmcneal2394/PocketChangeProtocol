@@ -37,9 +37,9 @@ let redis: Redis | null = null;
 
 export async function initConfigManager() {
   redis = new Redis(REDIS_URL);
-  await redis.subscribe('CONFIG_UPDATE');
+  await redis.subscribe('config:update');
   redis.on('message', async (channel, message) => {
-    if (channel === 'CONFIG_UPDATE') {
+    if (channel === 'config:update') {
       try {
         const updates = JSON.parse(message);
         let changed = false;
@@ -88,7 +88,7 @@ export function getConfig(): SwarmConfig {
 // Graceful shutdown
 export async function closeConfigManager() {
   if (redis) {
-      await redis.unsubscribe('CONFIG_UPDATE').catch(() => {});
+      await redis.unsubscribe('config:update').catch(() => {});
       await redis.quit();
   }
 }
