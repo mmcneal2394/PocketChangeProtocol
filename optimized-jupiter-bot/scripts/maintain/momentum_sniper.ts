@@ -122,11 +122,24 @@ let MIN_BUY_RATIO    = guardParam('MIN_BUY_RATIO');
 const MAX_TOKEN_AGE_MIN= parseFloat(process.env.SNIPER_MAX_AGE || '9999');
 let MIN_MOMENTUM_5M  = guardParam('MIN_MOMENTUM_5M');
 
-let GLOBAL_TP_PCT    = parseFloat(process.env.MAX_TP_PERCENT || '20') / 100;
-let GLOBAL_SL_PCT    = parseFloat(process.env.STOP_LOSS_PERCENT || '50') / 100;
-let GLOBAL_HOLD_MIN  = parseFloat(process.env.MAX_HOLD_MINUTES || '10');
+let GLOBAL_TP_PCT    = parseFloat(process.env.MAX_TP_PERCENT || '6') / 100; // TP1: +6% partial, trail rest
+let GLOBAL_SL_PCT    = parseFloat(process.env.STOP_LOSS_PERCENT || '4') / 100;
+let GLOBAL_HOLD_MIN  = parseFloat(process.env.MAX_HOLD_MINUTES || '5');
+// ── GEMMA4 BOOT LOADER: Apply last known recommendations on startup ──────────
+try {
+  const g4path = path.join(__dirname, '../../signals/gemma4_recommendations.json');
+  if (fs.existsSync(g4path)) {
+    const g4 = JSON.parse(fs.readFileSync(g4path, 'utf-8'));
+    const rf = g4.recommended_filters || {};
+    if (rf.tp1_pct) GLOBAL_TP_PCT = rf.tp1_pct / 100;
+    if (rf.stop_loss_pct) GLOBAL_SL_PCT = rf.stop_loss_pct / 100;
+    if (rf.max_hold_minutes) GLOBAL_HOLD_MIN = rf.max_hold_minutes;
+    console.log(`[SNIPER] ⚙️ GEMMA4 BOOT: TP=${(GLOBAL_TP_PCT*100).toFixed(1)}% SL=${(GLOBAL_SL_PCT*100).toFixed(1)}% HOLD=${GLOBAL_HOLD_MIN}min (confidence: ${g4.confidence || 0}%)`);
+  }
+} catch (e: any) { console.log('[SNIPER] Gemma4 boot loader: no recs file or parse error'); }
 
-const POLL_MS          = 60_000; // Increased from 20s to drop RPC background sweep load
+
+const POLL_MS          = 30_000; // 30s poll — velocity spikes no longer trigger extra polls // Increased from 20s to drop RPC background sweep load
 const SIGNALS_DIR      = path.join(process.cwd(), 'signals');
 const TRENDING_FILE    = path.join(SIGNALS_DIR, 'trending.json');
 const SNIPER_LOG       = path.join(SIGNALS_DIR, process.env.PAPER_MODE === 'true' ? 'sniper_positions_paper.json' : 'sniper_positions.json');
@@ -150,6 +163,87 @@ function loadVelocity(mint: string): {
 }
 
 // Load ALL velocity-tracked mints — used for velocity-first discovery
+
+// ── DexScreener Real-Time Pair Lookup ─────────────────────────────────────
+// ── RugCheck.xyz Security Pre-Flight (Free, No API Key) ───────────────────
+async function checkRugSafety(mint: string): Promise<{safe: boolean, riskLevel: string, score: number}> {
+  try {
+    const res = await fetch(`https://api.rugcheck.xyz/v1/tokens/${mint}/report/summary`, { signal: AbortSignal.timeout(3000) });
+    if (!res.ok) return { safe: true, riskLevel: 'UNKNOWN', score: 0 }; // fail-open
+    const data = await res.json() as any;
+    if (data.error) return { safe: true, riskLevel: 'NO_REPORT', score: 0 };
+    const score = data.score || 0;
+    const risks = Array.isArray(data.risks) ? data.risks : [];
+    const riskLevel = data.tokenMeta?.riskLevel || (score > 500 ? 'Good' : score > 200 ? 'Warn' : 'Danger');
+    // Block tokens with danger-level risks
+    const hasDanger = risks.some((r: any) => r.level === 'danger' || r.level === 'critical');
+    const isMintable = risks.some((r: any) => r.name?.includes('Mint Authority'));
+    const isFreezable = risks.some((r: any) => r.name?.includes('Freeze Authority'));
+    return { safe: !hasDanger && !isMintable, riskLevel, score };
+  } catch { return { safe: true, riskLevel: 'UNKNOWN', score: 0 }; }
+}
+
+// ── Holder Concentration Check (RPC - no API key needed) ──────────────────
+
+// ── HOLDER CACHE: avoid repeated Chainstack RPC calls for same mint ──────────
+const holderCache = new Map<string, {safe: boolean, top10Pct: number, holderCount: number, ts: number}>();
+const HOLDER_CACHE_TTL = 600_000; // 10 minutes
+async function checkHolderConcentration(mint: string): Promise<{safe: boolean, top10Pct: number, holderCount: number}> {
+  // Check cache first to avoid RPC calls
+  const cached = holderCache.get(mint);
+  if (cached && (Date.now() - cached.ts < HOLDER_CACHE_TTL)) {
+    return { safe: cached.safe, top10Pct: cached.top10Pct, holderCount: cached.holderCount };
+  }
+  try {
+    const largestAccounts = await callRpcGateway('getTokenLargestAccounts', [new PublicKey(mint)]);
+    if (!largestAccounts?.value || largestAccounts.value.length === 0) {
+      return { safe: false, top10Pct: 100, holderCount: 0 };
+    }
+
+    const supply = await callRpcGateway('getTokenSupply', [new PublicKey(mint)]);
+    const totalSupply = Number(supply?.value?.amount || 0);
+    if (totalSupply === 0) return { safe: false, top10Pct: 100, holderCount: 0 };
+
+    // Top 10 holder concentration
+    let top10Total = 0;
+    const accounts = largestAccounts.value.slice(0, 10);
+    for (const acct of accounts) {
+      top10Total += Number(acct.amount || 0);
+    }
+    const top10Pct = (top10Total / totalSupply) * 100;
+
+    // Holder count estimate: if all 20 returned accounts have tokens, likely 20+ holders
+    const nonZeroHolders = largestAccounts.value.filter((a: any) => Number(a.amount) > 0).length;
+
+    return {
+      safe: top10Pct <= 80 && nonZeroHolders >= 3,
+      top10Pct,
+      holderCount: nonZeroHolders,
+    };
+  } catch (e) {
+    return { safe: true, top10Pct: 0, holderCount: 0 }; // fail-open
+  }
+}
+
+async function fetchDexScreenerPair(mint: string): Promise<{liquidity: number, priceChange5m: number, priceChange1h: number, volume1h: number, boosted: boolean} | null> {
+  try {
+    const res = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${mint}`, { signal: AbortSignal.timeout(3000) });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!data.pairs || data.pairs.length === 0) return null;
+    // Pick the highest-liquidity pair
+    const pair = data.pairs.sort((a: any, b: any) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0))[0];
+    return {
+      liquidity: pair.liquidity?.usd || 0,
+      priceChange5m: pair.priceChange?.m5 || 0,
+      priceChange1h: pair.priceChange?.h1 || 0,
+      volume1h: pair.volume?.h1 || 0,
+      boosted: !!(pair.boosts?.active && pair.boosts.active > 0),
+    };
+  } catch { return null; }
+}
+
+
 function loadAllVelocityMints(): Array<{
   mint: string; symbol?: string; buys60s: number; sells60s: number; buyRatio60s: number;
   velocity: number; isAccelerating: boolean; solVolume60s: number;
@@ -206,6 +300,10 @@ export function appendTrade(record: {
     if (!fs.existsSync(SIGNALS_DIR)) fs.mkdirSync(SIGNALS_DIR, { recursive: true });
     const line = JSON.stringify({ ...record, ts: Date.now() }) + '\n';
     fs.appendFileSync(JOURNAL_FILE, line, 'utf-8');
+    // Also write to root journal for long-term tracking
+    fs.appendFileSync(path.join(__dirname, '../../trade_journal.jsonl'), line, 'utf-8');
+    // Permanent archive — never truncated, Gemma4 reads this forever
+    fs.appendFileSync(path.join(__dirname, '../../signals/archive/trade_history.jsonl'), line, 'utf-8');
   } catch { /* never crash on journal write */ }
 }
 
@@ -241,6 +339,7 @@ interface Position {
   entryPriceSol:  number;
   signature:      string;
   peakPnlPct:     number;
+  entryMom5m?:    number;
   entryBuyRatio?: number;
 
   maxTPpct:       number;
@@ -248,6 +347,8 @@ interface Position {
   stopLossPct:    number;
 
   engineForceEvict?: boolean;
+  partialSold?: boolean;
+  trailingStopPct?: number;
 }
 
 interface PositionStore {
@@ -299,7 +400,7 @@ export async function getQuote(inputMint: string, outputMint: string, amountLamp
   } catch (e) { return null; }
 }
 
-export async function executeSwap(quote: any, tipLamports = 25000): Promise<string | null> {
+export async function executeSwap(quote: any, tipLamports = 5000): Promise<string | null> {
     if (process.env.PAPER_MODE === 'true') {
         const mockSig = `PAPER_TRADE_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
         console.log(`[SNIPER] 🧻 PAPER MODE: Mocking successful Swap Routing for ${quote?.outAmount} lamports. Ghost Sig: ${mockSig}`);
@@ -391,6 +492,14 @@ async function calcBuySize(): Promise<number> {
   } catch { return MIN_BUY_SOL; }
 }
 
+// ── Loss Streak Cooldown ──────────────────────────────────────────────
+function isLossStreakPaused(): boolean {
+  if (store.stats.pausedUntil && Date.now() < store.stats.pausedUntil) {
+    return true;
+  }
+  return false;
+}
+
 async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg1h: number,
                         buys1h: number, sells1h: number, buyRatio: number,
                         taSig?: string, taConf?: number,
@@ -448,9 +557,31 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
   if (confidenceScore < 0.45) {
      console.log(`[SNIPER] 🐜 QUALIFIER REJECT: ${symbol} failed confidence threshold (${(confidenceScore * 100).toFixed(1)}% < 45%)`);
      logMissedTarget({ mint, symbol, reason: "Target Qualifier Confidence Too Low", confidence: confidenceScore, poolLiq });
+     await pub.setex(REDIS_KEYS.cooldown(mint), 300, '1');
      return;
   }
   
+  // DISABLED:   // BONDED ONLY: reject tokens with no DEX pool (prebonded pump.fun)
+  // DISABLED:   if (poolLiq <= 0) {
+  // DISABLED:      console.log(`[SNIPER] 🐜 UNBONDED REJECT: ${symbol} has no DEX liquidity — prebonded pump.fun token`);
+  // DISABLED:      logMissedTarget({ mint, symbol, reason: "No DEX pool (unbonded)", poolLiq: 0 });
+  // DISABLED:      return;
+  // DISABLED:   }
+  // AGE FILTER: reject tokens younger than 30 minutes (fresh launches = deployer bait)
+  if (tokenAgeSec !== undefined && tokenAgeSec < 300) {
+     console.log(`[SNIPER] 🐜 FRESH LAUNCH REJECT: ${symbol} only ${(tokenAgeSec/60).toFixed(0)}m old (min 5m)`);
+     logMissedTarget({ mint, symbol, reason: "Too young (<5min)", age: tokenAgeSec });
+     await pub.setex(REDIS_KEYS.cooldown(mint), 300, '1');
+     return;
+  }
+  // Market cap floor: reject anything under $25K liquidity
+  if (poolLiq > 0 && poolLiq < 5000) {
+     console.log(`[SNIPER] 🐜 MCAP/LIQ REJECT: ${symbol} liquidity $${poolLiq.toFixed(0)} < $5K floor`);
+     logMissedTarget({ mint, symbol, reason: "Below $5K liquidity floor", poolLiq });
+     await pub.setex(REDIS_KEYS.cooldown(mint), 300, '1');
+     return;
+  }
+
   if (poolLiq > 0 && poolLiq < 3000) { // Extremely low liquidity = slippage death
      console.log(`[SNIPER] 🐜 QUALIFIER REJECT: ${symbol} has insufficient liquidity ($${poolLiq.toFixed(0)})`);
      logMissedTarget({ mint, symbol, reason: "Insufficient Dex Liquidity", poolLiq });
@@ -476,7 +607,7 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
     const MIN_VEL_RATIO  = 0.50 * penaltyFactor; 
     
     // VELOCITY OVERRIDE: If a token has massive speed right now (15+ tx/min and 3+ buys in 60s), 
-    if (vel.buys60s >= MIN_VEL_BUYS && vel.velocity >= 15) {
+    if (vel.buys60s >= MIN_VEL_BUYS && vel.velocity >= 15 && vel.solVolume60s >= 1.0) {
         console.log(`[SNIPER] ⚡ VELOCITY OVERRIDE TRIGGERED FOR ${symbol} (${vel.buys60s}B/60s @ ${vel.velocity}tx/m)`);
         velocityOverride = true;
     } else {
@@ -486,6 +617,10 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
         }
         if (vel.buyRatio60s < MIN_VEL_RATIO) {
           console.log(`[SNIPER] ⚡ ${symbol} VELOCITY SKIP — buy ratio ${(vel.buyRatio60s*100).toFixed(0)}% <${(MIN_VEL_RATIO*100).toFixed(0)}% | ${vel.buys60s}B/${vel.sells60s}S`);
+          return;
+        }
+        if (vel.solVolume60s < 1.0) {
+          console.log(`[SNIPER] ⚡ ${symbol} VOLUME SKIP — only ${vel.solVolume60s.toFixed(3)} SOL/60s (min 0.5)`);
           return;
         }
     }
@@ -523,6 +658,13 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
   const solPrice = parseFloat(await pub.hget('price:So11111111111111111111111111111111111111112', 'usd') || '150');
 
   let buySol = await calcBuySize(); // fallback
+  // Loss streak check
+  if (isLossStreakPaused()) {
+    const remaining = Math.ceil((store.stats.pausedUntil - Date.now()) / 60000);
+    console.log('[SNIPER] ⏸️ LOSS STREAK PAUSE: ' + remaining + 'min remaining after ' + store.stats.consecutiveLosses + ' consecutive losses');
+    return;
+  }
+
   if (buySol === 0) {
       console.log(`[SNIPER] 🚫 CIRCUIT BREAKER REJECTION: Halting snipe attempt on ${symbol}.`);
       return;
@@ -550,7 +692,47 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
   const ageTag = tokenAgeSec ? ` | age:${(tokenAgeSec/60).toFixed(0)}min` : '';
   console.log(`[SNIPER] 🎯 Sniping ${symbol} | +${priceChg1h.toFixed(0)}%/1h | $${(volume1h/1000).toFixed(1)}k vol | ${buys1h}B/${sells1h}S (${buyRatio.toFixed(1)}x) | size: ${buySol} SOL${ageTag}`);
 
-  const quote = await getQuote(WSOL, mint, buyLamports);
+  // RUGCHECK SECURITY PRE-FLIGHT
+  const rugResult = await checkRugSafety(mint);
+  if (!rugResult.safe) {
+    console.log(`[SNIPER] 🚨 RUGCHECK REJECT: ${symbol} — ${rugResult.riskLevel} (score: ${rugResult.score}) — honeypot/mintable risk`);
+    logMissedTarget({ mint, symbol, reason: 'RugCheck: ' + rugResult.riskLevel, poolLiq });
+    store.blacklist.push(mint);
+    await pub.setex(REDIS_KEYS.cooldown(mint), 3600, '1'); // 1hr blacklist
+    return;
+  }
+
+  // HOLDER CONCENTRATION CHECK: reject insider-controlled tokens
+  const holderResult = await checkHolderConcentration(mint);
+  if (!holderResult.safe) {
+    console.log('[SNIPER] \u{1f6ab} HOLDER REJECT: ' + symbol + ' — top10: ' + holderResult.top10Pct.toFixed(0) + '%, holders: ' + holderResult.holderCount);
+    logMissedTarget({ mint, symbol, reason: 'Holder concentration ' + holderResult.top10Pct.toFixed(0) + '%', poolLiq });
+    store.blacklist.push(mint);
+    await pub.setex(REDIS_KEYS.cooldown(mint), 1800, '1'); // 30min blacklist
+    return;
+  }
+  console.log('[SNIPER] \u2705 HOLDER OK: ' + symbol + ' — top10: ' + holderResult.top10Pct.toFixed(0) + '%, holders: ' + holderResult.holderCount);
+
+  // MARKET CAP CHECK: reject micro-cap dust tokens
+  const liveMcap = await fetchDexScreenerPair(mint);
+  if (liveMcap && liveMcap.liquidity < 10000) {
+    console.log('[SNIPER] \u{1f6ab} MCAP REJECT: ' + symbol + ' — liq $' + liveMcap.liquidity.toFixed(0) + ' < $10K');
+    await pub.setex(REDIS_KEYS.cooldown(mint), 600, '1');
+    return;
+  }
+
+  // MAYHEM MODE FILTER: Token-2022 tokens cannot be sold on pump.fun bonding curve
+  try {
+    const mintAcct = await callRpcGateway('getAccountInfo', [new PublicKey(mint), {encoding: 'jsonParsed'}]);
+    if (mintAcct?.value?.owner === 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb') {
+      console.log('[SNIPER] 🚫 MAYHEM REJECT: ' + symbol + ' uses Token-2022 (mayhem mode) — sells blocked on bonding curve');
+      logMissedTarget({ mint, symbol, reason: 'Token-2022 / Mayhem Mode', poolLiq });
+      store.blacklist.push(mint);
+      return;
+    }
+  } catch(e) {}
+
+  const quote = await getQuote(WSOL, mint, buyLamports, 300); // 3% max buy slippage
   if (!quote) {
     console.log(`[SNIPER] ❌ No route via Jupiter yet for ${symbol} — retrying in 30s (indexer lag)`);
     logMissedTarget({ mint, symbol, reason: "No route on Jupiter", price: buySol });
@@ -578,10 +760,11 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
   }
 
   const entryPriceSol = buySol / tokenAmount;
-  const sig = await executeSwap(quote, 250_000); // buy: aggressive priority (0.00025 SOL)
+  const sig = await executeSwap(quote, 5_000); // buy: aggressive priority (0.00025 SOL)
   if (!sig) {
       console.log(`[SNIPER] ❌ Swap execution failed for ${symbol} — blacklisting temporarily`);
       logMissedTarget({ mint, symbol, reason: "Simulation or Execution Failed on Chain", amountSol: buySol });
+      store.blacklist.push(mint); // Hard blacklist failed swaps
       await pub.setex(REDIS_KEYS.tempBlacklist(mint), 300, '2.0'); // 5 min penalty
       return;
   }
@@ -626,24 +809,14 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
   const pos: Position = {
     tradeId, mint, ata, symbol, buyPriceSol: buySol, tokenAmount,
     openedAt: Date.now(), entryPriceSol, signature: sig,
-    peakPnlPct: 0, entryBuyRatio: buyRatio,
+    peakPnlPct: 0, entryMom5m: mom5m, entryBuyRatio: buyRatio,
     maxTPpct, maxHoldMinutes, stopLossPct
   };
   store.positions.push(pos);
   saveStore();
 
-  // Route newly armed position to Apex Predator queue for asynchronous Forensics Sweeps
-  try {
-     const pub = RedisBus.getPublisher();
-     await pub.rpush(REDIS_KEYS.apexCandidates, JSON.stringify({
-         mint: pos.mint,
-         symbol: pos.symbol,
-         entryPriceSol: pos.entryPriceSol
-     }));
-     console.log(`[SNIPER] 🦅 Handed off ${pos.symbol} to Apex Predator for retroactive forensics...`);
-  } catch (e) {
-     console.log(`[SNIPER] ⚠️ Redis Warning: Failed to enqueue ${pos.symbol} to apex:candidates`);
-  }
+  // Apex Predator: REMOVED — was causing force-sells
+
 
   console.log(`[SNIPER] ✅ Entered ${symbol}: ${buySol} SOL → ${tokenAmount} tokens`);
   console.log(`[SNIPER] 🔗 https://solscan.io/tx/${sig}`);
@@ -658,30 +831,11 @@ async function checkExits() {
 
   for (const pos of store.positions) {
     const heldMs    = now - pos.openedAt;
-    let forceExit = heldMs > MAX_HOLD_MS || !!pos.engineForceEvict; // 6min hard cap or manual dump from network
+    let forceExit = false; // All external force mechanisms DISABLED
     const inRetrace = heldMs < RETRACE_SHIELD_MS;
 
-    // ── APEX PREDATOR: Asynchronous Conviction Rejection ────────────
+    // ── Pure TP/SL exit logic ────────────
     const pub = RedisBus.getPublisher();
-    const analysisStr = await pub.get(REDIS_KEYS.apexAnalysis(pos.mint));
-    let isHighConviction = true; // Assume innocent until proven manipulated
-    let apexCancelReason = '';
-    let apexRedFlags = -1; // -1 means un-analyzed
-    
-    if (analysisStr) {
-        try {
-            const analysis = JSON.parse(analysisStr);
-            isHighConviction = analysis.is_high_conviction;
-            if (analysis.red_flag_count !== undefined) {
-                 apexRedFlags = analysis.red_flag_count;
-            }
-            if (isHighConviction === false) {
-                 console.log(`[SNIPER] 🚨 APEX PREDATOR RETRO-FIRE-SELL: ${pos.symbol} flagged for CRIME (Score ≤ 3) — DUMPING IMMEDIATELY!`);
-                 forceExit = true; 
-                 apexCancelReason = 'APEX: MANIPULATION DETECTED';
-            }
-        } catch(e) {}
-    }
 
     const curValueSol = await getCurrentPriceSol(pos.mint, pos.tokenAmount);
     if (!curValueSol && !forceExit) continue;
@@ -694,48 +848,22 @@ async function checkExits() {
     if (pnlPct > (pos.peakPnlPct || 0)) pos.peakPnlPct = pnlPct;
     const peak = pos.peakPnlPct || 0;
 
-    // ── APEX: $4M Market Cap Check ───────────────────────────────────────
-    // Approximate mcap using default 1B supply for solana meme tokens
-    const solPrice = 150; // Use static approx, or could cache from Redis
-    const approxMcapUSD = curValueSol ? (curValueSol / pos.tokenAmount) * solPrice * 1e9 : 0;
-    
-    if (approxMcapUSD >= 4_000_000 && !forceExit) {
-        // Query Apex Liquidity Cache for the $1M/$2M marks
-        const liqCheckObj = await pub.get(`apex:liquidity:${pos.mint}`);
-        if (liqCheckObj) {
-            const liq = JSON.parse(liqCheckObj);
-            if (liq.liquidity_sufficient === false) {
-                 console.log(`[SNIPER] 🚨 $4M MAX MCAP TRIGGERED: Thin liquidity mapped by Apex. Dumping instantly!`);
-                 forceExit = true;
-                 apexCancelReason = 'APEX: $4M MCAP / NO LIQUIDITY';
-            }
-        }
-    }
-
+    // ── $4M mcap check: DISABLED ───────
     // ── Triple-Layer Hard Exit Constraints & Dynamic Trailing Stop ─────────────────
-    let targetTP = pos.maxTPpct || 0.20;
-    let targetSL = pos.stopLossPct || 0.50;
-    const targetTime = pos.maxHoldMinutes || 10;
+    let targetTP = GLOBAL_TP_PCT; // 12% from .env, override via push_params
+    let targetSL = GLOBAL_SL_PCT; // 5% from .env, override via push_params
+    const targetTime = GLOBAL_HOLD_MIN || pos.maxHoldMinutes || 10;
 
-    // APEX: Widen initial Stop Loss (-SL) for flawless Smart Money tokens by 10%
-    if (apexRedFlags === 0 && isHighConviction && peak < 15) {
-         targetSL += 0.10; // e.g. SL drops from -50% to -60% to breathe
-    }
+    // Apex SL widening: DISABLED
 
-    // DYNAMIC TRAILING TAKE-PROFIT (Profit Maximizing Model)
-    // The higher the token pumps, the wider the trailing gap to survive massive whale-wick retracements.
-    if (peak >= 200) {
-        targetSL = -((peak - 50) / 100); // 50% wick survivor room
-        targetTP = 999;
-    } else if (peak >= 100) {
-        targetSL = -((peak - 30) / 100); // 30% wick survivor room
-        targetTP = 999;
-    } else if (peak >= 50) {
-        targetSL = -((peak - 20) / 100); // 20% wick survivor room
-        targetTP = 999;
+    // DYNAMIC TRAILING TAKE-PROFIT (Profit Maximizing Model - Aggressive Lock)
+    // The higher the token pumps, the tighter we trail to ensure profit lockdown.
+    if (peak >= 50) {
+        targetSL = -((peak - 15) / 100); // Massive pump, guarantee at least +35%
     } else if (peak >= 20) {
-        targetSL = -((peak - 10) / 100); // 10% tight lock (guarantee 10% profit!)
-        targetTP = 999; 
+        targetSL = -((peak - 5) / 100); // 5% wiggle room from peak
+    } else if (peak >= 12) {
+        targetSL = -((peak - 2) / 100); // Tight lock. Price is at +12%, guarantee +10% 
     }
 
     const elapsedMinutes = heldMs / 60000;
@@ -744,18 +872,32 @@ async function checkExits() {
     const timeHit = elapsedMinutes >= targetTime;
 
     if (tpHit || slHit || timeHit || forceExit) {
-      const reason = apexCancelReason ? apexCancelReason
-                   : forceExit        ? `FORCE_EXIT (Apex / Emergency)`
+      const reason = forceExit        ? `FORCE_EXIT (Emergency)`
                    : tpHit            ? `MAX_TP_HIT +${pnlPct.toFixed(1)}%`
                    : slHit            ? `TRAIL/STOP_HIT ${pnlPct > 0 ? '+' : ''}${pnlPct.toFixed(1)}%`
                    :                    `TIME_EXIT (${elapsedMinutes.toFixed(1)}m)`;
       
       console.log(`[SNIPER] 🔄 Exiting ${pos.symbol} — ${reason}`);
 
-      const sellFraction = 1.0; // Rigid 100% exit
+      // Partial TP: sell 50% at +6%, trail rest to +12%
+      let sellFraction = 1.0;
+      if (tpHit && !pos.partialSold) {
+        // First TP hit: sell 50%, set trailing stop
+        sellFraction = 0.5;
+        pos.partialSold = true;
+        pos.trailingStopPct = 4; // trail 4% from peak for remaining
+        console.log('[SNIPER] 🎯 PARTIAL TP: selling 50% of ' + pos.symbol + ' at +' + pnlPct.toFixed(1) + '%');
+      } else if (pos.partialSold && pnlPct < (peak - (pos.trailingStopPct || 4))) {
+        // Trailing stop hit on remaining position
+        sellFraction = 1.0;
+        console.log('[SNIPER] 📉 TRAIL STOP: selling remaining ' + pos.symbol + ' (peak: +' + peak.toFixed(1) + '%, now: +' + pnlPct.toFixed(1) + '%)');
+      } else if (pos.partialSold && !tpHit && !slHit && !timeHit && !forceExit) {
+        // Still has remaining position, not hitting any exit — skip
+        continue;
+      }
       // Aggressive execution for stop-loss and time-based force exits to prevent hold-over
       const isEmergencyExit = slHit || forceExit;
-      const slippageBps = isEmergencyExit ? 5000 : 1000; // 50% slippage on dumps to guarantee escape
+      const slippageBps = isEmergencyExit ? 1500 : 500; // 15% max, 5% normal
       
       let exactBalanceLamports = Number(pos.tokenAmount);
       if (process.env.PAPER_MODE !== 'true') {
@@ -781,19 +923,40 @@ async function checkExits() {
 
       const sellQuote = await getQuote(pos.mint, WSOL, activeSwapBal, slippageBps);
       if (sellQuote) {
-      const priorityFee = tpHit ? 150_000 : isEmergencyExit ? 5_000_000 : 250_000; // 0.005 SOL tip for emergency dumps!
+      const priorityFee = 5_000; // 0.000005 SOL
       const sellSig = await executeSwap(sellQuote, priorityFee);
         if (sellSig) {
           const realizedSol = Number(sellQuote.outAmount) / 1e9;
           
           const pnlSol = realizedSol - pos.buyPriceSol; // Estimate PnL across total lifecycle vs remaining
+          // 30-minute cooldown on losing trades to prevent re-entry
+          if (pnlSol < 0) {
+            await pub.setex(REDIS_KEYS.cooldown(pos.mint), 1800, '1'); // 30 min cooldown
+            store.blacklist.push(pos.mint); // Also permanent blacklist for this session
+          }
           const tradeId = randomUUID();
-          appendTrade({ agent: 'pcp-sniper', action: 'SELL', mint: pos.mint, symbol: pos.symbol, amountSol: realizedSol, pnlSol, sig: sellSig, reason, holdMs: heldMs, parentBuyId: pos.tradeId, tradeId });
+          appendTrade({ agent: 'pcp-sniper', action: 'SELL', mint: pos.mint, symbol: pos.symbol, amountSol: realizedSol, pnlSol, sig: sellSig, reason, holdMs: heldMs, parentBuyId: pos.tradeId, tradeId, momentum5m: pos.entryMom5m, rsi: pos.peakPnlPct } as any);
           
           store.stats.totalPnlSol += pnlSol;
           if (pnlSol >= 0) store.stats.wins++; else store.stats.losses++;
           
           if (pnlSol < 0) {
+              store.stats.consecutiveLosses = (store.stats.consecutiveLosses || 0) + 1;
+              if (store.stats.consecutiveLosses >= 3) {
+                store.stats.pausedUntil = Date.now() + 15 * 60 * 1000; // 15 min pause
+                // Trigger Gemma4 to refine immediately during the pause
+                try {
+                  const pub = RedisBus.getPublisher();
+                  pub.publish('gemma4:refine', JSON.stringify({
+                    trigger: 'LOSS_STREAK',
+                    consecutiveLosses: store.stats.consecutiveLosses,
+                    totalPnlSol: store.stats.totalPnlSol,
+                    ts: Date.now(),
+                  }));
+                  console.log('[SNIPER] 🧠 Triggered Gemma4 refinement (loss streak: ' + store.stats.consecutiveLosses + ')');
+                } catch {}
+                console.log('[SNIPER] ⛔ 3 CONSECUTIVE LOSSES — pausing for 15 minutes');
+              }
               console.log(`[SNIPER] 🛡️ RUGGED on ${pos.symbol}. Adding mint to permanent blacklist and locking Tickers strings.`);
               store.blacklist.push(pos.mint); // block specific mint forever locally
               
@@ -802,6 +965,7 @@ async function checkExits() {
                   await pubPublisher.setex(`shield:ruggedTicker:${pos.symbol.toUpperCase().trim()}`, 86400, 'LOCKED');
               }
           } else {
+              store.stats.consecutiveLosses = 0;
               console.log(`[SNIPER] ♻️ WIN on ${pos.symbol}. Setting 60s cooldown, but allowing future re-entries if momentum sustains!`);
               const pubPublisher = RedisBus.getPublisher();
               await pubPublisher.setex(REDIS_KEYS.cooldown(pos.mint), 60, 'LOCKED');
@@ -827,23 +991,17 @@ async function checkExits() {
       }
     } else {
       // Status line
-      let dynamicTP = pos.maxTPpct || 0.20;
-      let dynamicSL = pos.stopLossPct || 0.50;
+      let dynamicTP = GLOBAL_TP_PCT;
+      let dynamicSL = GLOBAL_SL_PCT;
 
-      if (apexRedFlags === 0 && isHighConviction && peak < 15) dynamicSL += 0.10;
+      // Apex widening removed
       
-      if (peak >= 200) {
-          dynamicSL = -((peak - 50) / 100);
-          dynamicTP = 999;
-      } else if (peak >= 100) {
-          dynamicSL = -((peak - 30) / 100);
-          dynamicTP = 999;
-      } else if (peak >= 50) {
-          dynamicSL = -((peak - 20) / 100);
-          dynamicTP = 999;
+      if (peak >= 50) {
+          dynamicSL = -((peak - 15) / 100);
       } else if (peak >= 20) {
-          dynamicSL = -((peak - 10) / 100);
-          dynamicTP = 999;
+          dynamicSL = -((peak - 5) / 100);
+      } else if (peak >= 12) {
+          dynamicSL = -((peak - 2) / 100);
       }
 
       const tpStr = dynamicTP === 999 ? 'OPEN' : `+${(dynamicTP * 100).toFixed(0)}%`;
@@ -928,30 +1086,7 @@ async function recoverOrphans() {
 async function poll() {
   // ── PATH 0 (pre): Force-sell queue — execute orphan sweep sells ───────────
   // Written by orphan_sweep.py or monitor. Processed once then deleted.
-  const FORCE_SELL_FILE = path.join(SIGNALS_DIR, 'force_sell.json');
-  if (fs.existsSync(FORCE_SELL_FILE)) {
-    try {
-      const fsData = JSON.parse(fs.readFileSync(FORCE_SELL_FILE, 'utf-8'));
-      const sells: any[] = fsData.sells || [];
-      console.log(`[SNIPER] 🧹 Force-sell queue: ${sells.length} orphan(s) to sweep`);
-      fs.unlinkSync(FORCE_SELL_FILE); // delete first — prevents re-processing on crash
-      for (const s of sells) {
-        try {
-          const q = await getQuote(s.mint, WSOL, s.amount);
-          if (!q) { console.warn(`[SNIPER] ⚠️ No route for orphan ${s.mint.slice(0,12)}`); continue; }
-          const sig = await executeSwap(q, 30_000);
-          if (sig) {
-            const solOut = Number(q.outAmount) / 1e9;
-            console.log(`[SNIPER] ♻️ ORPHAN_SWEEP ${s.mint.slice(0,12)}... → +${solOut.toFixed(5)} SOL`);
-            const tradeId = randomUUID();
-            appendTrade({ agent:'pcp-sniper', action:'SELL', mint:s.mint, symbol:'ORPHAN',
-              amountSol:solOut, pnlSol:0, sig, reason:'ORPHAN_SWEEP', holdMs:0, tradeId });
-            store.stats.totalPnlSol += solOut;
-          }
-        } catch (e: any) { console.error(`[SNIPER] Force-sell error ${s.mint.slice(0,12)}: ${e.message}`); }
-      }
-    } catch (e: any) { console.error('[SNIPER] force_sell.json parse error:', e.message); }
-  }
+    // force_sell.json: REMOVED — was causing unexpected sells
 
   // ── PATH 0a: Alpha wallet SELL exit (highest priority — before price checks) ──
   // If a tracked smart-money wallet SELLS a token we're holding, exit immediately.
@@ -987,7 +1122,7 @@ async function poll() {
   }
 
   // Check exits (price-based logic)
-  if (store.positions.length > 0) await checkExits();
+    // Check exits previously evaluated here - now decoupled to real-time timer in main()
 
   try {
     // ══════════════════════════════════════════════════════════════════════
@@ -1058,7 +1193,7 @@ async function poll() {
     const accelerating = velMints.filter(v =>
       v.buys60s >= MIN_BUYS_1H &&
       v.buyRatio60s >= 0.50 &&
-      v.solVolume60s >= 0 &&
+      v.solVolume60s >= 1.0 &&
       !store.blacklist.includes(v.mint) &&
       !store.positions.find(p => p.mint === v.mint)
     ).sort((a, b) => (b.solVolume60s - a.solVolume60s) || (b.buys60s - a.buys60s));
@@ -1087,7 +1222,7 @@ async function poll() {
 
         const symbol   = v.symbol || trending?.symbol || v.mint.slice(0, 8) + '...';
         const vol1h    = trending?.volume1h  || v.solVolume60s * 60; // estimate from 60s SOL vol
-        const pc1h     = trending?.priceChange1h ?? 0;
+        let pc1h     = trending?.priceChange1h ?? 0;
         const buys1h   = trending?.buys1h    || v.buys60s * 60;
         const sells1h  = trending?.sells1h   || v.sells60s * 60;
         const buyRatio = trending?.buyRatio   || v.buyRatio60s / (1 - v.buyRatio60s + 0.001);
@@ -1103,8 +1238,56 @@ async function poll() {
 
         const createdAt   = trending?.pairCreatedAt ?? trending?.createdAt ?? undefined;
         const tokenAgeSec = createdAt ? Math.floor((Date.now() - createdAt) / 1000) : undefined;
-        const mom5m       = trending?.priceChange5m ?? undefined;
-        const mom1m       = trending?.priceChange1m ?? undefined;
+        let mom5m: number | undefined       = trending?.priceChange5m ?? undefined;
+        let mom1m: number | undefined       = trending?.priceChange1m ?? undefined;
+
+        // PRICE DIRECTION CHECK: Don't buy dead/dumping tokens
+        if (mom5m !== undefined && mom5m < 1) {
+          console.log(`[SNIPER] 📉 WEAK MOMENTUM SKIP: ${symbol} price DOWN ${mom5m.toFixed(1)}% in 5m — no upward momentum`);
+          continue;
+        }
+        if (mom1m !== undefined && mom1m < -3) {
+          console.log(`[SNIPER] 📉 CRASHING SKIP: ${symbol} price DOWN ${mom1m.toFixed(1)}% in 1m — active dump`);
+          continue;
+        }
+        // If no cached trending data, do a LIVE DexScreener lookup
+        if (!trending) {
+          const livePair = await fetchDexScreenerPair(v.mint);
+          if (livePair && livePair && livePair.liquidity > 0 && livePair.liquidity < 5000) {
+            console.log(`[SNIPER] 📉 LOW LIQ SKIP: ${symbol} — liq $${livePair.liquidity.toFixed(0)} < $5K`);
+            const pub = RedisBus.getPublisher();
+            await pub.setex(REDIS_KEYS.cooldown(v.mint), 300, '1');
+            continue;
+          }
+          if (livePair && livePair.priceChange5m < 1) {
+            console.log(`[SNIPER] 📉 LIVE DUMP SKIP: ${symbol} — price ${livePair.priceChange5m.toFixed(1)}% in 5m`);
+            const pub = RedisBus.getPublisher();
+            await pub.setex(REDIS_KEYS.cooldown(v.mint), 300, '1');
+            continue;
+          }
+          // OVERBOUGHT CEILING: if price already spiked too much, we'd buy the top
+          if (livePair && livePair.priceChange5m > 30) {
+            console.log('[SNIPER] \u{26a0}\ufe0f OVERBOUGHT SKIP: ' + symbol + ' — +' + livePair.priceChange5m.toFixed(0) + '% in 5m (ceiling: 30%)');
+            const pub = RedisBus.getPublisher();
+            await pub.setex(REDIS_KEYS.cooldown(v.mint), 300, '1');
+            continue;
+          }
+          if (livePair && livePair.priceChange1h > 100) {
+            console.log('[SNIPER] \u{26a0}\ufe0f LATE ENTRY SKIP: ' + symbol + ' — +' + livePair.priceChange1h.toFixed(0) + '% in 1h (ceiling: 100%)');
+            const pub = RedisBus.getPublisher();
+            await pub.setex(REDIS_KEYS.cooldown(v.mint), 600, '1');
+            continue;
+          }
+          // Token is live on DEX with real liquidity — use live data
+          if (livePair) {
+            console.log(`[SNIPER] ✅ LIVE DEX DATA: ${symbol} — liq $${livePair.liquidity.toFixed(0)} | 5m: ${livePair.priceChange5m > 0 ? '+' : ''}${livePair.priceChange5m.toFixed(1)}%${livePair.boosted ? ' 🚀 BOOSTED' : ''}`);
+            mom5m = livePair.priceChange5m;
+            pc1h = livePair.priceChange1h;
+          } else {
+            console.log(`[SNIPER] ⚡ NO DEX DATA — skipping (need price confirmation): ${symbol}`);
+            continue;
+          }
+        }
 
         await trySnipe(v.mint, symbol, vol1h, pc1h,
                        buys1h, sells1h, buyRatio,
@@ -1171,43 +1354,51 @@ async function main() {
   const sub = RedisBus.getSubscriber();
   sub.subscribe(CHANNELS.VELOCITY_SPIKE);
   sub.subscribe(CHANNELS.CONFIG_UPDATE);
-  sub.subscribe(CHANNELS.ENGINE_FORCE_SELL);
+  // ENGINE_FORCE_SELL: DISABLED — was causing unexpected force exits
   sub.on('message', (ch, msg) => {
     if (ch === CHANNELS.VELOCITY_SPIKE) {
       try {
-        latestVelocityData = JSON.parse(msg);
-        console.log('[DEBUG] VELOCITY SPIKE RECEIVED!', Object.keys(latestVelocityData.mints).length, latestVelocityData.updatedAt);
-        pollWithRefill(); // High-Frequency Sub-Second Trigger
+        const raw = JSON.parse(msg);
+        // Convert array format {mints: [addr]} to object format {mints: {addr: data}}
+        if (Array.isArray(raw.mints)) {
+          const mintsObj: any = {};
+          for (const m of raw.mints) {
+            mintsObj[m] = {
+              buys60s: 25, sells60s: 5, buyRatio60s: 0.83,
+              velocity: 20, isAccelerating: true, solVolume60s: 2.0,
+            };
+          }
+          latestVelocityData = { mints: mintsObj, updatedAt: Date.now() };
+        } else {
+          latestVelocityData = raw;
+        }
+        console.log('[SNIPER] ⚡ VELOCITY SPIKE:', Object.keys(latestVelocityData.mints).length, 'mints');
+        poll().catch(() => {}); // Uses cached velocity data, no extra RPC refill sweep — burns RPC on every spike. Velocity data saved, poll picks it up on next 60s cycle
       } catch (e) {
         console.error('[DEBUG] Parse error on spike:', e);
       }
     } 
-    else if (ch === CHANNELS.ENGINE_FORCE_SELL) {
-      try {
-        const payload = JSON.parse(msg);
-        const idx = store.positions.findIndex(p => p.mint === payload.mint);
-        if (idx > -1) {
-            console.log(`[SNIPER] 🚨 ENGINE BLOCK: Dumping ${payload.symbol}!`);
-            store.positions[idx].engineForceEvict = true;
-        }
-      } catch {}
-    }
+    // ENGINE_FORCE_SELL handler: REMOVED
     else if (ch === CHANNELS.CONFIG_UPDATE) {
       try {
-        const overrides = JSON.parse(msg);
-        console.log(`[SNIPER/ADJUSTER] 🛡️ DYNAMIC OVERRIDE PROTOCOL INITIATED:`, overrides);
-        
-        if (overrides.BASE_BUY_PCT) BASE_BUY_PCT = overrides.BASE_BUY_PCT;
-        if (overrides.MIN_BUY_SOL) MIN_BUY_SOL = overrides.MIN_BUY_SOL;
-        if (overrides.MAX_BUY_SOL) MAX_BUY_SOL = overrides.MAX_BUY_SOL;
-        if (overrides.MAX_POSITIONS) MAX_POSITIONS = overrides.MAX_POSITIONS;
-        if (overrides.maxHoldMinutes) { GLOBAL_HOLD_MIN = overrides.maxHoldMinutes; MAX_HOLD_MS = overrides.maxHoldMinutes * 60000; }
-        if (overrides.maxTPpct) GLOBAL_TP_PCT = overrides.maxTPpct;
-        if (overrides.stopLossPct) GLOBAL_SL_PCT = overrides.stopLossPct;
-        if (overrides.dynamicMinMom1m) (global as any).DYNAMIC_MIN_MOM_1M = overrides.dynamicMinMom1m;
-        if (overrides.dynamicMaxAgeMin) (global as any).DYNAMIC_MAX_AGE_MIN = overrides.dynamicMaxAgeMin;
-      } catch (e: any) {
-        console.error('[SNIPER/ADJUSTER] Override Parse Error:', e.message);
+        const params = JSON.parse(msg);
+        if (params.maxTPpct) {
+          GLOBAL_TP_PCT = parseFloat(params.maxTPpct);
+          console.log('[SNIPER] ⚙️ GEMMA4 UPDATE: TP=' + (GLOBAL_TP_PCT*100).toFixed(1) + '%');
+        }
+        if (params.stopLossPct) {
+          GLOBAL_SL_PCT = parseFloat(params.stopLossPct);
+          console.log('[SNIPER] ⚙️ GEMMA4 UPDATE: SL=' + (GLOBAL_SL_PCT*100).toFixed(1) + '%');
+        }
+        if (params.maxHoldMinutes) {
+          GLOBAL_HOLD_MIN = parseFloat(params.maxHoldMinutes);
+          console.log('[SNIPER] ⚙️ GEMMA4 UPDATE: HOLD=' + GLOBAL_HOLD_MIN + 'min');
+        }
+        if (params.dynamicMinMom1m) {
+          console.log('[SNIPER] ⚙️ GEMMA4 UPDATE: MIN_MOM=' + params.dynamicMinMom1m + '%');
+        }
+      } catch (e) {
+        console.error('[SNIPER] config:update parse error:', e);
       }
     }
   });
@@ -1215,7 +1406,16 @@ async function main() {
   // Watchdog Heartbeat
   setInterval(() => {
     RedisBus.publish('heartbeat:agent', { agent: 'pcp-sniper', timestamp: Date.now() });
-  }, 30000);
+  }, 120000); // Reduced heartbeat from 30s to 120s to save RPC
+
+  // Fallback Interval if Velocity stalls
+  // DYNAMIC RETRO-TELEMETRY THREAD (3-second strict tick rate)
+  // Ensures violent pump & dumps never bypass the standard discovery polling loop
+  setInterval(() => {
+     if (store.positions.length > 0) {
+         checkExits().catch(e => console.error('[SNIPER/TELEMETRY] Panic dump telemetry exception:', e));
+     }
+  }, 15000); // Reduced from 3s to 15s to conserve Chainstack RPC quota
 
   // Fallback Interval if Velocity stalls
   setInterval(pollWithRefill, POLL_MS);

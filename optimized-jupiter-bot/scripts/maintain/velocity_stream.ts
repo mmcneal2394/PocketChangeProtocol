@@ -17,7 +17,7 @@ const AMM_PROGRAMS = [
   '675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8', // Raydium CPMM
   'CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK', // Orca
   'Eo7WjKq67rjJQSZxS6z3YkapzY3eMj6Xy8X5EQVn5UaB', // Meteora DLMM
-  '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P',  // Pump.fun
+  '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P',  // Pump.fun — primary volume source, re-enabled after RPC fix
   '9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin', // Meteora Pools
 ].map(addr => new PublicKey(addr));
 
@@ -68,12 +68,12 @@ async function processQueue() {
                         recentMints.delete(iter.next().value!);
                     }
                     console.log(`[VELOCITY] SPIKE MINT ISOLATED: ${mint}`);
-                    redis.publish('VELOCITY_SPIKE', JSON.stringify({ mints: [mint], slot: item.context.slot }));
+                    redis.publish('velocity:spike', JSON.stringify({ mints: [mint], slot: item.context.slot }));
                 }
             } catch (e) {}
         }
     }
-    setTimeout(processQueue, 250); // 4 TPS Rate limit gracefully backing off latency spikes
+    setTimeout(processQueue, 500); // 2 TPS — conserve RPC credits
 }
 processQueue();
 
@@ -135,7 +135,7 @@ rawWs.on('message', (data: Buffer) => {
   if (rawMsgCount++ < 10) console.log('[VELOCITY] RAW WS:', str.slice(0, 500));
 });
 
-subscribe();
+// subscribe() only called once above — duplicate removed to halve WS connection & RPC burn
 
 // Heartbeat every 10 seconds
 setInterval(() => {
