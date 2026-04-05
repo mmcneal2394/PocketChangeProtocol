@@ -125,6 +125,7 @@ let MIN_MOMENTUM_5M  = guardParam('MIN_MOMENTUM_5M');
 let GLOBAL_TP_PCT    = parseFloat(process.env.MAX_TP_PERCENT || '6') / 100; // TP1: +6% partial, trail rest
 let GLOBAL_SL_PCT    = parseFloat(process.env.STOP_LOSS_PERCENT || '4') / 100;
 let GLOBAL_HOLD_MIN  = parseFloat(process.env.MAX_HOLD_MINUTES || '5');
+let GLOBAL_OB_CEILING = 150; // Overbought ceiling % — Gemma4 can tighten dynamically
 // ── GEMMA4 BOOT LOADER: Apply last known recommendations on startup ──────────
 try {
   const g4path = path.join(__dirname, '../../signals/gemma4_recommendations.json');
@@ -300,6 +301,8 @@ export function appendTrade(record: {
     if (!fs.existsSync(SIGNALS_DIR)) fs.mkdirSync(SIGNALS_DIR, { recursive: true });
     const line = JSON.stringify({ ...record, ts: Date.now() }) + '\n';
     fs.appendFileSync(JOURNAL_FILE, line, 'utf-8');
+    // Write to signals journal
+    fs.appendFileSync(path.join(__dirname, '../../signals/trade_journal.jsonl'), line, 'utf-8');
     // Also write to root journal for long-term tracking
     fs.appendFileSync(path.join(__dirname, '../../trade_journal.jsonl'), line, 'utf-8');
     // Permanent archive — never truncated, Gemma4 reads this forever
@@ -809,7 +812,7 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
   const pos: Position = {
     tradeId, mint, ata, symbol, buyPriceSol: buySol, tokenAmount,
     openedAt: Date.now(), entryPriceSol, signature: sig,
-    peakPnlPct: 0, entryMom5m: mom5m, entryBuyRatio: buyRatio,
+    peakPnlPct: 0, entryMom5m: momentum5m, entryBuyRatio: buyRatio,
     maxTPpct, maxHoldMinutes, stopLossPct
   };
   store.positions.push(pos);
@@ -1221,7 +1224,7 @@ async function poll() {
         }
 
         const symbol   = v.symbol || trending?.symbol || v.mint.slice(0, 8) + '...';
-        const vol1h    = trending?.volume1h  || v.solVolume60s * 60; // estimate from 60s SOL vol
+        let vol1h    = trending?.volume1h  || v.solVolume60s * 60; // estimate from 60s SOL vol
         let pc1h     = trending?.priceChange1h ?? 0;
         const buys1h   = trending?.buys1h    || v.buys60s * 60;
         const sells1h  = trending?.sells1h   || v.sells60s * 60;
@@ -1259,6 +1262,13 @@ async function poll() {
             await pub.setex(REDIS_KEYS.cooldown(v.mint), 300, '1');
             continue;
           }
+          // MINIMUM VOLUME CHECK: skip tokens with no real trading activity
+          if (livePair && livePair.volume1h < 1000) {
+            console.log(`[SNIPER] 📉 LOW VOL SKIP: ${symbol} — vol $${livePair.volume1h.toFixed(0)} < $1K/1h`);
+            const pub = RedisBus.getPublisher();
+            await pub.setex(REDIS_KEYS.cooldown(v.mint), 300, '1');
+            continue;
+          }
           if (livePair && livePair.priceChange5m < 1) {
             console.log(`[SNIPER] 📉 LIVE DUMP SKIP: ${symbol} — price ${livePair.priceChange5m.toFixed(1)}% in 5m`);
             const pub = RedisBus.getPublisher();
@@ -1266,13 +1276,13 @@ async function poll() {
             continue;
           }
           // OVERBOUGHT CEILING: if price already spiked too much, we'd buy the top
-          if (livePair && livePair.priceChange5m > 30) {
-            console.log('[SNIPER] \u{26a0}\ufe0f OVERBOUGHT SKIP: ' + symbol + ' — +' + livePair.priceChange5m.toFixed(0) + '% in 5m (ceiling: 30%)');
+          if (livePair && livePair.priceChange5m > GLOBAL_OB_CEILING) {
+            console.log('[SNIPER] \u{26a0}\ufe0f OVERBOUGHT SKIP: ' + symbol + ' — +' + livePair.priceChange5m.toFixed(0) + '% in 5m (ceiling: ' + GLOBAL_OB_CEILING + '%)');
             const pub = RedisBus.getPublisher();
             await pub.setex(REDIS_KEYS.cooldown(v.mint), 300, '1');
             continue;
           }
-          if (livePair && livePair.priceChange1h > 100) {
+          if (livePair && livePair.priceChange1h > 500) {
             console.log('[SNIPER] \u{26a0}\ufe0f LATE ENTRY SKIP: ' + symbol + ' — +' + livePair.priceChange1h.toFixed(0) + '% in 1h (ceiling: 100%)');
             const pub = RedisBus.getPublisher();
             await pub.setex(REDIS_KEYS.cooldown(v.mint), 600, '1');
@@ -1282,6 +1292,7 @@ async function poll() {
           if (livePair) {
             console.log(`[SNIPER] ✅ LIVE DEX DATA: ${symbol} — liq $${livePair.liquidity.toFixed(0)} | 5m: ${livePair.priceChange5m > 0 ? '+' : ''}${livePair.priceChange5m.toFixed(1)}%${livePair.boosted ? ' 🚀 BOOSTED' : ''}`);
             mom5m = livePair.priceChange5m;
+            if (livePair.volume1h > vol1h) vol1h = livePair.volume1h; // use real volume
             pc1h = livePair.priceChange1h;
           } else {
             console.log(`[SNIPER] ⚡ NO DEX DATA — skipping (need price confirmation): ${symbol}`);

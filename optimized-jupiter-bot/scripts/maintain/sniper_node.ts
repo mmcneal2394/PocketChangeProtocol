@@ -6,18 +6,28 @@ import { config } from 'dotenv';
 import path from 'path';
 import { initConfigManager, getConfig, closeConfigManager } from './config_manager';
 
-config();
+config({ path: '/mnt/volume_sfo3_01/pcp-engine/optimized-jupiter-bot/.env' });
 
 const RPC_URL = (process.env.SOLANA_RPC_URL || process.env.RPC_ENDPOINT || '').trim();
-const PRIVATE_KEY = process.env.PRIVATE_KEY_1 || process.env.PRIVATE_KEY!;
+const PRIVATE_KEY = process.env.PRIVATE_KEY_1 || process.env.PRIVATE_KEY;
+const WALLET_KEYPAIR_PATH = process.env.WALLET_KEYPAIR_PATH;
 const DRY_RUN = process.env.DRY_RUN !== 'false'; // Default to dry-run mode for safety
 const REDIS_URL = (process.env.REDIS_URL || 'redis://127.0.0.1:6379').trim();
 const JUPITER_API = process.env.JUPITER_ENDPOINT || 'https://api.jup.ag/swap/v1';
 const JUP_HEADERS: Record<string, string> = process.env.JUPITER_API_KEY ? { 'x-api-key': process.env.JUPITER_API_KEY } : {};
 
 const redis = new Redis(REDIS_URL);
-if (!PRIVATE_KEY) throw new Error("No Wallet Key configured!");
-const wallet = Keypair.fromSecretKey(bs58.decode(PRIVATE_KEY));
+let wallet: Keypair;
+
+if (PRIVATE_KEY) {
+    wallet = Keypair.fromSecretKey(bs58.decode(PRIVATE_KEY));
+} else if (WALLET_KEYPAIR_PATH) {
+    const rawData = require('fs').readFileSync(WALLET_KEYPAIR_PATH, 'utf-8');
+    const keydata = JSON.parse(rawData);
+    wallet = Keypair.fromSecretKey(Uint8Array.from(keydata));
+} else {
+    throw new Error("No Wallet Key configured!");
+}
 const connection = new Connection(RPC_URL, 'confirmed');
 
 // In-memory dedup
@@ -89,6 +99,7 @@ async function executeSwap(
     });
     const swapData: any = await swapResp.json();
     const tx = VersionedTransaction.deserialize(Buffer.from(swapData.swapTransaction, 'base64'));
+    tx.sign([wallet]);
 
     // Send or simulate transaction
     let signature = 'simulated_' + Math.floor(Math.random()*10000);

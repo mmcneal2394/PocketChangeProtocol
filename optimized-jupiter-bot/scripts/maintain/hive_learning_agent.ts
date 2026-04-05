@@ -199,23 +199,57 @@ async function learnFromMistakes() {
 
         console.log(`[HIVE-MIND] 🔍 Analyzing ${losingTrades.length} losing trades with Gemma 4...`);
 
-        const prompt = `You are an expert crypto trading strategist. Analyze these losing trades and suggest specific parameter changes to avoid similar losses in the future.
+        const prompt = `
+You are a profit-focused trading strategist. Review the last 10 losing trades.
+Losing trades often failed to take profit early.
+
+Your goal: adjust parameters to take solid profits in the +5% to +15% range, not hold for 50%+ gains that rarely materialize.
+
+Current parameters:
+- takeProfitPercent: 20
+- trailingStopPercent: 50
+- stopLossPercent: 20
+- maxHoldMinutes: 10
 
 Losing trades:
 ${JSON.stringify(losingTrades, null, 2)}
 
-Current parameters: stopLossPct=0.2, maxHoldMinutes=2, minMomentum1m=5, baseBuyPct=0.1
+Return a JSON with:
+- "takeProfitPercent": number (suggest between 5 and 12)
+- "trailingStopPercent": number (suggest between 2 and 5)
+- "stopLossPercent": number (suggest between 8 and 10)
+- "maxHoldMinutes": number (suggest between 2 and 5)
+- "reasoning": string
 
-Return your analysis as plain text with:
-1. The common pattern in these losses (1-2 sentences)
-2. Exactly 2-3 specific parameter changes (e.g. "decrease stopLossPct to 0.15")
-3. A confidence level (low/medium/high)
-
-Be concise and actionable.`;
+Do not return any markdown formatting outside of the json block. Return pure JSON.
+`;
 
         const analysis = await runAgent(prompt);
         if (analysis) {
             console.log(`[HIVE-MIND] 🎓 Mistake Analysis:\n${analysis}`);
+            try {
+                // Extract JSON if it's wrapped in markdown
+                const jsonMatch = analysis.match(/\{[\s\S]*\}/);
+                const jsonString = jsonMatch ? jsonMatch[0] : analysis;
+                const advice = JSON.parse(jsonString);
+                
+                // Construct the payload matching the /config-update handler
+                const payload = {
+                    takeProfitPercent: advice.takeProfitPercent,
+                    trailingStopPercent: advice.trailingStopPercent,
+                    stopLossPct: advice.stopLossPercent / 100,
+                    maxHoldMinutes: advice.maxHoldMinutes
+                };
+
+                await fetch(`http://${DROPLET_IP}:3001/config-update`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                console.log(`[HIVE-MIND] ✅ Sent aggressive Gemma 4 tuning to Droplet.`);
+            } catch(e: any) {
+                console.warn(`[HIVE-MIND] ⚠️ Failed to parse or send JSON from Gemma:`, e.message);
+            }
         }
 
         // Clean up Droplet disk space by deleting logs after refining

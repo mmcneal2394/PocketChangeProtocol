@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PCP Swarm Monitor</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #0a0e17; --card: #111827; --card-border: #1e293b;
+      --text: #e2e8f0; --muted: #64748b; --accent: #06d6a0;
+      --red: #ef4444; --amber: #f59e0b; --blue: #3b82f6;
+      --purple: #8b5cf6; --teal: #14b8a6; --green: #22c55e;
+    }
+    body {
+      background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif;
+      min-height: 100vh; padding: 20px;
+    }
+    .header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 24px; padding: 16px 20px;
+      background: linear-gradient(135deg, rgba(6,214,160,0.08), rgba(59,130,246,0.08));
+      border: 1px solid var(--card-border); border-radius: 12px;
+    }
+    .header h1 {
+      font-size: 20px; font-weight: 700; letter-spacing: -0.5px;
+      background: linear-gradient(135deg, var(--accent), var(--blue));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .header .status {
+      display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted);
+    }
+    .header .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: pulse 2s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-bottom: 16px; }
+    .card {
+      background: var(--card); border: 1px solid var(--card-border); border-radius: 10px;
+      padding: 16px; overflow: hidden;
+    }
+    .card h2 { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 12px; }
+    .stat-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+    .stat-row:last-child { border-bottom: none; }
+    .stat-label { font-size: 13px; color: var(--muted); }
+    .stat-value { font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 600; }
+    .stat-value.green { color: var(--green); }
+    .stat-value.red { color: var(--red); }
+    .stat-value.amber { color: var(--amber); }
+    .stat-value.blue { color: var(--blue); }
+    .stat-value.accent { color: var(--accent); }
+    .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+    .kpi {
+      background: var(--card); border: 1px solid var(--card-border); border-radius: 10px;
+      padding: 14px 16px; text-align: center;
+    }
+    .kpi .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+    .kpi .value { font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 700; }
+    .pm2-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .pm2-table th { text-align: left; padding: 6px 8px; color: var(--muted); font-weight: 500; border-bottom: 1px solid var(--card-border); }
+    .pm2-table td { padding: 5px 8px; font-family: 'JetBrains Mono', monospace; font-size: 11px; border-bottom: 1px solid rgba(255,255,255,0.03); }
+    .badge {
+      display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; text-transform: uppercase;
+    }
+    .badge.online { background: rgba(34,197,94,0.15); color: var(--green); }
+    .badge.stopped { background: rgba(239,68,68,0.15); color: var(--red); }
+    .badge.errored { background: rgba(239,68,68,0.15); color: var(--red); }
+    .log-box {
+      background: #0d1117; border: 1px solid var(--card-border); border-radius: 8px;
+      padding: 10px; font-family: 'JetBrains Mono', monospace; font-size: 11px;
+      line-height: 1.6; max-height: 200px; overflow-y: auto; color: #8b949e;
+    }
+    .log-box .highlight { color: var(--accent); }
+    .log-box .warn { color: var(--amber); }
+    .log-box .err { color: var(--red); }
+    .trade-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.03); font-size: 12px; }
+    .trade-row:last-child { border: none; }
+    .trade-side { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; padding: 2px 6px; border-radius: 3px; }
+    .trade-side.BUY { background: rgba(59,130,246,0.15); color: var(--blue); }
+    .trade-side.SELL { background: rgba(139,92,246,0.15); color: var(--purple); }
+    .trade-mint { color: var(--muted); font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+    .trade-pnl { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600; margin-left: auto; }
+    .full-width { grid-column: 1 / -1; }
+    .loading { text-align: center; padding: 40px; color: var(--muted); }
+    @media (max-width: 768px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>⚡ PCP Swarm Monitor</h1>
+    <div class="status">
+      <div class="dot" id="live-dot"></div>
+      <span id="last-update">Loading...</span>
+    </div>
+  </div>
+
+  <div class="kpi-grid" id="kpis">
+    <div class="kpi"><div class="label">Wallet Balance</div><div class="value accent" id="kpi-balance">—</div></div>
+    <div class="kpi"><div class="label">Win Rate</div><div class="value green" id="kpi-winrate">—</div></div>
+    <div class="kpi"><div class="label">Lifetime PnL</div><div class="value" id="kpi-pnl">—</div></div>
+    <div class="kpi"><div class="label">Active Agents</div><div class="value blue" id="kpi-agents">—</div></div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>🏗️ Agent Fleet</h2>
+      <table class="pm2-table" id="pm2-table">
+        <thead><tr><th>Agent</th><th>Status</th><th>Uptime</th><th>↺</th><th>Mem</th></tr></thead>
+        <tbody id="pm2-body"><tr><td colspan="5" class="loading">Loading...</td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>📊 Strategy Params (Kelly)</h2>
+      <div id="strategy-params"><div class="loading">Loading...</div></div>
+    </div>
+
+    <div class="card">
+      <h2>🎯 Open Positions</h2>
+      <div id="positions"><div class="loading">Loading...</div></div>
+    </div>
+
+    <div class="card">
+      <h2>📈 Recent Trades</h2>
+      <div id="trades"><div class="loading">Loading...</div></div>
+    </div>
+
+    <div class="card full-width">
+      <h2>🚀 Momentum Sniper Log</h2>
+      <div class="log-box" id="momentum-log">Loading...</div>
+    </div>
+
+    <div class="card">
+      <h2>⚡ Velocity Spikes</h2>
+      <div class="log-box" id="velocity-log">Loading...</div>
+    </div>
+
+    <div class="card">
+      <h2>🔍 Qualifier Activity</h2>
+      <div class="log-box" id="qualifier-log">Loading...</div>
+    </div>
+  </div>
+
+  <script>
+    function formatUptime(ms) {
+      if (!ms) return '—';
+      const s = Math.floor(ms / 1000);
+      if (s < 60) return `${s}s`;
+      if (s < 3600) return `${Math.floor(s/60)}m`;
+      if (s < 86400) return `${Math.floor(s/3600)}h ${Math.floor((s%3600)/60)}m`;
+      return `${Math.floor(s/86400)}d`;
+    }
+
+    function formatMem(bytes) {
+      if (!bytes) return '—';
+      return `${(bytes / 1024 / 1024).toFixed(0)}MB`;
+    }
+
+    function colorLog(text) {
+      return text
+        .replace(/(✅|🎉|♻️|\+\d+\.\d+)/g, '<span class="highlight">$1</span>')
+        .replace(/(⚠️|WARN|MISSED|Missed)/gi, '<span class="warn">$1</span>')
+        .replace(/(❌|ERROR|FAIL|failed)/gi, '<span class="err">$1</span>')
+        .replace(/(VELOCITY|SPIKE|ENTRY|QUALIFIED|BUY|SELL)/g, '<span class="highlight">$1</span>');
+    }
+
+    function timeSince(ts) {
+      const s = Math.floor((Date.now() - ts) / 1000);
+      if (s < 60) return `${s}s ago`;
+      if (s < 3600) return `${Math.floor(s/60)}m ago`;
+      return `${Math.floor(s/3600)}h ago`;
+    }
+
+    async function refresh() {
+      try {
+        const res = await fetch('/api/data');
+        const d = await res.json();
+        if (d.error) { document.getElementById('last-update').textContent = `Error: ${d.error}`; return; }
+
+        // KPIs
+        document.getElementById('kpi-balance').textContent = d.wallet?.replace(' SOL', '') || 'N/A';
+        const stats = d.positions?.stats || {};
+        const total = (stats.wins || 0) + (stats.losses || 0);
+        const wr = total > 0 ? ((stats.wins / total) * 100).toFixed(1) : '—';
+        document.getElementById('kpi-winrate').textContent = total > 0 ? `${wr}%` : '—';
+        const pnl = stats.totalPnlSol || 0;
+        const pnlEl = document.getElementById('kpi-pnl');
+        pnlEl.textContent = `${pnl >= 0 ? '+' : ''}${pnl.toFixed(5)}`;
+        pnlEl.className = `value ${pnl >= 0 ? 'green' : 'red'}`;
+        const online = d.pm2?.filter(p => p.pm2_env?.status === 'online').length || 0;
+        document.getElementById('kpi-agents').textContent = `${online}/${d.pm2?.length || 0}`;
+
+        // PM2 Table
+        const tbody = document.getElementById('pm2-body');
+        tbody.innerHTML = (d.pm2 || []).map(p => {
+          const env = p.pm2_env || {};
+          const status = env.status || 'unknown';
+          const uptime = env.pm_uptime ? Date.now() - env.pm_uptime : 0;
+          return `<tr>
+            <td style="color:var(--text)">${p.name}</td>
+            <td><span class="badge ${status}">${status}</span></td>
+            <td>${formatUptime(uptime)}</td>
+            <td style="color:${env.restart_time > 50 ? 'var(--amber)' : 'var(--muted)'}">${env.restart_time || 0}</td>
+            <td>${formatMem(p.monit?.memory)}</td>
+          </tr>`;
+        }).join('');
+
+        // Strategy Params
+        const sp = d.strategy || {};
+        document.getElementById('strategy-params').innerHTML = Object.entries(sp)
+          .filter(([k]) => !k.endsWith('At'))
+          .map(([k, v]) => `<div class="stat-row"><span class="stat-label">${k}</span><span class="stat-value accent">${v}</span></div>`)
+          .join('') || '<span class="stat-label">No strategy params loaded</span>';
+
+        // Positions
+        const posArr = d.positions?.positions || [];
+        document.getElementById('positions').innerHTML = posArr.length > 0
+          ? posArr.map(p => `<div class="stat-row"><span class="stat-label">${p.symbol || p.mint?.slice(0,8)}</span><span class="stat-value blue">${p.size || '?'} SOL</span></div>`).join('')
+          : '<div style="text-align:center;color:var(--muted);padding:16px;font-size:13px">No open positions — waiting for signals</div>';
+
+        // Trades
+        document.getElementById('trades').innerHTML = (d.trades || []).slice(0, 8).map(t => {
+          const pnl = t.realizedPnL;
+          const pnlStr = pnl != null ? `${pnl >= 0 ? '+' : ''}${pnl.toFixed(5)}` : '';
+          const pnlClass = pnl != null ? (pnl >= 0 ? 'green' : 'red') : '';
+          return `<div class="trade-row">
+            <span class="trade-side ${t.side}">${t.side}</span>
+            <span class="trade-mint">${t.mint?.slice(0, 8)}…</span>
+            <span style="color:var(--muted);font-size:11px">${t.timestamp ? timeSince(t.timestamp) : ''}</span>
+            <span class="trade-pnl ${pnlClass}">${pnlStr}</span>
+            <span style="font-size:10px">${t.success ? '✅' : '❌'}</span>
+          </div>`;
+        }).join('') || '<div style="text-align:center;color:var(--muted);padding:16px">No recent trades</div>';
+
+        // Logs
+        document.getElementById('momentum-log').innerHTML = colorLog(d.momentum || 'No logs yet');
+        document.getElementById('velocity-log').innerHTML = colorLog(d.velocity || 'Waiting for spikes...');
+        document.getElementById('qualifier-log').innerHTML = colorLog(d.qualifier || 'No evaluations yet');
+
+        document.getElementById('last-update').textContent = `Updated ${new Date().toLocaleTimeString()}`;
+        document.getElementById('live-dot').style.background = 'var(--accent)';
+      } catch (e) {
+        document.getElementById('last-update').textContent = `Connection error`;
+        document.getElementById('live-dot').style.background = 'var(--red)';
+      }
+    }
+
+    refresh();
+    setInterval(refresh, 12000);
+  </script>
+</body>
+</html>

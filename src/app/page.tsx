@@ -21,10 +21,10 @@ export default function LandingPage() {
 
   const tickerItems = [
     "> 9-AGENT AI SWARM ONLINE",
+    "> GEMMA 4 ADAPTIVE ENGINE LIVE",
     "> VELOCITY STREAM ACTIVE · &lt;2s LATENCY",
     "> OPTIMIZER CYCLE: 10min · GENETIC ALGO",
-    "> TRAILING TP LIVE · LOCKS AT +2% PEAK",
-    "> 28 RUGS BLACKLISTED · ZERO REPEATS",
+    "> MULTI-LAYER FILTER PIPELINE ACTIVE",
     "> PUMPFUN SCANNER · KELLY-SIZED ENTRIES",
   ];
 
@@ -181,11 +181,11 @@ export default function LandingPage() {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "16px" }} className="grid-mobile-2">
           {[
             { e: "⚡", t: "Velocity Entry",         d: "gRPC stream · <2s detection · fires before DexScreener shows anything",                  c: "#00ff41" },
-            { e: "🧠", t: "Swarm Optimizer",        d: "6-agent genetic loop · Gemini LLM critique · promotes params every 10min",               c: "#aa55ff" },
-            { e: "🎯", t: "Tiered Trailing TP",     d: "Activates at +2% peak · tightens as gains grow · 85% retention at +20%",                 c: "#ffaa00" },
-            { e: "🛡️", t: "Rug Detection",          d: "8 checks: honeypot, bundler wallets, freeze authority · permanent blacklist",             c: "#ff4444" },
-            { e: "🚀", t: "PumpFun Scanner",         d: "Launchpad monitoring · Kelly-fractioned sizing · EMA win-rate adaptive",                  c: "#3b82f6" },
-            { e: "↩️", t: "Order Flow Reversal",    d: "Watches buy/sell ratio post-entry · exits at -2% if sellers take over in <3min",          c: "#ec4899" },
+            { e: "🧠", t: "Gemma 4 Optimizer",      d: "Continuous adaptation loop · Tunes parameters dynamically based on market & loss streaks",c: "#aa55ff" },
+            { e: "🎯", t: "Tiered Trailing TP",     d: "Activates at +20% peak · tightens as gains grow · Locks in profit dynamically",          c: "#ffaa00" },
+            { e: "🛡️", t: "Multi-Filter Pipeline",  d: "Volume, Liquidity, Overbought Ceiling, Dump Detection, & Rugcheck safeguards",            c: "#ff4444" },
+            { e: "🚀", t: "PumpFun Scanner",        d: "Launchpad monitoring · Kelly-fractioned sizing · EMA win-rate adaptive",                  c: "#3b82f6" },
+            { e: "↩️", t: "RPC Optimized",          d: "Optimized polling · Caching · 70% reduction in RPC costs + ATA rent reclamation",         c: "#ec4899" },
           ].map(({ e, t, d, c }) => (
             <div key={t}
               style={{ background: "rgba(0,5,0,0.8)", border: `1px solid ${c}22`, borderRadius: "6px", padding: "24px 20px", transition: "border-color 0.3s, transform 0.3s", cursor: "default" }}

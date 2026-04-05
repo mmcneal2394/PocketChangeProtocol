@@ -33,6 +33,25 @@ function loadFromEnv(): SwarmConfig {
 
 // In‑memory store
 let currentConfig: SwarmConfig = loadFromEnv();
+
+// [KELLY BRIDGE] On boot, load Kelly-computed trade size from strategy_params.json
+try {
+  const fsSync = require('fs');
+  const stratPath = path.join(process.cwd(), 'strategy_params.json');
+  if (fsSync.existsSync(stratPath)) {
+    const stratParams = JSON.parse(fsSync.readFileSync(stratPath, 'utf-8'));
+    if (stratParams.MAX_TRADE_SIZE_SOL && stratParams.MAX_TRADE_SIZE_SOL > 0) {
+      currentConfig.BUY_AMOUNT_SOL = stratParams.MAX_TRADE_SIZE_SOL;
+      console.log(`[CONFIG] 🧮 Kelly position size loaded: BUY_AMOUNT_SOL=${currentConfig.BUY_AMOUNT_SOL}`);
+    }
+    if (stratParams.MAX_SLIPPAGE_BPS && stratParams.MAX_SLIPPAGE_BPS > 0) {
+      currentConfig.MAX_SLIPPAGE_BPS = stratParams.MAX_SLIPPAGE_BPS;
+    }
+  }
+} catch (e) {
+  // strategy_params.json doesn't exist yet — will be created by strategy_tune.ts
+}
+
 let redis: Redis | null = null;
 
 export async function initConfigManager() {
