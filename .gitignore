@@ -21,6 +21,11 @@ dist/
 .env.test.local
 .env.production.local
 .env.vault.*
+**/droplet_env*
+**/*_env.txt
+**/*secret*
+**/*private_key*
+**/gcp_key*
 
 # logs
 npm-debug.log*
