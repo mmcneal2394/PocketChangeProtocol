@@ -4496,8 +4496,13 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
       );
       if (routeLiveZeroLiqDecision.shouldHold || routeLiveZeroLiqDecision.shouldBlock) {
         const bypassHunterModeActive = !lossStreakState.restrictionsActive && (store.positions ? store.positions.length < 8 : false);
+        const replayRecoveryBypassActive = entryOptions?.replayRecoveryProbe === true && store.positions.length <= 0;
         if (bypassHunterModeActive) {
           console.log(`[SNIPER]  HUNTER MODE BYPASS: ${symbol} overriding ZERO LIQ ROUTE BLOCK.`);
+        } else if (replayRecoveryBypassActive) {
+          console.log(
+            `[SNIPER]  RECOVERY PROBE ZERO LIQ PASS: ${symbol} ${entryOptions?.replayRecoveryReason || routeLiveZeroLiqDecision.reason}.`
+          );
         } else {
           console.log(
             `[SNIPER] ${routeLiveZeroLiqDecision.shouldHold ? '' : ''} ZERO LIQ ROUTE ${routeLiveZeroLiqDecision.shouldHold ? 'HOLD' : 'BLOCK'}: ` +
