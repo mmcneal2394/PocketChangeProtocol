@@ -211,7 +211,7 @@ def infer_signal_source(buy, sell=None):
 
 def is_ghost_trade(trade):
     sig = str((trade or {}).get('sig') or (trade or {}).get('signature') or '')
-    mode = str((trade or {}).get('mode') or '').strip().lower()
+    mode = str((trade or {}).get('mode') or (trade or {}).get('entryMode') or '').strip().lower()
     return mode != 'desperation_bypass'
 
 
