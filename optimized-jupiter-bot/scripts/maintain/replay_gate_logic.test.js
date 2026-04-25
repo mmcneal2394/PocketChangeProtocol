@@ -122,3 +122,32 @@ test('evaluateReplayBackedRecoveryProbe allows one empty-book recovery probe on 
   assert.equal(allowed.windowMs, 20 * 60_000);
   assert.equal(coolingDown.allow, false);
 });
+
+test('evaluateReplayBackedRecoveryProbe also accepts healthier route-live liquidity when it matches the promoted floor', () => {
+  const allowed = evaluateReplayBackedRecoveryProbe({
+    slopfestParams: {
+      fitness: 0.18,
+      simulated_psr: 3.4,
+      simulated_pnl: 0.12,
+      recommended_filters: {
+        min_5m_change: 1,
+        min_volume_5m: 0,
+        min_liquidity_usd: 12000,
+      },
+    },
+    routeLive: true,
+    priceChange5m: 0.4,
+    liquidityUsd: 13500,
+    buys60s: 9,
+    buyRatio60s: 0.78,
+    velocity: 11,
+    solVolume60s: 2.5,
+    probeLikeFlowReady: true,
+    openPositionCount: 0,
+    consecutiveLosses: 6,
+    lastProbeAtMs: 0,
+    nowMs: 2_000_000,
+  });
+
+  assert.equal(allowed.allow, true);
+});

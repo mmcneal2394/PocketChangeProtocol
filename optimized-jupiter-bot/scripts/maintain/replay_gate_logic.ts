@@ -143,6 +143,9 @@ export function evaluateReplayBackedRecoveryProbe(args: {
   const velocity = Math.max(0, toFiniteNumber(args.velocity, 0));
   const solVolume60s = Math.max(0, toFiniteNumber(args.solVolume60s, 0));
   const recoveryMomentumFloor = Math.max(0, profile.min5mChange - 1);
+  const meetsRecoveryLiquidity =
+    liquidityUsd <= 5_000 ||
+    (profile.minLiquidityUsd > 0 && liquidityUsd >= profile.minLiquidityUsd);
   const strongFlow =
     buys60s >= 5 &&
     buyRatio60s >= 0.68 &&
@@ -153,7 +156,7 @@ export function evaluateReplayBackedRecoveryProbe(args: {
     args.probeLikeFlowReady === true &&
     strongFlow &&
     meetsRecoveryMomentum &&
-    liquidityUsd <= 5_000;
+    meetsRecoveryLiquidity;
   let windowMs = 15 * 60_000;
   if (consecutiveLosses >= 8) windowMs = 45 * 60_000;
   else if (consecutiveLosses >= 6) windowMs = 20 * 60_000;
@@ -170,6 +173,7 @@ export function evaluateReplayBackedRecoveryProbe(args: {
     profile,
     strongFlow,
     meetsRecoveryMomentum,
+    meetsRecoveryLiquidity,
     routeLiveRecoveryShape,
     cooldownReady,
     windowMs,

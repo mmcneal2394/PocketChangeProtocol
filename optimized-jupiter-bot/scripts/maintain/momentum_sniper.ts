@@ -7924,6 +7924,32 @@ async function poll() {
           routeLiveQualifierThresholdScale = routeLiveEntryRefinement.qualifierThresholdScale;
           routeLiveShouldBypassLowVolumeFloor = routeLiveEntryRefinement.shouldBypassLowVolumeFloor;
           routeLiveQualifierReason = routeLiveEntryRefinement.reason;
+          if (microOnlyMode && lossStreakRestricted && routeLivePreflight && !routeLiveRecoveryEntryOptions) {
+            const replayRecoveryProbeDecision = evaluateReplayBackedRecoveryProbe({
+              slopfestParams: GLOBAL_SLOPFEST_PARAMS_RAW,
+              routeLive: true,
+              priceChange5m: livePair?.priceChange5m,
+              liquidityUsd: livePair?.liquidity,
+              buys60s: v.buys60s,
+              buyRatio60s: v.buyRatio60s,
+              velocity: v.velocity,
+              solVolume60s: v.solVolume60s,
+              probeLikeFlowReady: microScoutDecision.shouldScout,
+              openPositionCount: store.positions.length,
+              consecutiveLosses: lossStreakState.consecutiveLosses,
+              lastProbeAtMs: getLastRecoveryProbeAt(),
+            });
+            if (replayRecoveryProbeDecision.allow) {
+              routeLiveRecoveryEntryOptions = {
+                replayRecoveryProbe: true,
+                replayRecoveryReason: replayRecoveryProbeDecision.reason,
+                replayRecoveryWindowMs: replayRecoveryProbeDecision.windowMs,
+              };
+              console.log(
+                `[SNIPER]  RECOVERY PROBE READY: ${symbol} ${replayRecoveryProbeDecision.reason}.`
+              );
+            }
+          }
           // MINIMUM VOLUME CHECK: skip tokens with no real trading activity
           if (livePair && livePair.volume1h < 1000) {
             if (routeLiveEntryRefinement.shouldBypassLowVolumeFloor) {
