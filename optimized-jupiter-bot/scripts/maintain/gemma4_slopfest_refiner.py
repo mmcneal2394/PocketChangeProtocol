@@ -239,8 +239,8 @@ def generate_autonomous_grid_search_results(pairs, base_filters=None):
     if not replay_pairs:
         return []
 
-    vol_floors = [500, 1000, 2500, 5000]
-    mom_floors = [2.0, 5.0, 10.0, 20.0]
+    vol_floors = [0, 500, 1000, 2500, 5000]
+    mom_floors = [0.0, 2.0, 5.0, 10.0, 20.0]
     trails = [0.03, 0.05, 0.08, 0.12]
     tps = [0.20, 0.50, 1.00]
 
@@ -1738,7 +1738,13 @@ def run_cycle():
     # Save recommendations
     with open(RECS, 'w', encoding='utf-8') as f:
         json.dump(recs, f, indent=2)
-    store_gemma_cycle(recs, len(trades), len(pairs), len(missed), db_path=SIGNAL_DB_PATH)
+    if 'store_gemma_cycle' in globals():
+        try:
+            store_gemma_cycle(recs, len(trades), len(pairs), len(missed), db_path=SIGNAL_DB_PATH)
+        except Exception as exc:
+            print(f'[GEMMA4] store_gemma_cycle skipped: {exc}')
+    else:
+        print('[GEMMA4] store_gemma_cycle unavailable; skipping cycle persistence')
 
     print(f'[G4] --- Analysis Cycle {now} ---')
     print(f'[G4] Executing CoT: {recs["analysis"]}')
