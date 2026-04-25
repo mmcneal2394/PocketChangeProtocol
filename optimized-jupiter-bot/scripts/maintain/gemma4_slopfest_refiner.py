@@ -4,6 +4,7 @@ Gemma 4 Auto-Refiner — Runs on a schedule, analyzes trade data,
 and pushes refined parameters to the live sniper via Redis.
 Deployed as a PM2 process with a built-in sleep loop.
 """
+import hashlib
 import json, os, sys, time, subprocess, io, re, socket
 import urllib.request
 import urllib.error
@@ -37,6 +38,8 @@ TRENDING_FILE = os.path.join(SIGNALS_DIR, 'trending.json')
 BAYESIAN_FILE = os.path.join(SIGNALS_DIR, 'bayesian_params.json')
 BAYESIAN_FILE = os.path.join(SIGNALS_DIR, 'bayesian_params.json')
 REALIZED_PROFIT_FILE = os.path.join(SIGNALS_DIR, 'realized_profit_paper.json' if PAPER_MODE else 'realized_profit.json')
+SWARM_DIR = os.path.join(SIGNALS_DIR, 'swarm')
+BACKTEST_RESULTS_FILE = os.path.join(SWARM_DIR, 'backtest_results.json')
 SNIPER_TS = os.path.join(PROJECT_ROOT, 'scripts', 'maintain', 'momentum_sniper.ts')
 INTERVAL_SECONDS = int(os.environ.get('GEMMA4_INTERVAL_SECONDS', '900'))  # Run every 15 minutes
 MIN_TRADE_SAMPLE = 10
@@ -82,6 +85,10 @@ def calculate_profit_seeking_score(pnl_sol):
     if pnl < 0:
         return -((abs(pnl) ** 2) * 200)
     return 0.0
+
+def round_metric(value, digits=6):
+    numeric = try_float(value, 0) or 0
+    return round(numeric, digits)
 
 def summarize_profit_seeking_pairs(pairs):
     positive_score = 0.0
@@ -208,19 +215,32 @@ def is_ghost_trade(trade):
     return mode != 'desperation_bypass'
 
 
-def run_autonomous_grid_search(pairs):
+def _build_grid_recommended_filters(candidate, base_filters=None):
+    merged = dict(base_filters or {})
+    merged['min_5m_change'] = clamp(round_metric(candidate.get('minMomentum', 0), 3), *BOUNDS['min_5m_change'])
+    merged['min_volume_5m'] = clamp(round_metric(candidate.get('minVolume', 0), 3), *BOUNDS['min_volume_5m'])
+    merged['tp1_pct'] = clamp(round_metric((candidate.get('takeProfit', 0) or 0) * 100, 3), *BOUNDS['tp1_pct'])
+    if 'max_hold_minutes' in merged:
+        merged['max_hold_minutes'] = clamp(round_metric(merged.get('max_hold_minutes', 0), 3), *BOUNDS['max_hold_minutes'])
+    if 'stop_loss_pct' in merged:
+        merged['stop_loss_pct'] = clamp(round_metric(merged.get('stop_loss_pct', 0), 3), *BOUNDS['stop_loss_pct'])
+    if 'min_liquidity_usd' in merged:
+        merged['min_liquidity_usd'] = clamp(round_metric(merged.get('min_liquidity_usd', 0), 3), *BOUNDS['min_liquidity_usd'])
+    if 'max_top10_holder_pct' in merged:
+        merged['max_top10_holder_pct'] = clamp(round_metric(merged.get('max_top10_holder_pct', 0), 3), *BOUNDS['max_top10_holder_pct'])
+    return merged
+
+def generate_autonomous_grid_search_results(pairs, base_filters=None):
     slopfest_pairs = [p for p in pairs if p.get('slopfest_id')]
     if not slopfest_pairs:
-        return None
+        return []
 
     vol_floors = [500, 1000, 2500, 5000]
     mom_floors = [2.0, 5.0, 10.0, 20.0]
     trails = [0.03, 0.05, 0.08, 0.12]
     tps = [0.20, 0.50, 1.00]
 
-    best_pnl = -9999
-    best_score = -999999
-    best_params = None
+    results = []
 
     for v in vol_floors:
         for m in mom_floors:
@@ -250,21 +270,96 @@ def run_autonomous_grid_search(pairs):
                         sim_score += calculate_profit_seeking_score(realized_pnl)
                         simulated_pairs.append({'pnl': realized_pnl})
 
-                    if sim_trades >= 3 and (sim_score > best_score or (sim_score == best_score and sim_pnl > best_pnl)):
-                        best_score = sim_score
-                        score_summary = summarize_profit_seeking_pairs(simulated_pairs)
-                        best_pnl = sim_pnl
-                        best_params = {
-                            'minVolume': v,
-                            'minMomentum': m,
-                            'trailingStop': tr,
-                            'takeProfit': tp,
-                            'simulated_pnl': sim_pnl,
-                            'simulated_profit_score': round(sim_score, 6),
-                            'simulated_psr': score_summary.get('psr', 0),
-                            'simulated_trades': sim_trades
-                        }
-    return best_params
+                    if sim_trades < 3:
+                        continue
+                    score_summary = summarize_profit_seeking_pairs(simulated_pairs)
+                    positive_pnl = sum(max(0, try_float(p.get('pnl'), 0) or 0) for p in simulated_pairs)
+                    negative_pnl_abs = sum(abs(min(0, try_float(p.get('pnl'), 0) or 0)) for p in simulated_pairs)
+                    win_count = sum(1 for p in simulated_pairs if (try_float(p.get('pnl'), 0) or 0) > 0)
+                    profit_factor = positive_pnl / negative_pnl_abs if negative_pnl_abs > 0 else (positive_pnl if positive_pnl > 0 else 0)
+                    base_candidate = {
+                        'minVolume': v,
+                        'minMomentum': m,
+                        'trailingStop': tr,
+                        'takeProfit': tp,
+                        'simulated_pnl': round_metric(sim_pnl),
+                        'simulated_profit_score': round_metric(sim_score),
+                        'simulated_psr': round_metric(score_summary.get('psr', 0)),
+                        'simulated_trades': sim_trades,
+                        'win_rate': round_metric((win_count / max(sim_trades, 1)) * 100, 2),
+                        'profit_factor': round_metric(profit_factor),
+                        'positive_pnl_sol': round_metric(positive_pnl),
+                        'negative_pnl_sol_abs': round_metric(negative_pnl_abs),
+                    }
+                    recommended_filters = _build_grid_recommended_filters(base_candidate, base_filters=base_filters)
+                    signature = {
+                        'minVolume': v,
+                        'minMomentum': m,
+                        'trailingStop': tr,
+                        'takeProfit': tp,
+                        'recommended_filters': recommended_filters,
+                    }
+                    base_candidate['param_hash'] = hashlib.sha1(
+                        json.dumps(signature, sort_keys=True).encode('utf-8')
+                    ).hexdigest()[:12]
+                    base_candidate['fitness'] = base_candidate['simulated_profit_score']
+                    base_candidate['trades_sim'] = base_candidate['simulated_trades']
+                    base_candidate['total_pnl_sol'] = base_candidate['simulated_pnl']
+                    base_candidate['profit_seeking_ratio'] = base_candidate['simulated_psr']
+                    base_candidate['recommended_filters'] = recommended_filters
+                    base_candidate['min_volume_5m'] = v
+                    base_candidate['min_momentum5m'] = m
+                    base_candidate['trailing_stop_pct'] = round_metric(tr * 100, 3)
+                    base_candidate['take_profit_pct'] = round_metric(tp * 100, 3)
+                    base_candidate['min_volume_1h'] = v
+                    base_candidate['min_price_chg_1h'] = m
+                    base_candidate['recency_gate_min'] = recommended_filters.get('max_hold_minutes')
+                    base_candidate['tp_pct'] = recommended_filters.get('tp1_pct')
+                    base_candidate['sl_pct'] = recommended_filters.get('stop_loss_pct')
+                    base_candidate['trail_activate_pct'] = round_metric(tp * 100, 3)
+                    base_candidate['trail_lock_pct'] = round_metric(tr * 100, 3)
+                    results.append(base_candidate)
+
+    results.sort(
+        key=lambda item: (
+            item.get('fitness', 0),
+            item.get('total_pnl_sol', 0),
+            item.get('win_rate', 0),
+            item.get('profit_factor', 0),
+        ),
+        reverse=True,
+    )
+    return results
+
+def run_autonomous_grid_search(pairs, base_filters=None):
+    results = generate_autonomous_grid_search_results(pairs, base_filters=base_filters)
+    return results[0] if results else None
+
+def persist_swarm_backtest_results(pairs, recs):
+    base_filters = ((recs or {}).get('recommended_filters') or {})
+    results = generate_autonomous_grid_search_results(pairs, base_filters=base_filters)
+    payload = {
+        'generated_at': datetime.now(timezone.utc).isoformat(),
+        'optimizer': 'gemma4_slopfest_refiner',
+        'mode': 'paper' if PAPER_MODE else 'live',
+        'journal_file': JOURNAL,
+        'lookback_hours': LOOKBACK_HOURS,
+        'pair_count': len(pairs or []),
+        'slopfest_pair_count': len([p for p in (pairs or []) if p.get('slopfest_id')]),
+        'results': results[:25],
+    }
+    os.makedirs(SWARM_DIR, exist_ok=True)
+    with open(BACKTEST_RESULTS_FILE, 'w', encoding='utf-8') as handle:
+        json.dump(payload, handle, indent=2)
+    return payload
+
+def run_swarm_memory_cycle():
+    try:
+        from swarm_memory_agent import run as run_memory_agent
+        return run_memory_agent()
+    except Exception as exc:
+        print(f'[GEMMA4] Memory agent skipped: {exc}')
+        return {}
 
 def collapse_trade_lifecycles(trades):
     buys = []
@@ -462,7 +557,7 @@ def build_llm_prompt(pairs, missed, wallet_ctx, base_recs, entry_analysis, signa
     }
 
     best_profile_msg = ""
-    optimal = run_autonomous_grid_search(pairs)
+    optimal = run_autonomous_grid_search(pairs, base_filters=(base_recs or {}).get('recommended_filters'))
     if optimal:
         best_profile_msg = (
             f"### AUTONOMOUS BACKTESTER RESULTS\n"
@@ -1097,9 +1192,15 @@ def analyze_trades(trades):
                 'success': True if 'sig' in sell else False,
                 'signal_source': signal_source,
                 'entry_momentum5m': try_float(buy.get('momentum5m'), 0) or 0,
+                'entry_volume5m': try_float(buy.get('volume5m'), 0) or 0,
                 'entry_price_chg_1h': try_float(parsed_entry.get('price_chg_1h'), 0) or 0,
                 'entry_buys': int(parsed_entry.get('buys', 0) or 0),
                 'entry_buy_ratio': try_float(parsed_entry.get('buy_ratio'), 0) or 0,
+                'peak_pnl_pct': try_float(sell.get('rsi'), 0) or 0,
+                'slopfest_id': buy.get('slopfestParamsSetId') or sell.get('slopfestParamsSetId'),
+                'slopfest_raw': buy.get('slopfestParamsRaw') or sell.get('slopfestParamsRaw'),
+                'mint': buy.get('mint') or sell.get('mint'),
+                'symbol': buy.get('symbol') or sell.get('symbol'),
                 'event_count': 1,
             })
     return pairs
@@ -1592,6 +1693,26 @@ def run_cycle():
     recs = apply_live_inference(recs, pairs, missed, wallet_ctx, entry_analysis, signal_profile, live_signal_context)
     recs['paper_mode'] = PAPER_MODE
     recs['history_db'] = None # get_history_stats(SIGNAL_DB_PATH)
+
+    backtest_payload = persist_swarm_backtest_results(pairs, recs)
+    memory_result = run_swarm_memory_cycle()
+    if backtest_payload.get('results'):
+        best_backtest = backtest_payload['results'][0]
+        print(
+            '[GEMMA4] Backtest replay: '
+            f'{len(backtest_payload.get("results", []))} candidate(s) | '
+            f'best={best_backtest.get("param_hash")} '
+            f'fitness={best_backtest.get("fitness", 0):.4f} '
+            f'pnl={best_backtest.get("total_pnl_sol", 0):+.4f} SOL'
+        )
+    else:
+        print('[GEMMA4] Backtest replay: no eligible slopfest candidates this cycle')
+    if memory_result:
+        print(
+            '[GEMMA4] Swarm memory: '
+            f'promoted={memory_result.get("promoted", False)} '
+            f'best_fitness={memory_result.get("best_fitness", 0):.4f}'
+        )
 
     # Save recommendations
     with open(RECS, 'w', encoding='utf-8') as f:

@@ -4,6 +4,24 @@ import sys
 import os
 from collections import defaultdict
 
+def _to_float(value, default=0.0):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+def resolve_trade_pnl_sol(sell_records):
+    completed = [r for r in sell_records if r.get('partialExit') is not True]
+    completed.sort(key=lambda r: _to_float(r.get('ts'), 0))
+    if completed:
+        lifecycle = _to_float(completed[-1].get('lifecyclePnlSol'), float('nan'))
+        if lifecycle == lifecycle:
+            return lifecycle
+    return sum(_to_float(s.get('pnlSol'), 0) for s in sell_records)
+
+def resolve_peak_pnl_pct(sell_records):
+    return max([_to_float(s.get('rsi'), 0) for s in sell_records], default=0.0)
+
 def load_journal(filepath):
     buys = {}
     sells = defaultdict(list)
@@ -20,7 +38,8 @@ def load_journal(filepath):
                 action = record.get('action')
                 if action == 'BUY':
                     # Only analyze slopfest (desperation_bypass) trades
-                    if record.get('entryMode') == 'desperation_bypass':
+                    entry_mode = record.get('entryMode') or record.get('mode')
+                    if entry_mode == 'desperation_bypass':
                         buys[record.get('tradeId')] = record
                 elif action == 'SELL':
                     parent_buy_id = record.get('parentBuyId')
@@ -47,10 +66,10 @@ def simulate_trade(buy_record, sell_records, hyp_params):
         return None
 
     # Determine peak PnL and total hold time
-    peak_pnl_pct = max([float(s.get('rsi', 0) or 0) for s in sell_records], default=0.0)
-    final_pnl_sol = sum([float(s.get('pnlSol', 0) or 0) for s in sell_records])
-    entry_cost = float(buy_record.get('amountSol', 0) or 0)
-    max_hold_ms = max([float(s.get('holdMs', 0) or 0) for s in sell_records], default=0.0)
+    peak_pnl_pct = resolve_peak_pnl_pct(sell_records)
+    final_pnl_sol = resolve_trade_pnl_sol(sell_records)
+    entry_cost = _to_float(buy_record.get('amountSol'), 0)
+    max_hold_ms = max([_to_float(s.get('holdMs'), 0) for s in sell_records], default=0.0)
 
     hyp_tp_pct = hyp_params.get('take_profit_pct', 999.0)
     hyp_sl_pct = hyp_params.get('stop_loss_pct', -999.0)
@@ -106,8 +125,8 @@ def run_backtest(journal_path, hyp_params):
             continue # Trade still open or orphan
 
         # Actual Stats
-        total_pnl = sum([float(s.get('pnlSol', 0) or 0) for s in sell_records])
-        max_hold = max([float(s.get('holdMs', 0) or 0) for s in sell_records], default=0.0)
+        total_pnl = resolve_trade_pnl_sol(sell_records)
+        max_hold = max([_to_float(s.get('holdMs'), 0) for s in sell_records], default=0.0)
 
         actual_trades += 1
         actual_pnl += total_pnl

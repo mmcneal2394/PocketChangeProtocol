@@ -9,9 +9,11 @@ import json
 from pathlib import Path
 from datetime import datetime, timezone
 
-SIGNALS      = Path(__file__).parents[3] / "signals"   # parents[3] = bot root from scripts/maintain/swarm/
+BOT_ROOT     = Path(__file__).resolve().parents[2]
+SIGNALS      = BOT_ROOT / "signals"
 SWARM        = SIGNALS / "swarm"
-STRATEGY     = SIGNALS / "strategy_params.json"
+STRATEGY     = BOT_ROOT / "strategy_params.json"
+STRATEGY_MIRROR = SIGNALS / "strategy_params.json"
 BT_RESULTS   = SWARM / "backtest_results.json"
 EXP_LOG      = SWARM / "experiment_log.jsonl"
 HISTORY_LOG  = SWARM / "fitness_history.jsonl"  # cross-session longitudinal memory
@@ -20,12 +22,57 @@ SUMMARY      = SWARM / "swarm_summary.md"
 PROMOTE_THRESHOLD = 1.10  # must be 10% better to promote
 
 def load_current_params() -> dict:
-    if STRATEGY.exists():
-        try:
-            return json.loads(STRATEGY.read_text(encoding="utf-8"))
-        except Exception:
-            pass
+    for path in (STRATEGY, STRATEGY_MIRROR):
+        if path.exists():
+            try:
+                return json.loads(path.read_text(encoding="utf-8"))
+            except Exception:
+                continue
     return {}
+
+def write_strategy_params(payload: dict) -> None:
+    for path in (STRATEGY, STRATEGY_MIRROR):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+def extract_promotable_fields(best: dict) -> dict:
+    promoted = {}
+    param_keys = [
+        "min_buy_ratio", "min_price_chg_1h", "min_volume_1h", "min_buys_1h",
+        "recency_gate_min", "trail_activate_pct", "trail_lock_pct",
+        "tp_pct", "sl_pct", "retrace_shield_s",
+    ]
+    for key in param_keys:
+        if key in best:
+            promoted[key] = best[key]
+
+    recommended_filters = best.get("recommended_filters")
+    if isinstance(recommended_filters, dict) and recommended_filters:
+        promoted["recommended_filters"] = recommended_filters
+        for key in (
+            "min_5m_change",
+            "min_liquidity_usd",
+            "min_volume_5m",
+            "max_top10_holder_pct",
+            "tp1_pct",
+            "stop_loss_pct",
+            "max_hold_minutes",
+            "overbought_ceiling",
+            "hunterModeMultiplier",
+        ):
+            if key in recommended_filters:
+                promoted[key] = recommended_filters[key]
+
+    return promoted
+
+def summarize_current_strategy(current: dict) -> dict:
+    recommended_filters = current.get("recommended_filters")
+    if isinstance(recommended_filters, dict) and recommended_filters:
+        return recommended_filters
+    return {k: current.get(k) for k in [
+        "min_buy_ratio","min_price_chg_1h","min_volume_1h","min_buys_1h",
+        "recency_gate_min","trail_activate_pct","trail_lock_pct","tp_pct","sl_pct"
+    ]}
 
 def run() -> dict:
     SWARM.mkdir(parents=True, exist_ok=True)
@@ -50,14 +97,7 @@ def run() -> dict:
     if best_fitness > current_fitness * PROMOTE_THRESHOLD and best_fitness > 0:
         # Build new strategy_params by merging best candidate into current
         new_params = dict(current)
-        param_keys = [
-            "min_buy_ratio", "min_price_chg_1h", "min_volume_1h", "min_buys_1h",
-            "recency_gate_min", "trail_activate_pct", "trail_lock_pct",
-            "tp_pct", "sl_pct", "retrace_shield_s",
-        ]
-        for k in param_keys:
-            if k in best:
-                new_params[k] = best[k]
+        new_params.update(extract_promotable_fields(best))
 
         new_params["fitness_score"]  = best_fitness
         new_params["win_rate"]       = best.get("win_rate", 0)
@@ -68,7 +108,7 @@ def run() -> dict:
         new_params["source"]         = "optimizer_swarm"
         new_params["param_hash"]     = best.get("param_hash", "")
 
-        STRATEGY.write_text(json.dumps(new_params, indent=2), encoding="utf-8")
+        write_strategy_params(new_params)
         promoted = True
         print(f"[MemoryAgent] ✅ PROMOTED {best.get('param_hash','?')} | "
               f"fitness {current_fitness:.3f} → {best_fitness:.3f} "
@@ -89,6 +129,8 @@ def run() -> dict:
                 "win_rate":      r.get("win_rate", 0),
                 "profit_factor": r.get("profit_factor", 0),
                 "trades_sim":    r.get("trades_sim", 0),
+                "total_pnl_sol": r.get("total_pnl_sol", 0),
+                "profit_seeking_ratio": r.get("profit_seeking_ratio", 0),
                 "promoted":      promoted and r is best,
             }
             f.write(json.dumps(entry) + "\n")
@@ -110,10 +152,7 @@ def run() -> dict:
         f"",
         f"## Current Strategy Params (live)",
         f"```json",
-        json.dumps({k: current.get(k) for k in [
-            "min_buy_ratio","min_price_chg_1h","min_volume_1h","min_buys_1h",
-            "recency_gate_min","trail_activate_pct","trail_lock_pct","tp_pct","sl_pct"
-        ]}, indent=2),
+        json.dumps(summarize_current_strategy(current), indent=2),
         f"```",
         f"",
         f"## Top 5 Candidates This Cycle",
