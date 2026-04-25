@@ -1710,7 +1710,6 @@ def run_cycle():
     entry_analysis = analyze_entry_quality(trades)
 
     recs = generate_recommendations(pairs, missed, wallet_ctx, signal_profile, live_signal_context)
-    recs = apply_live_inference(recs, pairs, missed, wallet_ctx, entry_analysis, signal_profile, live_signal_context)
     recs['paper_mode'] = PAPER_MODE
     recs['history_db'] = None # get_history_stats(SIGNAL_DB_PATH)
 
@@ -1733,6 +1732,8 @@ def run_cycle():
             f'promoted={memory_result.get("promoted", False)} '
             f'best_fitness={memory_result.get("best_fitness", 0):.4f}'
         )
+
+    recs = apply_live_inference(recs, pairs, missed, wallet_ctx, entry_analysis, signal_profile, live_signal_context)
 
     # Save recommendations
     with open(RECS, 'w', encoding='utf-8') as f:
