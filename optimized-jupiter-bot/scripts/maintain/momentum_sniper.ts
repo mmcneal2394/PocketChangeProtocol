@@ -160,6 +160,7 @@ const {
 const {
   resolveReplayBackedStrategyProfile,
   evaluateReplayBackedRouteLiveOverride,
+  evaluateReplayBackedRecoveryProbe,
 } = require('./replay_gate_logic.ts');
 const {
   classifyExitSwapFailure,
@@ -508,6 +509,9 @@ interface EntryOptions {
   expectedValueConfidence?: number;
   expectedValueRankScore?: number;
   expectedValueTradeCount?: number;
+  replayRecoveryProbe?: boolean;
+  replayRecoveryReason?: string;
+  replayRecoveryWindowMs?: number;
 }
 
 interface QuoteRequestOptions {
@@ -2165,6 +2169,9 @@ interface PositionStore {
     wins: number;
     losses: number;
     totalPnlSol: number;
+    consecutiveLosses: number;
+    pausedUntil: number;
+    lastRecoveryProbeAt: number;
   };
 }
 
@@ -2186,7 +2193,19 @@ type WalletHoldingSnapshotRow = {
 };
 
 //  State
-let store: PositionStore = { positions: [], blacklist: [], strikes: {}, stats: { wins: 0, losses: 0, totalPnlSol: 0 } };
+let store: PositionStore = {
+  positions: [],
+  blacklist: [],
+  strikes: {},
+  stats: {
+    wins: 0,
+    losses: 0,
+    totalPnlSol: 0,
+    consecutiveLosses: 0,
+    pausedUntil: 0,
+    lastRecoveryProbeAt: 0,
+  },
+};
 loadStore();
 let familyPerformanceMemory = buildFamilyPerformanceMemory([]);
 
@@ -2848,6 +2867,7 @@ function loadStore() {
           totalPnlSol: Number(raw?.stats?.totalPnlSol || 0),
           consecutiveLosses: recoveredConsecutiveLosses,
           pausedUntil: Math.max(0, Number(raw?.stats?.pausedUntil || 0)),
+          lastRecoveryProbeAt: Math.max(0, Number(raw?.stats?.lastRecoveryProbeAt || 0)),
         },
       };
       if (recoveredConsecutiveLosses > persistedConsecutiveLosses) {
@@ -3654,6 +3674,10 @@ function isLossStreakPaused(): boolean {
   return state.pauseActive;
 }
 
+function getLastRecoveryProbeAt(): number {
+  return Math.max(0, Number((store.stats as any)?.lastRecoveryProbeAt || 0));
+}
+
 async function getMintCooldownState(mint: string): Promise<{ active: boolean; value: string | null; ttlSeconds: number | null }> {
   try {
     const pub = RedisBus.getPublisher();
@@ -3697,6 +3721,7 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
     entryOptions?.sourceLane === 'wallet' ||
     (entryOptions?.sourceLane !== 'alpha' && typeof taSig === 'string' && taSig.startsWith('ALPHA_'));
   const lossStreakState = getLossStreakState();
+  const replayRecoveryWindowMs = Math.max(0, Number(entryOptions?.replayRecoveryWindowMs || 0));
   if (lossStreakState.restrictionsActive && entryOptions?.quotaAssist === true) {
       console.log(
         `[SNIPER]  QUOTA ASSIST HOLD: ${symbol} blocked while the bot cools down ` +
@@ -3705,11 +3730,32 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
       return;
   }
   if (lossStreakState.restrictionsActive && (entryOptions?.allowRoutableLowLiquidity === true || entryOptions?.routeLiveFastTrack === true)) {
+      if (entryOptions?.replayRecoveryProbe === true && store.positions.length <= 0) {
+        const nowMs = Date.now();
+        const lastRecoveryProbeAt = getLastRecoveryProbeAt();
+        const remainingMs = Math.max(0, replayRecoveryWindowMs - (nowMs - lastRecoveryProbeAt));
+        if (remainingMs > 0) {
+          const cooldownSec = Math.max(30, Math.ceil(remainingMs / 1000));
+          console.log(
+            `[SNIPER]  RECOVERY PROBE HOLD: ${symbol} replay-backed recovery lane is still cooling down ` +
+            `for ${Math.ceil(remainingMs / 60000)}m.`
+          );
+          await setMintCooldownExact(pub, mint, cooldownSec, 'RECOVERY_PROBE_COOLDOWN');
+          return;
+        }
+        store.stats.lastRecoveryProbeAt = nowMs;
+        saveStore();
+        console.log(
+          `[SNIPER]  RECOVERY PROBE PASS: ${symbol} ${entryOptions?.replayRecoveryReason || 'empty-book route-live recovery is active'} ` +
+          `| cooldown ${Math.max(1, Math.round(replayRecoveryWindowMs / 60000))}m.`
+        );
+      } else {
       console.log(
         `[SNIPER]  COLD STREAK HOLD: ${symbol} route-live / low-liquidity bypass disabled ` +
         `after ${lossStreakState.consecutiveLosses} consecutive losses.`
       );
       return;
+      }
   }
   let entryMode = entryOptions?.entryMode || 'normal';
   if (
@@ -7422,6 +7468,7 @@ async function poll() {
         let routeLiveQualifierThresholdScale: number | null = null;
         let routeLiveShouldBypassLowVolumeFloor = false;
         let routeLiveQualifierReason: string | null = null;
+        let routeLiveRecoveryEntryOptions: Partial<EntryOptions> | null = null;
 
         // If no cached trending data, do a LIVE DexScreener lookup
         if (!trending) {
@@ -7569,6 +7616,28 @@ async function poll() {
                 solVolume60s: v.solVolume60s,
                 probeLikeFlowReady: microScoutDecision.shouldScout,
               });
+              const replayRecoveryProbeDecision = evaluateReplayBackedRecoveryProbe({
+                slopfestParams: GLOBAL_SLOPFEST_PARAMS_RAW,
+                routeLive: true,
+                priceChange5m: livePair.priceChange5m,
+                liquidityUsd: livePair.liquidity,
+                buys60s: v.buys60s,
+                buyRatio60s: v.buyRatio60s,
+                velocity: v.velocity,
+                solVolume60s: v.solVolume60s,
+                probeLikeFlowReady: microScoutDecision.shouldScout,
+                openPositionCount: store.positions.length,
+                consecutiveLosses: lossStreakState.consecutiveLosses,
+                lastProbeAtMs: getLastRecoveryProbeAt(),
+              });
+              const replayRecoveryEntryOptions =
+                lossStreakRestricted && replayRecoveryProbeDecision.allow
+                  ? {
+                      replayRecoveryProbe: true,
+                      replayRecoveryReason: replayRecoveryProbeDecision.reason,
+                      replayRecoveryWindowMs: replayRecoveryProbeDecision.windowMs,
+                    }
+                  : {};
               const routeLiveCanUseMicroScout =
                 microScoutConfig.enabled &&
                 microScoutEntriesThisPoll < microScoutPacing.maxCandidatesPerPoll &&
@@ -7634,6 +7703,7 @@ async function poll() {
 	                    allowRoutableLowLiquidity: true,
 	                    bypassAgeFloor: true,
 	                    routeLiveFastTrack,
+                      ...replayRecoveryEntryOptions,
 	                  }
                 );
                 continue;
@@ -7717,6 +7787,28 @@ async function poll() {
               solVolume60s: v.solVolume60s,
               probeLikeFlowReady: microScoutDecision.shouldScout,
             });
+            const replayRecoveryProbeDecision = evaluateReplayBackedRecoveryProbe({
+              slopfestParams: GLOBAL_SLOPFEST_PARAMS_RAW,
+              routeLive: true,
+              priceChange5m: livePair.priceChange5m,
+              liquidityUsd: livePair.liquidity,
+              buys60s: v.buys60s,
+              buyRatio60s: v.buyRatio60s,
+              velocity: v.velocity,
+              solVolume60s: v.solVolume60s,
+              probeLikeFlowReady: microScoutDecision.shouldScout,
+              openPositionCount: store.positions.length,
+              consecutiveLosses: lossStreakState.consecutiveLosses,
+              lastProbeAtMs: getLastRecoveryProbeAt(),
+            });
+            const replayRecoveryEntryOptions =
+              lossStreakRestricted && replayRecoveryProbeDecision.allow
+                ? {
+                    replayRecoveryProbe: true,
+                    replayRecoveryReason: replayRecoveryProbeDecision.reason,
+                    replayRecoveryWindowMs: replayRecoveryProbeDecision.windowMs,
+                  }
+                : {};
             const routeLiveCanUseMicroScout =
               microScoutConfig.enabled &&
               microScoutEntriesThisPoll < microScoutPacing.maxCandidatesPerPoll &&
@@ -7778,12 +7870,17 @@ async function poll() {
 		                  minLiquidityUsd: 0,
 	                  allowRoutableLowLiquidity: true,
 	                  bypassAgeFloor: true,
+                      ...replayRecoveryEntryOptions,
 	                }
               );
               continue;
             }
             if (microOnlyMode) {
-              if (lossStreakRestricted && !replayRouteLiveOverride.allowLowLiquidityColdStreakOverride) {
+              if (
+                lossStreakRestricted &&
+                !replayRouteLiveOverride.allowLowLiquidityColdStreakOverride &&
+                !replayRecoveryProbeDecision.allow
+              ) {
                 console.log(
                   `[SNIPER]  LOW LIQ HOLD: ${symbol} route is live but low-liquidity preservation is disabled ` +
                   `during the current cold streak (${lossStreakState.consecutiveLosses} losses).`
@@ -7795,6 +7892,11 @@ async function poll() {
               if (lossStreakRestricted && replayRouteLiveOverride.allowLowLiquidityColdStreakOverride) {
                 console.log(
                   `[SNIPER]  REPLAY LOW LIQ PASS: ${symbol} ${replayRouteLiveOverride.reason}.`
+                );
+              } else if (lossStreakRestricted && replayRecoveryProbeDecision.allow) {
+                routeLiveRecoveryEntryOptions = replayRecoveryEntryOptions;
+                console.log(
+                  `[SNIPER]  RECOVERY PROBE READY: ${symbol} ${replayRecoveryProbeDecision.reason}.`
                 );
               }
               console.log(
@@ -8074,6 +8176,9 @@ async function poll() {
           }
           if (routeLiveShouldBypassLowVolumeFloor) {
             normalEntryOptions.bypassNormalVolumeFloor = true;
+          }
+          if (routeLiveRecoveryEntryOptions) {
+            Object.assign(normalEntryOptions, routeLiveRecoveryEntryOptions);
           }
         }
 

@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const {
   resolveReplayBackedStrategyProfile,
   evaluateReplayBackedRouteLiveOverride,
+  evaluateReplayBackedRecoveryProbe,
 } = require('./replay_gate_logic.ts');
 
 test('resolveReplayBackedStrategyProfile activates only for profitable promoted replay profiles', () => {
@@ -73,4 +74,51 @@ test('evaluateReplayBackedRouteLiveOverride unlocks continuation only for strong
   assert.equal(allowed.allowLowLiquidityColdStreakOverride, true);
   assert.equal(blocked.allowContinuationOverride, false);
   assert.equal(blocked.allowLowLiquidityColdStreakOverride, false);
+});
+
+test('evaluateReplayBackedRecoveryProbe allows one empty-book recovery probe on a timer for strong replay-shaped flow', () => {
+  const allowed = evaluateReplayBackedRecoveryProbe({
+    slopfestParams: {
+      fitness: 0.18,
+      simulated_psr: 3.4,
+      simulated_pnl: 0.12,
+      recommended_filters: { min_5m_change: 1, min_volume_5m: 0 },
+    },
+    routeLive: true,
+    priceChange5m: 0.1,
+    liquidityUsd: 3200,
+    buys60s: 7,
+    buyRatio60s: 0.74,
+    velocity: 7,
+    solVolume60s: 1.1,
+    probeLikeFlowReady: true,
+    openPositionCount: 0,
+    consecutiveLosses: 6,
+    lastProbeAtMs: 0,
+    nowMs: 2_000_000,
+  });
+  const coolingDown = evaluateReplayBackedRecoveryProbe({
+    slopfestParams: {
+      fitness: 0.18,
+      simulated_psr: 3.4,
+      simulated_pnl: 0.12,
+      recommended_filters: { min_5m_change: 1, min_volume_5m: 0 },
+    },
+    routeLive: true,
+    priceChange5m: 0.1,
+    liquidityUsd: 3200,
+    buys60s: 7,
+    buyRatio60s: 0.74,
+    velocity: 7,
+    solVolume60s: 1.1,
+    probeLikeFlowReady: true,
+    openPositionCount: 0,
+    consecutiveLosses: 6,
+    lastProbeAtMs: 1_500_000,
+    nowMs: 2_000_000,
+  });
+
+  assert.equal(allowed.allow, true);
+  assert.equal(allowed.windowMs, 20 * 60_000);
+  assert.equal(coolingDown.allow, false);
 });
