@@ -1,32 +1,19 @@
 version: '3.8'
 
-# Local development override — adds a local Postgres instance.
-# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
-
 services:
-  db:
-    image: postgres:15-alpine
-    container_name: pcp_db_dev
-    restart: always
+  postgres:
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-admin}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-admin123}
-      POSTGRES_DB: ${POSTGRES_DB:-pcp}
-    ports:
-      - "5432:5432"
+      POSTGRES_USER: ${POSTGRES_USER:-pcp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-pocketchange_dev}
     volumes:
       - pgdata_dev:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U admin -d pcp"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   web:
     environment:
-      - DATABASE_URL=postgres://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-admin123}@db:5432/${POSTGRES_DB:-pcp}
+      DATABASE_URL: postgres://${POSTGRES_USER:-pcp}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-pocketchange_dev}
     depends_on:
-      db:
+      postgres:
         condition: service_healthy
 
 volumes:

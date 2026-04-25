@@ -6,7 +6,13 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "pcp:install": "npm --prefix optimized-jupiter-bot install",
+    "pcp:test": "npm --prefix optimized-jupiter-bot test",
+    "pcp:smoke": "npm --prefix optimized-jupiter-bot run sniper:smoke",
+    "pcp:profit:once": "npm --prefix optimized-jupiter-bot run profit:once",
+    "pcp:allocator:once": "npm --prefix optimized-jupiter-bot run allocator:once",
+    "pcp:arb:scout": "npm --prefix optimized-jupiter-bot run arb:scout"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.28.0",

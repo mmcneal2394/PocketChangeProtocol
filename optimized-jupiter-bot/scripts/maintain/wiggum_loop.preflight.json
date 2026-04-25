@@ -1,0 +1,22 @@
+{
+  "name": "preflight",
+  "task": "Validate the live route, RPC simulation path, and wallet balance before Wiggum yield execution.",
+  "maxIterations": 12,
+  "delayMs": 300000,
+  "requireWorkerSuccess": true,
+  "worker": {
+    "cwd": "/var/www/pcprotocol",
+    "command": "bash -lc 'mkdir -p .swarm/wiggum/preflight && node --require ts-node/register/transpile-only scripts/maintain/preflight_loop.ts && date -Is > .swarm/wiggum/preflight/last_success && echo PREFLIGHT_CHECK_PASSED'"
+  },
+  "validator": {
+    "cwd": "/var/www/pcprotocol",
+    "command": "bash -lc 'test -f .swarm/wiggum/preflight/last_success && echo PREFLIGHT_CHECK_PASSED'",
+    "successExitCodes": [
+      0
+    ],
+    "successMarker": "PREFLIGHT_CHECK_PASSED"
+  },
+  "reviewer": {
+    "enabled": false
+  }
+}

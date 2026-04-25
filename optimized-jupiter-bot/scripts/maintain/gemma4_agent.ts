@@ -1,28 +1,35 @@
-// gemma4_agent.ts — Changed to ultra-lightweight llama3.2:1b to prevent local freezing
+// gemma4_agent.ts
 import * as http from 'http';
+import * as https from 'https';
 import dotenv from 'dotenv';
 import path from 'path';
 
 dotenv.config({ path: path.join(process.cwd(), '.env') });
 
+const OLLAMA_MODEL = process.env.GEMMA4_MODEL || process.env.OLLAMA_MODEL || 'dmind-risk';
+const OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434/api/chat';
+
 function ollamaChat(prompt: string): Promise<string> {
   return new Promise((resolve, reject) => {
+    const target = new URL(OLLAMA_URL);
+    const transport = target.protocol === 'https:' ? https : http;
     const postData = JSON.stringify({
-      model: 'llama3.2:1b',
+      model: OLLAMA_MODEL,
       messages: [{ role: 'user', content: prompt }],
       stream: false,
     });
 
-    const req = http.request({
-      hostname: '127.0.0.1',
-      port: 11434,
-      path: '/api/chat',
+    const req = transport.request({
+      protocol: target.protocol,
+      hostname: target.hostname,
+      port: target.port || (target.protocol === 'https:' ? 443 : 80),
+      path: `${target.pathname}${target.search}`,
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Content-Length': Buffer.byteLength(postData),
       },
-      timeout: 600_000, 
+      timeout: 600_000,
     }, (res) => {
       let data = '';
       res.on('data', (chunk) => { data += chunk; });
@@ -45,6 +52,7 @@ function ollamaChat(prompt: string): Promise<string> {
 
 export async function runAgent(userPrompt: string): Promise<string | null> {
   try {
+    console.log(`[AGENT] Using Ollama model: ${OLLAMA_MODEL} @ ${OLLAMA_URL}`);
     const content = await ollamaChat(userPrompt);
     console.log('[AGENT] Native Response:\n', content);
     return content;

@@ -1,65 +1,42 @@
 import Redis from 'ioredis';
 
-// Singleton instance to prevent multiple redundant connections
-class RedisBus {
-    private static publisher: Redis | null = null;
-    private static subscriber: Redis | null = null;
-    
-    // Connects to a local Redis server (default 6379 natively or via Docker)
-    private static readonly REDIS_URL = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
+let publisher: Redis | null = null;
+let subscriber: Redis | null = null;
 
-    /**
-     * Get the singleton Publisher instance (used for writing data fast)
-     */
-    static getPublisher(): Redis {
-        if (!this.publisher) {
-            this.publisher = new Redis(this.REDIS_URL, {
-                retryStrategy: (times) => Math.min(times * 50, 2000),
-                maxRetriesPerRequest: 3,
-            });
-            
-            this.publisher.on('error', (err) => {
-                console.error('[REDIS] ⚠️ Publisher connection error:', err.message);
-            });
-            this.publisher.on('connect', () => {
-                console.log('[REDIS] ✅ Publisher connected natively');
-            });
-        }
-        return this.publisher;
-    }
+function createRedisClient(): Redis {
+  if (process.env.REDIS_URL) {
+    return new Redis(process.env.REDIS_URL, {
+      maxRetriesPerRequest: null,
+      enableReadyCheck: false,
+    });
+  }
 
-    /**
-     * Get the singleton Subscriber instance (requires an isolated connection for pub/sub)
-     */
-    static getSubscriber(): Redis {
-        if (!this.subscriber) {
-            this.subscriber = new Redis(this.REDIS_URL, {
-                retryStrategy: (times) => Math.min(times * 50, 2000),
-                maxRetriesPerRequest: 3,
-            });
-
-            this.subscriber.on('error', (err) => {
-                console.error('[REDIS] ⚠️ Subscriber connection error:', err.message);
-            });
-            this.subscriber.on('connect', () => {
-                console.log('[REDIS] ✅ Subscriber connected natively');
-            });
-        }
-        return this.subscriber;
-    }
-
-    /**
-     * Publishes a fully-typed JSON payload to the specified topic.
-     * Replaces fs.writeFileSync entirely.
-     */
-    static async publish(channel: string, payload: any) {
-        const pub = this.getPublisher();
-        try {
-            await pub.publish(channel, JSON.stringify(payload));
-        } catch (e: any) {
-            console.error(`[REDIS] Publish failed on ${channel}: ${e.message}`);
-        }
-    }
+  return new Redis({
+    host: process.env.REDIS_HOST || '127.0.0.1',
+    port: Number(process.env.REDIS_PORT || 6379),
+    password: process.env.REDIS_PASSWORD || undefined,
+    db: Number(process.env.REDIS_DB || 0),
+    maxRetriesPerRequest: null,
+    enableReadyCheck: false,
+  });
 }
 
+const RedisBus = {
+  getPublisher(): Redis {
+    if (!publisher) publisher = createRedisClient();
+    return publisher;
+  },
+
+  getSubscriber(): Redis {
+    if (!subscriber) subscriber = createRedisClient();
+    return subscriber;
+  },
+
+  async publish(channel: string, payload: any): Promise<void> {
+    const message = typeof payload === 'string' ? payload : JSON.stringify(payload);
+    await RedisBus.getPublisher().publish(channel, message);
+  },
+};
+
 export default RedisBus;
+module.exports = RedisBus;

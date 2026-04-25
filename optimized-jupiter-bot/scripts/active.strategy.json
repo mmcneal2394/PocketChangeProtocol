@@ -1,0 +1,165 @@
+{
+  "id": "meteora-dlmm-paper",
+  "description": "Paper-first concentrated liquidity strategy scaffold for a Meteora-style SOL-USDC management loop.",
+  "mode": "live",
+  "strategyType": "meteora_dlmm_auto",
+  "walletPublicKey": "7c5JGzkgRXePGSjSDoTj71qiAVwDTWeUqHyQyyP1krzD",
+  "walletKeypairPath": "./wallet.json",
+  "preflight": {
+    "enabled": true,
+    "inputMint": "So11111111111111111111111111111111111111112",
+    "outputMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+    "buyLamports": "5000000"
+  },
+  "gates": {
+    "requireReadiness": true,
+    "requirePreflight": false,
+    "requireYieldCycleFreshness": true,
+    "maxYieldCycleAgeSeconds": 10800,
+    "blockOnKillSwitch": true
+  },
+  "arbScout": {
+    "enabled": true,
+    "source": "yield-cycle-alpha",
+    "minNetEdgeBps": 12,
+    "minReadinessScore": 60,
+    "maxReportAgeSeconds": 300,
+    "cooldownSeconds": 90,
+    "opportunityTtlSeconds": 180,
+    "requireStrategyGate": true
+  },
+  "lastStand": {
+    "enabled": true,
+    "triggerTreasurySol": 0.10,
+    "reserveSol": 0.001,
+    "minDeploySol": 0.001,
+    "maxDeploySol": 0.005,
+    "minTokenAgeSeconds": 30,
+    "maxTokenAgeSeconds": 604800,
+    "minMomentum5mPct": 7,
+    "minMomentum1mPct": 0.8,
+    "blowoffMomentum5mPct": 45,
+    "requireContinuationAgeSeconds": 75,
+    "minVolumeUsd": 8000,
+    "minLiquidityUsd": 5000,
+    "minBuys60s": 6,
+    "minBuyRatio60s": 0.55,
+    "maxCandidatesPerPoll": 8,
+    "trailingActivationPct": 6,
+    "trailingStopPct": 10,
+    "stopLossPct": 10,
+    "maxHoldMinutes": 6
+  },
+  "microScout": {
+    "enabled": true,
+    "reserveSol": 0.02,
+    "fixedBuySol": 0.0025,
+    "minRawBuys60s": 8,
+    "minRawBuyRatio60s": 0.7,
+    "minRawSolVolume60s": 1,
+    "minVelocity": 8,
+    "maxCandidatesPerPoll": 2,
+    "noDexCooldownSeconds": 45,
+    "requireApexOverlay": false,
+    "stopLossPct": 8,
+    "maxHoldMinutes": 3,
+    "maxTPpct": 12
+  },
+  "liveTest": {
+    "disableLossStreakPause": true
+  },
+  "yieldCycle": {
+    "protocol": "meteora-dlmm",
+    "pool": "SOL-USDC",
+    "baseToken": "SOL",
+    "quoteToken": "USDC",
+    "positionWidthBps": 100,
+    "rebalanceThreshold": 0.5,
+    "maxSlippageBps": 25,
+    "compoundFrequencyMinutes": 15,
+    "alphaSignal": {
+      "enabled": true,
+      "shortTimeframe": "5m",
+      "longTimeframe": "1h",
+      "shortWindowCandles": 6,
+      "longWindowCandles": 6,
+      "deviationThresholdPct": 0.5,
+      "momentumConfirmPct": 0.2
+    },
+    "alphaReadiness": {
+      "enabled": true,
+      "minimumScore": 60,
+      "requireQualifiedSpread": true,
+      "requireDirectionalSignal": true,
+      "historyLimit": 72,
+      "minConsecutiveReadyCycles": 2
+    },
+    "alphaExecution": {
+      "enabled": true,
+      "mode": "paper",
+      "paperOnly": false,
+      "maxDailyExecutions": 4,
+      "maxDailyLamports": 2000000,
+      "maxConsecutiveFailures": 3,
+      "maxDailyLossLamports": 1500000,
+      "requireReadyStreak": true,
+      "requireQualifiedSpread": true,
+      "requireDirectionalSignal": true
+    },
+    "alphaPromotion": {
+      "enabled": true,
+      "minimumAverageScore": 70,
+      "minimumReadyInWindow": 3,
+      "windowSize": 5,
+      "allowAutoLive": true,
+      "requireExecutionModePaper": true
+    },
+    "executionEnabled": true,
+    "minNativeSolReserve": 0.02,
+    "minCycleWalletSol": 0.005,
+    "microTransaction": {
+      "enabled": true,
+      "amountLamports": 1000000,
+      "maxSlippageBps": 50,
+      "confirmCommitment": "confirmed",
+      "maxDailyExecutions": 4,
+      "maxDailyLamports": 4000000,
+      "requireFreshPreflight": true,
+      "memo": "wiggum micro live probe",
+      "profitability": {
+        "enabled": true,
+        "minimumEdgeLamports": 10000,
+        "estimatedPriorityFeeLamports": 10000,
+        "stableQuoteMints": [
+          "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+        ]
+      },
+      "inventoryMaintenance": {
+        "enabled": true,
+        "maxAcceptableLossLamports": 50000,
+        "checkBalanceBeforeAttempt": true,
+        "mode": "dynamic",
+        "staticTarget": 0.5,
+        "cooldownSeconds": 900,
+        "dynamic": {
+          "baseTradeSizeSol": 0.001,
+          "safetyFactor": 2.0,
+          "minFloorUsdc": 0.1,
+          "maxCeilingUsdc": 2.0
+        }
+      },
+      "sizing": {
+        "mode": "kelly",
+        "fixedSizeSol": 0.001,
+        "kelly": {
+          "maxRiskPerTrade": 0.02,
+          "kellyFraction": 0.5,
+          "minTradeSizeSol": 0.0005,
+          "maxTradeSizeSol": 0.01,
+          "volatilityWindowDays": 7,
+          "fallbackAnnualizedVolatilityPct": 80
+        }
+      }
+    }
+  }
+}

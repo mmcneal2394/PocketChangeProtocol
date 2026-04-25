@@ -1,0 +1,18 @@
+{
+  "name": "strategy-gate",
+  "task": "Validate the active strategy profile, readiness, and preflight route before switching the VPS swarm to a new strategy.",
+  "maxIterations": 10,
+  "delayMs": 30000,
+  "requireWorkerSuccess": true,
+  "worker": {
+    "cwd": "/var/www/pcprotocol",
+    "command": "bash -lc 'node scripts/strategy_gate.js'"
+  },
+  "validator": {
+    "cwd": "/var/www/pcprotocol",
+    "command": "bash -lc 'node -e \"const path = require(\\\"path\\\"); const { getEngineState } = require(path.join(process.cwd(), \\\"scripts\\\", \\\"engine_state_store.js\\\")); const state = getEngineState(\\\"strategy-gate\\\"); if (state && state.state === \\\"armed\\\") { console.log(\\\"STRATEGY_GATE_PASSED\\\"); process.exit(0); } process.exit(1);\"'"
+  },
+  "reviewer": {
+    "enabled": false
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "name": "hermes-orchestrator",
+  "task": "Run one full role-separated yield orchestration cycle using the active strategy profile.",
+  "maxIterations": 24,
+  "delayMs": 3600000,
+  "requireWorkerSuccess": true,
+  "worker": {
+    "cwd": "/var/www/pcprotocol",
+    "command": "bash -lc 'node scripts/maintain/hermes_orchestrator.js'"
+  },
+  "validator": {
+    "cwd": "/var/www/pcprotocol",
+    "command": "bash -lc 'node scripts/maintain/validate_orchestrator_output.js'",
+    "successExitCodes": [0],
+    "successMarker": "ORCHESTRATOR_OUTPUT_VALID"
+  },
+  "reviewer": {
+    "enabled": true,
+    "model": "dmind-risk",
+    "systemPrompt": "Review the orchestrator cycle and suggest one high-signal coordination improvement in 3 short lines."
+  }
+}

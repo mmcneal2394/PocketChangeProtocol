@@ -32,12 +32,19 @@ const SCRUB_RULES = [
     rep:  'https://yellowstone-solana-mainnet.core.chainstack.com/YOUR_CHAINSTACK_ENDPOINT' },
   // Bags keys (any format)
   { find: /bags_prod_[A-Za-z0-9_-]{10,}/g, rep: 'process.env.BAGS_API_KEY' },
+  { find: /AIza[0-9A-Za-z\\-_]{20,}/g, rep: 'process.env.GOOGLE_API_KEY' },
+  { find: /set KMS_MASTER_KEY=.*/g, rep: 'set KMS_MASTER_KEY=SET_KMS_MASTER_KEY_IN_ENV' },
+  { find: /set JWT_SECRET=.*/g, rep: 'set JWT_SECRET=SET_JWT_SECRET_IN_ENV' },
 ];
 
 // ── Exact secret patterns that BLOCK the push if found ──────────────────────
 const BLOCK_PATTERNS = [
   /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i,  // UUID API keys
+  /AIza[0-9A-Za-z\-_]{20,}/,                                         // Google-style API keys
   /bags_prod_[A-Za-z0-9_-]{10,}/,                                       // Bags keys
+  /["'`][1-9A-HJ-NP-Za-km-z]{80,120}["'`]/,                             // Base58 secret keys
+  /sk_(test|live)_[A-Za-z0-9]+/,                                        // Stripe-style tokens
+  /POSTGRES_PASSWORD:\s*\$\{POSTGRES_PASSWORD:-[A-Za-z0-9_!-]+\}/,      // Weak docker defaults
   /\btz5h4vi5\b/,                                                        // Chainstack token fragment
   // Wallet keypair arrays (64 numbers)
   /\[\s*(\d+\s*,\s*){63}\d+\s*\]/,
@@ -55,6 +62,7 @@ const SAFE_PATTERNS = [
   '3155a25e-0542-4a02-b4da-a9343131394d',            // test UUID
   'bb328d29-b99e-4d05-98f9-a610ce470001',            // test UUID
   '1a65cb8f-b1f4-46cd-9ed3-3f2b3ac2e30d',            // test UUID
+  '5Ns6cTPBHjZvDUFBF8TRQ8TWkB1aKQVK993FBfBLc5N8kcc6AeBCfA1SBshbVzuT433fpKzpTyajrxXV3mv35zU8',
 ];
 
 // File extensions that get BLOCK-checked (only source files, not data/logs)

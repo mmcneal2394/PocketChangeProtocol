@@ -8,9 +8,9 @@ echo.
 
 :: 1. Environment Variable Setup for the local wrapper
 set PORT=3000
-set JWT_SECRET=local_dummy_jwt_secret_arbitrabot
-set KMS_MASTER_KEY=00000000000000000000000000000000
-set STRIPE_SECRET_KEY=sk_test_51MockStripeSecretKeyForArbitraSaaS
+if "%JWT_SECRET%"=="" set JWT_SECRET=SET_JWT_SECRET_IN_ENV
+if "%KMS_MASTER_KEY%"=="" set KMS_MASTER_KEY=SET_KMS_MASTER_KEY_IN_ENV
+if "%STRIPE_SECRET_KEY%"=="" set STRIPE_SECRET_KEY=SET_STRIPE_SECRET_KEY_IN_ENV
 
 echo ^> [1/4] Installing necessary NPM dependencies...
 call npm install

@@ -1,0 +1,24 @@
+{
+  "name": "yield-cycle",
+  "task": "Run one bounded live yield cycle and report the truthful economic outcome for Wiggum.",
+  "maxIterations": 24,
+  "delayMs": 3600000,
+  "requireWorkerSuccess": true,
+  "worker": {
+    "cwd": "/var/www/pcprotocol",
+    "command": "bash -lc 'node scripts/maintain/run_yield_cycle.js'"
+  },
+  "validator": {
+    "cwd": "/var/www/pcprotocol",
+    "command": "bash -lc 'node scripts/maintain/validate_yield_cycle.js'",
+    "successExitCodes": [
+      0
+    ],
+    "successMarker": "YIELD_CYCLE_VALID"
+  },
+  "reviewer": {
+    "enabled": true,
+    "model": "dmind-risk",
+    "systemPrompt": "Review the latest yield cycle and suggest one short high-signal profitability or risk-control improvement."
+  }
+}
