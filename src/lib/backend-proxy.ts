@@ -64,7 +64,7 @@ export async function getHealthResponse() {
   if (!baseUrl) {
     return NextResponse.json({
       ok: true,
-      site: "pcprotcol.dev",
+      site: "pcprotocol.dev",
       status: "frontend_ready",
       backendConfigured: false,
     });
@@ -86,7 +86,7 @@ export async function getHealthResponse() {
     return NextResponse.json(
       {
         ok: false,
-        site: "pcprotcol.dev",
+        site: "pcprotocol.dev",
         status: "backend_unreachable",
         backendConfigured: true,
         error: error instanceof Error ? error.message : "Unknown backend health failure",
