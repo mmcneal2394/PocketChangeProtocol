@@ -232,7 +232,11 @@ def _build_grid_recommended_filters(candidate, base_filters=None):
 
 def generate_autonomous_grid_search_results(pairs, base_filters=None):
     slopfest_pairs = [p for p in pairs if p.get('slopfest_id')]
-    if not slopfest_pairs:
+    replay_pairs = slopfest_pairs or [
+        p for p in pairs
+        if p.get('entry_volume5m') is not None or p.get('entry_momentum5m') is not None
+    ]
+    if not replay_pairs:
         return []
 
     vol_floors = [500, 1000, 2500, 5000]
@@ -250,7 +254,7 @@ def generate_autonomous_grid_search_results(pairs, base_filters=None):
                     sim_score = 0
                     simulated_pairs = []
                     sim_trades = 0
-                    for p in slopfest_pairs:
+                    for p in replay_pairs:
                         if p.get('entry_volume5m', 0) < v: continue
                         if p.get('entry_momentum5m', 0) < m: continue
 
@@ -337,6 +341,7 @@ def run_autonomous_grid_search(pairs, base_filters=None):
 
 def persist_swarm_backtest_results(pairs, recs):
     base_filters = ((recs or {}).get('recommended_filters') or {})
+    slopfest_pair_count = len([p for p in (pairs or []) if p.get('slopfest_id')])
     results = generate_autonomous_grid_search_results(pairs, base_filters=base_filters)
     payload = {
         'generated_at': datetime.now(timezone.utc).isoformat(),
@@ -345,7 +350,8 @@ def persist_swarm_backtest_results(pairs, recs):
         'journal_file': JOURNAL,
         'lookback_hours': LOOKBACK_HOURS,
         'pair_count': len(pairs or []),
-        'slopfest_pair_count': len([p for p in (pairs or []) if p.get('slopfest_id')]),
+        'slopfest_pair_count': slopfest_pair_count,
+        'replay_scope': 'slopfest' if slopfest_pair_count else 'all_recent',
         'results': results[:25],
     }
     os.makedirs(SWARM_DIR, exist_ok=True)
@@ -788,7 +794,21 @@ def apply_live_inference(base_recs, pairs, missed, wallet_ctx, entry_analysis, s
 
 def load_trades():
     trades = load_recent_trade_events(LOOKBACK_HOURS, db_path=SIGNAL_DB_PATH)
-    return [trade for trade in trades if not is_ghost_trade(trade)]
+    slopfest_trades = [trade for trade in trades if not is_ghost_trade(trade)]
+    if len(slopfest_trades) >= MIN_TRADE_SAMPLE:
+        return slopfest_trades
+    if slopfest_trades and len(slopfest_trades) == len(trades):
+        return slopfest_trades
+    if slopfest_trades and len(slopfest_trades) < MIN_TRADE_SAMPLE and len(trades) > len(slopfest_trades):
+        print(
+            f'[GEMMA4] Slopfest sample undersized ({len(slopfest_trades)} entries); '
+            f'falling back to all recent trades ({len(trades)} entries).'
+        )
+        return trades
+    if not slopfest_trades and trades:
+        print(f'[GEMMA4] No recent slopfest sample; falling back to all recent trades ({len(trades)} entries).')
+        return trades
+    return slopfest_trades
 
 def load_missed(n=500):
     return load_recent_missed_targets(LOOKBACK_HOURS, limit=n, db_path=SIGNAL_DB_PATH)
