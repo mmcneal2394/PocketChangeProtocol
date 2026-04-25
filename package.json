@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "monitor:public": "node scripts/check_public_endpoints.mjs"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.28.0",
