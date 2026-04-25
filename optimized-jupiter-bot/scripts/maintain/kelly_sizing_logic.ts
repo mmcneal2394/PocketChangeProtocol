@@ -25,6 +25,8 @@ function clamp(v: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, v));
 }
 
+const { deriveKellyRewardAsymmetryFactor } = require('./profit_seeking_logic.ts');
+
 // ── Types ──────────────────────────────────────────────────────────────────
 
 export interface KellySizingInput {
@@ -48,6 +50,18 @@ export interface KellySizingInput {
 
   /** Regime multiplier from Layer 3 (default: 1.0) */
   regimeMultiplier?: number;
+
+  /** Optional aggregate profit-seeking ratio from recent realized performance */
+  profitSeekingRatio?: number;
+
+  /** Optional cumulative profit-seeking score from recent realized performance */
+  totalProfitSeekingScore?: number;
+
+  /** Optional sample size used to derive the profit-seeking factor */
+  profitSeekingTradeCount?: number;
+
+  /** Explicit asymmetry factor override; if omitted it is derived from profit metrics */
+  rewardAsymmetryFactor?: number;
 
   /** Minimum position size in SOL */
   minSizeSol?: number;
@@ -85,6 +99,7 @@ export interface KellySizingResult {
     bankroll: number;
     atrPct: number;
     regimeMultiplier: number;
+    rewardAsymmetryFactor: number;
   };
 }
 
@@ -116,6 +131,17 @@ export function computeKellySize(input: KellySizingInput): KellySizingResult {
   const atrMultiplier = toFinite(input.atrMultiplier, 2.0);
   const kellyScale = clamp(toFinite(input.kellyFraction, 0.5), 0.1, 1.0);
   const regimeMult = clamp(toFinite(input.regimeMultiplier, 1.0), 0.1, 2.0);
+  const rewardAsymmetryFactor = clamp(
+    typeof input.rewardAsymmetryFactor === 'number' && Number.isFinite(input.rewardAsymmetryFactor)
+      ? input.rewardAsymmetryFactor
+      : deriveKellyRewardAsymmetryFactor({
+        profitSeekingRatio: input.profitSeekingRatio,
+        totalProfitSeekingScore: input.totalProfitSeekingScore,
+        tradeCount: input.profitSeekingTradeCount,
+      }),
+    -0.35,
+    0.35,
+  );
   const minSize = toFinite(input.minSizeSol, 0.001);
   const maxSize = toFinite(input.maxSizeSol, 0.05);
   const reserve = toFinite(input.reserveSol, 0.05);
@@ -131,12 +157,12 @@ export function computeKellySize(input: KellySizingInput): KellySizingResult {
       stopDistancePct: atrPct * atrMultiplier,
       skipTrade: true,
       skipReason: `No mathematical edge (f*=${rawKelly.toFixed(4)}, p=${p.toFixed(3)}, b=${b.toFixed(2)})`,
-      breakdown: { winProb: p, winLossRatio: b, bankroll, atrPct, regimeMultiplier: regimeMult },
+      breakdown: { winProb: p, winLossRatio: b, bankroll, atrPct, regimeMultiplier: regimeMult, rewardAsymmetryFactor },
     };
   }
 
   // Apply fractional Kelly and regime adjustment
-  const adjustedKelly = rawKelly * kellyScale * regimeMult;
+  const adjustedKelly = rawKelly * kellyScale * regimeMult * (1 + rewardAsymmetryFactor);
 
   // Stop distance from ATR
   const stopDistancePct = atrPct * atrMultiplier;
@@ -160,7 +186,7 @@ export function computeKellySize(input: KellySizingInput): KellySizingResult {
       stopDistancePct,
       skipTrade: true,
       skipReason: `Size ${finalSize.toFixed(6)} SOL below min ${minSize.toFixed(4)} SOL`,
-      breakdown: { winProb: p, winLossRatio: b, bankroll, atrPct, regimeMultiplier: regimeMult },
+      breakdown: { winProb: p, winLossRatio: b, bankroll, atrPct, regimeMultiplier: regimeMult, rewardAsymmetryFactor },
     };
   }
 
@@ -171,7 +197,7 @@ export function computeKellySize(input: KellySizingInput): KellySizingResult {
     stopDistancePct,
     skipTrade: false,
     skipReason: null,
-    breakdown: { winProb: p, winLossRatio: b, bankroll, atrPct, regimeMultiplier: regimeMult },
+    breakdown: { winProb: p, winLossRatio: b, bankroll, atrPct, regimeMultiplier: regimeMult, rewardAsymmetryFactor },
   };
 }
 

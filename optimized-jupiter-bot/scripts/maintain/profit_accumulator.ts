@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 
 const { shouldPersistTradeRecord } = require('./trade_journal_logic.ts');
+const { deriveKellyRewardAsymmetryFactor, summarizeProfitSeekingScores } = require('./profit_seeking_logic.ts');
 
 const IS_PAPER = process.env.PAPER_MODE === 'true';
 const SIGNALS_DIR = path.join(process.cwd(), 'signals');
@@ -37,6 +38,11 @@ type RealizedProfitSummary = {
   totalRealizedPnlSol: number;
   eligibleProfitSol: number;
   realizedProfitSol: number;
+  positiveProfitSeekingScore: number;
+  negativeProfitSeekingScoreAbs: number;
+  totalProfitSeekingScore: number;
+  profitSeekingRatio: number;
+  rewardAsymmetryFactor: number;
   lastSellTs: number | null;
 };
 
@@ -74,6 +80,7 @@ export function summarizeRealizedProfit(records: JournalTradeRecord[], reinvestm
   const positivePnlSol = closed.reduce((sum, record) => sum + Math.max(0, Number(record?.pnlSol || 0)), 0);
   const negativePnlSol = closed.reduce((sum, record) => sum + Math.min(0, Number(record?.pnlSol || 0)), 0);
   const totalRealizedPnlSol = positivePnlSol + negativePnlSol;
+  const profitSeeking = summarizeProfitSeekingScores(closed.map((record) => Number(record?.pnlSol || 0)));
   const wins = closed.filter((record) => Number(record?.pnlSol || 0) >= 0).length;
   const losses = closed.filter((record) => Number(record?.pnlSol || 0) < 0).length;
   const lastSellTs = closed.reduce((latest, record) => Math.max(latest, Number(record?.ts || 0) || 0), 0) || null;
@@ -91,6 +98,15 @@ export function summarizeRealizedProfit(records: JournalTradeRecord[], reinvestm
     totalRealizedPnlSol: roundSol(totalRealizedPnlSol),
     eligibleProfitSol: roundSol(Math.max(0, totalRealizedPnlSol) * normalizedRatio),
     realizedProfitSol: roundSol(Math.max(0, totalRealizedPnlSol)),
+    positiveProfitSeekingScore: roundSol(profitSeeking.positiveScore),
+    negativeProfitSeekingScoreAbs: roundSol(profitSeeking.negativeScoreAbs),
+    totalProfitSeekingScore: roundSol(profitSeeking.totalScore),
+    profitSeekingRatio: roundSol(profitSeeking.profitSeekingRatio),
+    rewardAsymmetryFactor: roundSol(deriveKellyRewardAsymmetryFactor({
+      profitSeekingRatio: profitSeeking.profitSeekingRatio,
+      totalProfitSeekingScore: profitSeeking.totalScore,
+      tradeCount: closed.length,
+    })),
     lastSellTs,
   };
 }
@@ -109,7 +125,7 @@ async function runCycle() {
   writeSummary(summary);
   console.log(
     `[PROFIT] sells=${summary.closedSellCount} pnl=${summary.totalRealizedPnlSol >= 0 ? '+' : ''}${summary.totalRealizedPnlSol.toFixed(6)} SOL ` +
-    `eligible=${summary.eligibleProfitSol.toFixed(6)} SOL`,
+    `eligible=${summary.eligibleProfitSol.toFixed(6)} SOL score=${summary.totalProfitSeekingScore.toFixed(6)} psr=${summary.profitSeekingRatio.toFixed(3)}`,
   );
 }
 

@@ -59,6 +59,37 @@ function copyabilityPenalty(signal: Record<string, any>): number {
   return 0;
 }
 
+export function computeWalletProfitSeekingEdgeScore(signal: Record<string, any> | null | undefined): number {
+  if (!signal) return 0;
+  const consensusScore = Math.max(0, Math.min(1, toFiniteNumber(signal?.consensusScore)));
+  const walletPnlScore = Math.max(0, Math.min(1, toFiniteNumber(signal?.walletPnlScore)));
+  const weightedScore = Math.max(0, Math.min(1, toFiniteNumber(signal?.walletWeightedScore || signal?.walletCompositeScore)));
+  const avgWinRate = Math.max(0, Math.min(1, toFiniteNumber(signal?.avgWalletWinRate)));
+  const riskPenalty = copyabilityPenalty(signal);
+  const probabilityOfWin = Math.max(
+    0,
+    Math.min(
+      1,
+      (consensusScore * 0.30) +
+      (weightedScore * 0.42) +
+      (avgWinRate * 0.23) +
+      (signal?.sizeUp ? 0.05 : 0),
+    ),
+  );
+  const probabilityOfLoss = 1 - probabilityOfWin;
+  const rewardMultiplier =
+    0.9 +
+    (walletPnlScore * 0.70) +
+    (weightedScore * 0.45) +
+    (signal?.kolConfirmed ? 0.08 : 0);
+  const penaltyMultiplier =
+    1.0 +
+    ((1 - walletPnlScore) * 0.85) +
+    (riskPenalty * 2.2);
+  const expectedScore = (probabilityOfWin * rewardMultiplier) - (probabilityOfLoss * penaltyMultiplier);
+  return Number(Math.max(0, Math.min(1, (expectedScore + 1) / 2)).toFixed(6));
+}
+
 export function computeWalletQuotaSignalScore(signal: Record<string, any> | null | undefined): number {
   if (!signal) return 0;
   const sizeUpBoost = signal?.sizeUp ? 0.2 : 0;
@@ -66,6 +97,7 @@ export function computeWalletQuotaSignalScore(signal: Record<string, any> | null
   const consensusScore = Math.max(0, Math.min(1, toFiniteNumber(signal?.consensusScore)));
   const walletPnlScore = Math.max(0, Math.min(1, toFiniteNumber(signal?.walletPnlScore)));
   const weightedScore = Math.max(0, Math.min(1, toFiniteNumber(signal?.walletWeightedScore || signal?.walletCompositeScore)));
+  const profitSeekingEdgeScore = computeWalletProfitSeekingEdgeScore(signal);
   const avgWinRate = Math.max(0, Math.min(1, toFiniteNumber(signal?.avgWalletWinRate)));
   const tradeDepthScore = logScore(signal?.walletTradeCount, 5.5);
   const walletCount = Array.isArray(signal?.wallets) ? signal.wallets.length : toFiniteNumber(signal?.walletCount);
@@ -79,12 +111,13 @@ export function computeWalletQuotaSignalScore(signal: Record<string, any> | null
     (
       sizeUpBoost +
       priorityBoost +
-      (consensusScore * 0.18) +
-      (walletPnlScore * 0.16) +
-      (weightedScore * 0.24) +
-      (avgWinRate * 0.12) +
+      (consensusScore * 0.16) +
+      (walletPnlScore * 0.12) +
+      (weightedScore * 0.21) +
+      (profitSeekingEdgeScore * 0.18) +
+      (avgWinRate * 0.11) +
       (tradeDepthScore * 0.07) +
-      (diversityScore * 0.06) +
+      (diversityScore * 0.05) +
       kolBoost +
       freshnessScore -
       copyabilityPenalty(signal)
@@ -201,6 +234,7 @@ module.exports = {
   resolveQuotaAssistLevel,
   resolveQuotaPressure,
   walletPriorityRank,
+  computeWalletProfitSeekingEdgeScore,
   computeWalletQuotaSignalScore,
   sortWalletQuotaSignals,
   resolveWalletQuotaCandidateLimit,

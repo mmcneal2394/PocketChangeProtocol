@@ -19,6 +19,19 @@ export interface NativeSolBalanceSnapshot {
   reserveSol: number;
 }
 
+export function normalizeGatewayBalanceLamports(viaGateway: any): number | null {
+  if (viaGateway === null || viaGateway === undefined) return null;
+  const rawValue =
+    viaGateway && typeof viaGateway === 'object'
+      ? Object.prototype.hasOwnProperty.call(viaGateway, 'value')
+        ? viaGateway.value
+        : null
+      : viaGateway;
+  if (rawValue === null || rawValue === undefined) return null;
+  const normalized = Number(rawValue);
+  return Number.isFinite(normalized) && normalized >= 0 ? normalized : null;
+}
+
 function createTimeout(ms = 5_000): Promise<never> {
   return new Promise((_, reject) => {
     setTimeout(() => reject(new Error('RPC_TIMEOUT')), ms);
@@ -102,8 +115,8 @@ export async function getNativeBalanceLamports(
       callRpcGateway('getBalance', [ownerKey]),
       createTimeout(),
     ]) as any;
-    const normalized = Number(viaGateway?.value ?? viaGateway ?? 0);
-    if (Number.isFinite(normalized) && normalized >= 0) {
+    const normalized = normalizeGatewayBalanceLamports(viaGateway);
+    if (normalized !== null) {
       rememberNativeBalanceLamports(ownerKey, normalized);
       return normalized;
     }

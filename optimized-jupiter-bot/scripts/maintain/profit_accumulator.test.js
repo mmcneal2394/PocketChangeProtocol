@@ -16,6 +16,11 @@ test('summarizeRealizedProfit accumulates closed sell pnl including partial exit
   assert.equal(summary.losses, 1);
   assert.equal(summary.totalRealizedPnlSol, 0.06);
   assert.equal(summary.eligibleProfitSol, 0.048);
+  assert.equal(summary.positiveProfitSeekingScore, 0.25);
+  assert.equal(summary.negativeProfitSeekingScoreAbs, 0.02);
+  assert.equal(summary.totalProfitSeekingScore, 0.23);
+  assert.equal(summary.profitSeekingRatio, 12.5);
+  assert.ok(summary.rewardAsymmetryFactor > 0);
   assert.equal(summary.lastSellTs, 4);
 });
 
@@ -30,4 +35,7 @@ test('summarizeRealizedProfit ignores ghost live rows and clamps reinvestment at
   assert.equal(summary.totalRealizedPnlSol, -0.3);
   assert.equal(summary.realizedProfitSol, 0);
   assert.equal(summary.eligibleProfitSol, 0);
+  assert.equal(summary.totalProfitSeekingScore, -18);
+  assert.equal(summary.profitSeekingRatio, 0);
+  assert.ok(summary.rewardAsymmetryFactor < 0);
 });

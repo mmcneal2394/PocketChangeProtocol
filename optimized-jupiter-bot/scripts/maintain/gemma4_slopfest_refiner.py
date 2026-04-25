@@ -36,6 +36,7 @@ VELOCITY_FILE = os.path.join(SIGNALS_DIR, 'velocity.json')
 TRENDING_FILE = os.path.join(SIGNALS_DIR, 'trending.json')
 BAYESIAN_FILE = os.path.join(SIGNALS_DIR, 'bayesian_params.json')
 BAYESIAN_FILE = os.path.join(SIGNALS_DIR, 'bayesian_params.json')
+REALIZED_PROFIT_FILE = os.path.join(SIGNALS_DIR, 'realized_profit_paper.json' if PAPER_MODE else 'realized_profit.json')
 SNIPER_TS = os.path.join(PROJECT_ROOT, 'scripts', 'maintain', 'momentum_sniper.ts')
 INTERVAL_SECONDS = int(os.environ.get('GEMMA4_INTERVAL_SECONDS', '900'))  # Run every 15 minutes
 MIN_TRADE_SAMPLE = 10
@@ -73,6 +74,38 @@ def try_float(value, default=None):
         return float(value)
     except (TypeError, ValueError):
         return default
+
+def calculate_profit_seeking_score(pnl_sol):
+    pnl = try_float(pnl_sol, 0) or 0
+    if pnl > 0:
+        return (pnl ** 2) * 100
+    if pnl < 0:
+        return -((abs(pnl) ** 2) * 200)
+    return 0.0
+
+def summarize_profit_seeking_pairs(pairs):
+    positive_score = 0.0
+    negative_score_abs = 0.0
+    total_score = 0.0
+    for pair in pairs or []:
+        score = calculate_profit_seeking_score(pair.get('pnl', 0))
+        total_score += score
+        if score > 0:
+            positive_score += score
+        elif score < 0:
+            negative_score_abs += abs(score)
+    if negative_score_abs > 0:
+        psr = positive_score / negative_score_abs
+    elif positive_score > 0:
+        psr = 100.0
+    else:
+        psr = 0.0
+    return {
+        'positive_score': round(positive_score, 6),
+        'negative_score_abs': round(negative_score_abs, 6),
+        'total_score': round(total_score, 6),
+        'psr': round(psr, 6),
+    }
 
 def parse_timestamp_ms(value):
     if value is None:
@@ -186,6 +219,7 @@ def run_autonomous_grid_search(pairs):
     tps = [0.20, 0.50, 1.00]
 
     best_pnl = -9999
+    best_score = -999999
     best_params = None
 
     for v in vol_floors:
@@ -193,6 +227,8 @@ def run_autonomous_grid_search(pairs):
             for tr in trails:
                 for tp in tps:
                     sim_pnl = 0
+                    sim_score = 0
+                    simulated_pairs = []
                     sim_trades = 0
                     for p in slopfest_pairs:
                         if p.get('entry_volume5m', 0) < v: continue
@@ -204,13 +240,19 @@ def run_autonomous_grid_search(pairs):
                         entry_cost = 0.01 # micro-scout assumption
 
                         if peak >= tp:
-                            sim_pnl += tp * entry_cost
+                            realized_pnl = tp * entry_cost
                         elif peak > 0 and (peak - tr) >= actual_pnl:
-                            sim_pnl += (peak - tr) * entry_cost
+                            realized_pnl = (peak - tr) * entry_cost
                         else:
-                            sim_pnl += actual_pnl
+                            realized_pnl = actual_pnl
 
-                    if sim_trades >= 3 and sim_pnl > best_pnl:
+                        sim_pnl += realized_pnl
+                        sim_score += calculate_profit_seeking_score(realized_pnl)
+                        simulated_pairs.append({'pnl': realized_pnl})
+
+                    if sim_trades >= 3 and (sim_score > best_score or (sim_score == best_score and sim_pnl > best_pnl)):
+                        best_score = sim_score
+                        score_summary = summarize_profit_seeking_pairs(simulated_pairs)
                         best_pnl = sim_pnl
                         best_params = {
                             'minVolume': v,
@@ -218,6 +260,8 @@ def run_autonomous_grid_search(pairs):
                             'trailingStop': tr,
                             'takeProfit': tp,
                             'simulated_pnl': sim_pnl,
+                            'simulated_profit_score': round(sim_score, 6),
+                            'simulated_psr': score_summary.get('psr', 0),
                             'simulated_trades': sim_trades
                         }
     return best_params
@@ -347,6 +391,7 @@ def build_source_policy(source_performance):
 def build_llm_prompt(pairs, missed, wallet_ctx, base_recs, entry_analysis, signal_profile=None, live_signal_context=None):
     wins = [p for p in pairs if p['pnl'] > 0]
     losses = [p for p in pairs if p['pnl'] <= 0]
+    profit_objective = summarize_profit_seeking_pairs(pairs)
     miss_counts = {}
     for item in missed[-150:]:
         reason = item.get('reason', 'unknown')
@@ -393,6 +438,10 @@ def build_llm_prompt(pairs, missed, wallet_ctx, base_recs, entry_analysis, signa
         'win_rate': round((len(wins) / max(len(pairs), 1)) * 100, 2),
         'avg_win_pct': round(sum(p.get('pnl_pct', 0) for p in wins) / max(len(wins), 1), 3) if wins else 0,
         'avg_loss_pct': round(sum(p.get('pnl_pct', 0) for p in losses) / max(len(losses), 1), 3) if losses else 0,
+        'profit_objective': {
+            **profit_objective,
+            'realized_summary': wallet_ctx.get('realized_profit_summary', {}) or {},
+        },
         'wallets': {
             'active': wallet_ctx.get('active_buy_count', 0),
             'executable': wallet_ctx.get('executable_buy_count', 0),
@@ -423,7 +472,7 @@ def build_llm_prompt(pairs, missed, wallet_ctx, base_recs, entry_analysis, signa
             f"- minMomentum: {optimal['minMomentum']}%\n"
             f"- trailingStop: {optimal['trailingStop'] * 100}%\n"
             f"- takeProfit: {optimal['takeProfit'] * 100}%\n"
-            f"(Simulated PnL: +{optimal['simulated_pnl']:.4f} SOL across {optimal['simulated_trades']} trades)\n\n"
+            f"(Simulated PnL: +{optimal['simulated_pnl']:.4f} SOL | score {optimal.get('simulated_profit_score', 0):.4f} | PSR {optimal.get('simulated_psr', 0):.2f} across {optimal['simulated_trades']} trades)\n\n"
             f"Use these mathematical truths as your baseline when generating the new configuration.\n\n"
         )
 
@@ -687,9 +736,18 @@ def get_vps_ssh_config():
         raise RuntimeError('VPS_HOST and VPS_PW must be set for remote sync/publish')
     return host, username, password
 
+def has_vps_ssh_config():
+    return bool(str(os.environ.get('VPS_HOST', '')).strip() and str(os.environ.get('VPS_PW', '')).strip())
+
+def is_local_runtime_ready():
+    return os.path.exists(JOURNAL) or os.path.exists(FALLBACK_JOURNAL)
+
 def sync_history_store():
     import paramiko
     import os
+    if not has_vps_ssh_config() and is_local_runtime_ready():
+        print('[GEMMA4] Remote sync skipped; using local journal files')
+        return
     try:
         host, username, password = get_vps_ssh_config()
         ssh = paramiko.SSHClient()
@@ -889,6 +947,7 @@ def load_wallet_context():
     wallet_pnl_data = load_json(WALLET_PNL_FILE, {})
     alpha_data = load_json(ALPHA_WALLETS, {})
     kol_data = load_json(KOL_WALLETS, {})
+    realized_profit_data = load_json(REALIZED_PROFIT_FILE, {})
     wallet_pnl_rows = wallet_pnl_data.get('wallets', []) or []
     wallet_pnl_map = {row.get('walletAddr'): row for row in wallet_pnl_rows if row.get('walletAddr')}
     tracked_wallet_rows = (alpha_data.get('tracked_wallets', []) or []) + (kol_data.get('tracked_wallets', []) or [])
@@ -1002,6 +1061,13 @@ def load_wallet_context():
         'hot_sector': wallet_data.get('hot_sector'),
         'signal_updated_at': wallet_data.get('updated_at'),
         'wallet_pnl_updated_at': wallet_pnl_data.get('updated_at'),
+        'realized_profit_summary': {
+            'total_realized_pnl_sol': round(try_float(realized_profit_data.get('totalRealizedPnlSol'), 0) or 0, 6),
+            'total_profit_seeking_score': round(try_float(realized_profit_data.get('totalProfitSeekingScore'), 0) or 0, 6),
+            'profit_seeking_ratio': round(try_float(realized_profit_data.get('profitSeekingRatio'), 0) or 0, 6),
+            'reward_asymmetry_factor': round(try_float(realized_profit_data.get('rewardAsymmetryFactor'), 0) or 0, 6),
+            'closed_sell_count': int(try_float(realized_profit_data.get('closedSellCount'), 0) or 0),
+        },
     }
 
 def analyze_trades(trades):
@@ -1096,6 +1162,7 @@ def generate_recommendations(pairs, missed, wallet_ctx=None, signal_profile=None
     failed_ratio = len(failed) / total
     avg_loss = sum(p['pnl_pct'] for p in losses) / max(len(losses), 1) if losses else 0
     avg_win = sum(p['pnl_pct'] for p in wins) / max(len(wins), 1) if wins else 0
+    profit_objective = summarize_profit_seeking_pairs(pairs)
 
     # Count missed target reasons
     miss_reasons = {}
@@ -1116,7 +1183,10 @@ def generate_recommendations(pairs, missed, wallet_ctx=None, signal_profile=None
 
     analysis = f"Win rate: {win_rate:.0f}% ({len(wins)}/{total}). "
     analysis += f"Avg win: {avg_win:+.1f}%, avg loss: {avg_loss:+.1f}%. "
-    analysis += f"Failed sells: {failed_ratio*100:.0f}%."
+    analysis += (
+        f"Failed sells: {failed_ratio*100:.0f}%. "
+        f"Profit-seeking score: {profit_objective['total_score']:+.2f}, PSR: {profit_objective['psr']:.2f}."
+    )
 
     insight = ""
     confidence = 50
@@ -1127,6 +1197,9 @@ def generate_recommendations(pairs, missed, wallet_ctx=None, signal_profile=None
     source_policy = build_source_policy(source_performance)
     bayesian_data = load_json(BAYESIAN_FILE, {})
     recs['hunterModeMultiplier'] = bayesian_data.get('params', {}).get('hunter_mode_multiplier', 0.5)
+    realized_summary = wallet_ctx.get('realized_profit_summary', {}) or {}
+    realized_psr = try_float(realized_summary.get('profit_seeking_ratio'), 0) or 0
+    realized_score = try_float(realized_summary.get('total_profit_seeking_score'), 0) or 0
 
     # Decision logic based on data patterns
     if total < 10:
@@ -1156,6 +1229,34 @@ def generate_recommendations(pairs, missed, wallet_ctx=None, signal_profile=None
     else:
         insight = "System profitable. Consider increasing position size."
         confidence = 85
+
+    if total >= 10 and (profit_objective['psr'] < 1 or profit_objective['total_score'] < 0):
+        recs['min_5m_change'] = clamp(recs['min_5m_change'] + 0.5, *BOUNDS['min_5m_change'])
+        recs['min_liquidity_usd'] = clamp(recs['min_liquidity_usd'] + 2500, *BOUNDS['min_liquidity_usd'])
+        recs['max_hold_minutes'] = clamp(min(recs['max_hold_minutes'], 4), *BOUNDS['max_hold_minutes'])
+        recs['hunterModeMultiplier'] = min(recs.get('hunterModeMultiplier', 0.5), 0.35)
+        confidence = max(35, confidence - 6)
+        insight += (
+            f" PROFIT OBJECTIVE: recent score {profit_objective['total_score']:+.2f} and PSR {profit_objective['psr']:.2f} are loss-skewed, "
+            "so Gemma is tightening entries and shortening exposure."
+        )
+    elif total >= 10 and profit_objective['psr'] >= 1.25 and profit_objective['total_score'] > 0:
+        confidence = min(confidence + 4, 95)
+        insight += (
+            f" PROFIT OBJECTIVE: recent score {profit_objective['total_score']:+.2f} and PSR {profit_objective['psr']:.2f} favor asymmetric upside."
+        )
+
+    if realized_psr >= 1.15 and realized_score > 0:
+        confidence = min(confidence + 3, 95)
+        insight += (
+            f" REALIZED OBJECTIVE: cumulative score {realized_score:+.2f} and PSR {realized_psr:.2f} confirm the broader book is still profit-seeking."
+        )
+    elif realized_score < 0 and realized_psr > 0:
+        recs['hunterModeMultiplier'] = min(recs.get('hunterModeMultiplier', 0.5), 0.3)
+        confidence = max(30, confidence - 4)
+        insight += (
+            f" REALIZED OBJECTIVE: cumulative score {realized_score:+.2f} with PSR {realized_psr:.2f} argues for more conservative hunter deployment."
+        )
 
     weak_bridge = source_performance.get('bridge', {})
     strong_hybrid = source_performance.get('hybrid', {})
@@ -1341,6 +1442,7 @@ def generate_recommendations(pairs, missed, wallet_ctx=None, signal_profile=None
         'trade_count': total,
         'win_rate': win_rate,
         'total_pnl_sol': sum(p['pnl'] for p in pairs),
+        'profit_objective': profit_objective,
         'generated_at': datetime.now(timezone.utc).isoformat(),
     }
 
@@ -1426,6 +1528,10 @@ def apply_recommendations(recs):
         # --- PUSH TO VPS REDIS VIA SSH ---
         try:
             import paramiko
+            if not has_vps_ssh_config():
+                print('  [VPS] Redis publish skipped; using local runtime only')
+                print(f'  Params: {json.dumps(params, indent=4)}')
+                return True
             host, username, password = get_vps_ssh_config()
             ssh = paramiko.SSHClient()
             ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())

@@ -5,7 +5,18 @@ module.exports = {
       script: "scripts/maintain/momentum_sniper.ts",
       interpreter: "node",
       interpreter_args: "--require ts-node/register",
-      env: { NODE_ENV: "production", WALLET_INDEX: "1" }
+      env: {
+        NODE_ENV: "production",
+        WALLET_INDEX: "",
+        WALLET_KEYPAIR_PATH: "./wallet.json",
+        STRATEGY_PROFILE_PATH: "config/strategy-profiles/active.strategy.json",
+        SNIPER_POLL_MS: "15000",
+        SNIPER_MAX_POS: "10",
+        SNIPER_MIN_VOL: "8000",
+        SNIPER_MIN_CHG: "3",
+        SNIPER_MIN_BR: "2.5",
+        SNIPER_MIN_BUYS: "8"
+      }
     },
     {
       name: "pcp-wallet-monitor",

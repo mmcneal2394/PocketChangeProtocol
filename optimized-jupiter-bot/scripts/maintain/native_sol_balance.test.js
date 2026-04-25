@@ -5,6 +5,7 @@ const {
   computeSpendableNativeBalance,
   getCachedNativeBalanceLamports,
   MIN_NATIVE_SOL_RESERVE,
+  normalizeGatewayBalanceLamports,
   rememberNativeBalanceLamports,
   resetNativeBalanceCacheForTests,
 } = require('../../src/utils/native_sol_balance.ts');
@@ -38,4 +39,14 @@ test('native SOL cache preserves a fresh last-known balance', () => {
 test('native SOL cache expires stale balance snapshots', () => {
   rememberNativeBalanceLamports('wallet-2', 987654321, 1_000);
   assert.equal(getCachedNativeBalanceLamports('wallet-2', 5_000, 7_001), null);
+});
+
+test('normalizeGatewayBalanceLamports only accepts explicit gateway values', () => {
+  assert.equal(normalizeGatewayBalanceLamports(undefined), null);
+  assert.equal(normalizeGatewayBalanceLamports(null), null);
+  assert.equal(normalizeGatewayBalanceLamports({}), null);
+  assert.equal(normalizeGatewayBalanceLamports({ result: 123 }), null);
+  assert.equal(normalizeGatewayBalanceLamports({ value: 0 }), 0);
+  assert.equal(normalizeGatewayBalanceLamports({ value: '123456789' }), 123456789);
+  assert.equal(normalizeGatewayBalanceLamports(42), 42);
 });

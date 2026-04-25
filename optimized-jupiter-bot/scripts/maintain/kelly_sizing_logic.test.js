@@ -78,6 +78,27 @@ test('computeKellySize: regime multiplier scales size', () => {
   assert.ok(normal.sizeSol >= cautious.sizeSol);
 });
 
+test('computeKellySize: reward asymmetry factor scales size around the same edge', () => {
+  const neutral = computeKellySize({
+    winProbability: 0.6, winLossRatio: 1.5,
+    bankrollSol: 2.0, atrPct: 5.0, rewardAsymmetryFactor: 0,
+    maxSizeSol: 0.5,
+  });
+  const aggressive = computeKellySize({
+    winProbability: 0.6, winLossRatio: 1.5,
+    bankrollSol: 2.0, atrPct: 5.0, rewardAsymmetryFactor: 0.2,
+    maxSizeSol: 0.5,
+  });
+  const defensive = computeKellySize({
+    winProbability: 0.6, winLossRatio: 1.5,
+    bankrollSol: 2.0, atrPct: 5.0, rewardAsymmetryFactor: -0.2,
+    maxSizeSol: 0.5,
+  });
+
+  assert.ok(aggressive.adjustedKellyFraction > neutral.adjustedKellyFraction);
+  assert.ok(defensive.adjustedKellyFraction < neutral.adjustedKellyFraction);
+});
+
 test('computeKellySize: never exceeds maxSizeSol', () => {
   const result = computeKellySize({
     winProbability: 0.95, winLossRatio: 5.0,

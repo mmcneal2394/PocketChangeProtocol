@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
+  computeWalletProfitSeekingEdgeScore,
   computeWalletQuotaSignalScore,
   resolveQuotaAssistLevel,
   sortWalletQuotaSignals,
@@ -25,6 +26,30 @@ test('sortWalletQuotaSignals prioritizes the composite wallet score before legac
   assert.deepEqual(sorted.map((row) => row.mint), ['a', 'd', 'b', 'c']);
   assert.ok(computeWalletQuotaSignalScore(sorted[1]) > computeWalletQuotaSignalScore(sorted[2]));
   assert.ok(computeWalletQuotaSignalScore(sorted[2]) > computeWalletQuotaSignalScore(sorted[3]));
+});
+
+test('computeWalletProfitSeekingEdgeScore penalizes risky low-quality quota candidates', () => {
+  const strong = computeWalletProfitSeekingEdgeScore({
+    sizeUp: true,
+    consensusScore: 0.82,
+    walletPnlScore: 0.76,
+    walletWeightedScore: 0.79,
+    avgWalletWinRate: 0.68,
+    kolConfirmed: true,
+    copyabilityRisk: 'low',
+  });
+  const weak = computeWalletProfitSeekingEdgeScore({
+    sizeUp: false,
+    consensusScore: 0.58,
+    walletPnlScore: 0.32,
+    walletWeightedScore: 0.41,
+    avgWalletWinRate: 0.44,
+    kolConfirmed: false,
+    copyabilityRisk: 'high',
+  });
+
+  assert.ok(strong > weak);
+  assert.ok(strong > 0.5);
 });
 
 test('shouldBypassCooldownForQuotaAssist only allows level-2 alpha and wallet entries with zero strikes', () => {
