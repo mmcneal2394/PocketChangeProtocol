@@ -18,15 +18,13 @@
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.28.0",
-    "@drift-labs/sdk": "^2.159.0-beta.2",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@mui/icons-material": "^7.3.9",
     "@mui/material": "^7.3.9",
-    "@prisma/client": "^7.5.0",
     "@solana/spl-token": "^0.4.14",
     "@solana/wallet-adapter-base": "^0.9.27",
-    "@solana/wallet-adapter-phantom": "^0.9.28",
+    "@solana/wallet-adapter-phantom": "^0.9.29",
     "@solana/wallet-adapter-react": "^0.15.39",
     "@solana/wallet-adapter-react-ui": "^0.9.39",
     "@solana/web3.js": "^1.98.4",
@@ -36,13 +34,13 @@
     "ccxt": "^4.5.43",
     "cross-fetch": "^4.1.0",
     "dotenv": "^17.3.1",
-    "next": "16.1.6",
+    "next": "^16.2.4",
     "node-fetch": "^3.3.2",
     "pg": "^8.20.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "stripe": "^20.4.1",
-    "yaml": "^2.8.2"
+    "yaml": "^2.8.3"
   },
   "devDependencies": {
     "@types/node": "^20",
@@ -50,8 +48,10 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.1.6",
-    "prisma": "^7.5.0",
+    "eslint-config-next": "^16.2.4",
     "typescript": "^5"
+  },
+  "overrides": {
+    "postcss": "^8.5.10"
   }
 }
