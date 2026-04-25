@@ -108,3 +108,76 @@ test('detectGuardianAnomalies marks stale journals when upstream feeds are onlin
 
   assert.ok(anomalies.some((item) => item.type === 'journal_stale'));
 });
+
+test('detectGuardianAnomalies ignores restart flap when pm2 restart counters reset after a clean redeploy', () => {
+  const state = {
+    ...baseState(),
+    restartHistory: {
+      'pcp-sniper-1': [
+        { ts: 560_000, restarts: 4950, uptimeMs: 25_000 },
+        { ts: 780_000, restarts: 4957, uptimeMs: 20_000 },
+      ],
+    },
+  };
+  const services = [
+    { name: 'pcp-sniper-1', status: 'online', restarts: 0, uptimeMs: 35_000, scriptPath: 'scripts/maintain/momentum_sniper.ts' },
+    { name: 'pcp-wallet-monitor', status: 'online', restarts: 0, uptimeMs: 500_000, scriptPath: 'scripts/maintain/wallet_monitor.ts' },
+    { name: 'pcp-velocity-stream', status: 'online', restarts: 0, uptimeMs: 500_000, scriptPath: 'scripts/maintain/velocity_stream.ts' },
+    { name: 'pcp-gemma4-refiner', status: 'online', restarts: 0, uptimeMs: 500_000, scriptPath: 'scripts/maintain/gemma4_slopfest_refiner.py' },
+  ];
+
+  const anomalies = detectGuardianAnomalies({
+    now: 800_000,
+    services,
+    state,
+    journalAgeMs: 60_000,
+    latestJournalTs: 240_000,
+    walletSignalsAgeMs: 60_000,
+    profileEventsAgeMs: 60_000,
+    profileStatsAgeMs: 60_000,
+    openPositions: 12,
+    bootConfig: { tpPct: 25, slPct: 15, holdMinutes: 2 },
+    runtimeBanner: { tpPct: 25, slPct: 15, holdMinutes: 2 },
+    gemmaConfig: { tpPct: 25, slPct: 15, holdMinutes: 2 },
+    activeMode: 'normal',
+    microRuntimeConfig: null,
+  });
+
+  assert.ok(!anomalies.some((item) => item.type === 'restart_flap'));
+  assert.ok(!anomalies.some((item) => item.type === 'refiner_entrypoint_drift'));
+});
+
+test('detectGuardianAnomalies accepts refiner entrypoint when pm2 uses python interpreter with script args', () => {
+  const services = [
+    { name: 'pcp-sniper-1', status: 'online', restarts: 6, uptimeMs: 150_000, scriptPath: 'scripts/maintain/momentum_sniper.ts' },
+    { name: 'pcp-wallet-monitor', status: 'online', restarts: 0, uptimeMs: 500_000, scriptPath: 'scripts/maintain/wallet_monitor.ts' },
+    { name: 'pcp-velocity-stream', status: 'online', restarts: 0, uptimeMs: 500_000, scriptPath: 'scripts/maintain/velocity_stream.ts' },
+    {
+      name: 'pcp-gemma4-refiner',
+      status: 'online',
+      restarts: 0,
+      uptimeMs: 500_000,
+      scriptPath: '/usr/bin/python3',
+      scriptArgs: '/var/www/pcprotocol/scripts/maintain/gemma4_slopfest_refiner.py',
+    },
+  ];
+
+  const anomalies = detectGuardianAnomalies({
+    now: 800_000,
+    services,
+    state: baseState(),
+    journalAgeMs: 60_000,
+    latestJournalTs: 240_000,
+    walletSignalsAgeMs: 60_000,
+    profileEventsAgeMs: 60_000,
+    profileStatsAgeMs: 60_000,
+    openPositions: 12,
+    bootConfig: { tpPct: 25, slPct: 15, holdMinutes: 2 },
+    runtimeBanner: { tpPct: 25, slPct: 15, holdMinutes: 2 },
+    gemmaConfig: { tpPct: 25, slPct: 15, holdMinutes: 2 },
+    activeMode: 'normal',
+    microRuntimeConfig: null,
+  });
+
+  assert.ok(!anomalies.some((item) => item.type === 'refiner_entrypoint_drift'));
+});

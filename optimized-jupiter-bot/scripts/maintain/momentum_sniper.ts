@@ -5622,7 +5622,7 @@ async function recoverOrphans() {
 
     let nativeBalanceSol: number | null = null;
     try {
-      nativeBalanceSol = (await connection.getBalance(wallet.publicKey, 'confirmed')) / LAMPORTS_PER_SOL;
+      nativeBalanceSol = Number((await getSpendableNativeBalance(connection, wallet.publicKey, 0)).nativeSol || 0);
     } catch {}
 
     const holdings: WalletHoldingSnapshotRow[] = Array.from(seen.entries())

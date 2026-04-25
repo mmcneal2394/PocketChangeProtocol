@@ -41,18 +41,21 @@ export default function DashboardWidget() {
   const [config, setConfig] = useState<Config | null>(null);
   const [tuningLog, setTuningLog] = useState<TuningEvent[]>([]);
   const [heartbeats, setHeartbeats] = useState<Record<string, Heartbeat['data']>>({});
-  const [ws, setWs] = useState<WebSocket | null>(null);
 
   useEffect(() => {
-    // Connect to WebSocket bridge - targeting droplet explicitly for WS relay or using relative if proxy
-    // Typically window.location.hostname would hit localhost:8080 if running UI locally.
-    // If the WS bridge is on the droplet, point to the droplet IP!
-    const wsHost = process.env.NEXT_PUBLIC_WS_BRIDGE || 'ws://64.23.173.160:8080';
-    const socket = new WebSocket(wsHost);
-    
-    socket.onopen = () => console.log('Dashboard WS connected to Droplet:', wsHost);
-    socket.onmessage = (event) => {
-      try {
+    const wsHost = process.env.NEXT_PUBLIC_WS_BRIDGE?.trim();
+    if (!wsHost) return;
+
+    let closed = false;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let socket: WebSocket | null = null;
+
+    const connect = () => {
+      socket = new WebSocket(wsHost);
+
+      socket.onopen = () => console.log('Dashboard WS connected:', wsHost);
+      socket.onmessage = (event) => {
+        try {
           const msg = JSON.parse(event.data);
           if (msg.channel === 'CONFIG_UPDATE') {
             setConfig((prev) => ({ ...prev, ...msg.data } as Config));
@@ -60,12 +63,23 @@ export default function DashboardWidget() {
           } else if (msg.channel === 'HEARTBEAT') {
             setHeartbeats((prev) => ({ ...prev, [msg.data.agent]: msg.data }));
           }
-      } catch (e) {}
+        } catch {}
+      };
+      socket.onclose = () => {
+        if (!closed) {
+          retryTimer = setTimeout(connect, 3000);
+        }
+      };
     };
-    socket.onclose = () => setTimeout(() => setWs(null), 3000);
-    setWs(socket);
-    return () => socket.close();
-  }, [ws]); // Will attempt to reconnect if ws becomes null
+
+    connect();
+
+    return () => {
+      closed = true;
+      if (retryTimer) clearTimeout(retryTimer);
+      socket?.close();
+    };
+  }, []);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 p-4">
@@ -88,7 +102,9 @@ export default function DashboardWidget() {
               ))}
             </div>
           ) : (
-            <p className="text-white/40">Waiting for remote config sync...</p>
+            <p className="text-white/40">
+              {process.env.NEXT_PUBLIC_WS_BRIDGE ? 'Waiting for remote config sync...' : 'Remote event bridge not configured.'}
+            </p>
           )}
         </CardContent>
       </Card>

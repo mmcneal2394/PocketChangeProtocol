@@ -9,6 +9,10 @@ dotenv.config({ path: path.join(process.cwd(), '.env') });
 
 const JOURNAL_PATH = path.join(process.cwd(), 'signals', process.env.PAPER_MODE === 'true' ? 'trade_journal_paper.jsonl' : 'trade_journal.jsonl');
 const MIN_SAMPLE_SIZE = 5; // Start adjusting once we have at least 5 wins
+const CONTROL_BASE_URL =
+    process.env.HIVE_CONTROL_BASE_URL?.trim()?.replace(/\/+$/, '') ||
+    process.env.PCP_HIVE_CONTROL_BASE_URL?.trim()?.replace(/\/+$/, '') ||
+    '';
 
 interface Trade {
     action: string;
@@ -27,6 +31,39 @@ function calculatePercentile(arr: number[], p: number): number {
     const i = Math.floor(index);
     const fraction = index - i;
     return arr[i] + (arr[i + 1] - arr[i]) * fraction;
+}
+
+async function postControlUpdate(payload: Record<string, unknown>, label: string) {
+    if (!CONTROL_BASE_URL) {
+        console.log(`[HIVE-MIND] Skipping ${label}: HIVE_CONTROL_BASE_URL is not configured.`);
+        return false;
+    }
+
+    await fetch(`${CONTROL_BASE_URL}/config-update`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    });
+    return true;
+}
+
+async function fetchTradeSamples(filter: string, limit: number) {
+    if (!CONTROL_BASE_URL) {
+        console.log(`[HIVE-MIND] Skipping mistake analysis fetch: HIVE_CONTROL_BASE_URL is not configured.`);
+        return null;
+    }
+
+    const res = await fetch(`${CONTROL_BASE_URL}/trades?filter=${encodeURIComponent(filter)}&limit=${limit}`);
+    if (!res.ok) {
+        throw new Error(`Failed to fetch trades: ${res.status}`);
+    }
+    return res.json() as Promise<any[]>;
+}
+
+async function clearRemoteTrades() {
+    if (!CONTROL_BASE_URL) return;
+
+    await fetch(`${CONTROL_BASE_URL}/trades`, { method: 'DELETE' });
 }
 
 async function runHiveAnalysis() {
@@ -147,15 +184,13 @@ async function runHiveAnalysis() {
         if (isDryRun) {
             console.log(`[HIVE-MIND] Dry-run: would send parameter update to Droplet`);
         } else {
-            // POST to Remote Droplet via Ingestion API
             try {
-                await fetch('http://64.23.173.160:3001/config-update', {
-                    method: 'POST',
-                    body: JSON.stringify(payload)
-                });
-                console.log(`[HIVE-MIND] ✅ Sent payload to remote execution Droplet`);
+                const sent = await postControlUpdate(payload, 'parameter broadcast');
+                if (sent) {
+                    console.log(`[HIVE-MIND] ✅ Sent payload to remote execution controller`);
+                }
             } catch (e: any) {
-                console.error(`[HIVE-MIND] ❌ Failed to bridge Droplet update.`, e.message);
+                console.error(`[HIVE-MIND] ❌ Failed to bridge remote update.`, e.message);
             }
         }
         
@@ -179,19 +214,12 @@ async function runHiveAnalysis() {
     }
 }
 
-const DROPLET_IP = '64.23.173.160';
-
 async function learnFromMistakes() {
     try {
-        console.log(`[HIVE-MIND] 📚 Fetching losing trades from Droplet for mistake analysis...`);
-        
-        const res = await fetch(`http://${DROPLET_IP}:3001/trades?filter=loss&limit=10`);
-        if (!res.ok) {
-            console.error(`[HIVE-MIND] ❌ Failed to fetch trades: ${res.status}`);
-            return;
-        }
-        
-        const losingTrades = await res.json() as any[];
+        console.log(`[HIVE-MIND] 📚 Fetching losing trades for mistake analysis...`);
+
+        const losingTrades = await fetchTradeSamples('loss', 10);
+        if (!losingTrades) return;
         if (losingTrades.length === 0) {
             console.log(`[HIVE-MIND] ✅ No losing trades found — nothing to learn from.`);
             return;
@@ -241,25 +269,21 @@ Do not return any markdown formatting outside of the json block. Return pure JSO
                     maxHoldMinutes: advice.maxHoldMinutes
                 };
 
-                await fetch(`http://${DROPLET_IP}:3001/config-update`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                console.log(`[HIVE-MIND] ✅ Sent aggressive Gemma 4 tuning to Droplet.`);
+                const sent = await postControlUpdate(payload, 'mistake-analysis tuning');
+                if (sent) {
+                    console.log(`[HIVE-MIND] ✅ Sent aggressive Gemma 4 tuning to remote controller.`);
+                }
             } catch(e: any) {
                 console.warn(`[HIVE-MIND] ⚠️ Failed to parse or send JSON from Gemma:`, e.message);
             }
         }
 
-        // Clean up Droplet disk space by deleting logs after refining
+        // Clean up remote disk space by deleting logs after refining
         try {
-            const deleteRes = await fetch(`http://${DROPLET_IP}:3001/trades`, { method: 'DELETE' });
-            if (deleteRes.ok) {
-                console.log(`[HIVE-MIND] 🧹 Cleared trade journal from Droplet to minimize logs.`);
-            }
+            await clearRemoteTrades();
+            console.log(`[HIVE-MIND] 🧹 Cleared remote trade samples after refinement.`);
         } catch (e: any) {
-            console.error(`[HIVE-MIND] Failed to clear Droplet logs: ${e.message}`);
+            console.error(`[HIVE-MIND] Failed to clear remote trade samples: ${e.message}`);
         }
     } catch (e: any) {
         console.error(`[HIVE-MIND] ❌ learnFromMistakes error: ${e.message}`);

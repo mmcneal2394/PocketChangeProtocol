@@ -563,6 +563,36 @@ def load_trades():
 def load_missed(n=500):
     return load_recent_missed_targets(LOOKBACK_HOURS, limit=n, db_path=SIGNAL_DB_PATH)
 
+def _read_jsonl_rows(file_path):
+    rows = []
+    if not os.path.exists(file_path):
+        return rows
+    try:
+        with open(file_path, encoding='utf-8') as handle:
+            for line in handle:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rows.append(json.loads(line))
+                except Exception:
+                    continue
+    except Exception:
+        return []
+    return rows
+
+def load_recent_trade_events(lookback_hours, db_path=None):
+    cutoff_ms = int((time.time() - max(float(lookback_hours or 0), 0) * 3600) * 1000)
+    rows = _read_jsonl_rows(JOURNAL)
+    if not rows and os.path.exists(FALLBACK_JOURNAL) and FALLBACK_JOURNAL != JOURNAL:
+        rows = _read_jsonl_rows(FALLBACK_JOURNAL)
+    return [row for row in rows if in_lookback_window(row, cutoff_ms)]
+
+def load_recent_missed_targets(lookback_hours, limit=500, db_path=None):
+    cutoff_ms = int((time.time() - max(float(lookback_hours or 0), 0) * 3600) * 1000)
+    rows = [row for row in _read_jsonl_rows(MISSED) if in_lookback_window(row, cutoff_ms)]
+    return rows[-max(int(limit or 0), 0):] if limit else rows
+
 def sync_history_store():
     journal_paths = [JOURNAL]
     if PAPER_MODE and FALLBACK_JOURNAL != JOURNAL:

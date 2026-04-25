@@ -98,6 +98,30 @@ function tailLines(filePath: string, maxLines = 300): string[] {
   }
 }
 
+function normalizeRestartHistory(
+  rows: Array<{ ts: number; restarts: number; uptimeMs: number | null }>,
+  now: number,
+) {
+  const recent = (Array.isArray(rows) ? rows : [])
+    .filter((row) => row && (now - Number(row.ts || 0)) <= 5 * 60_000)
+    .slice(-10);
+  const normalized: Array<{ ts: number; restarts: number; uptimeMs: number | null }> = [];
+  for (const row of recent) {
+    if (
+      normalized.length > 0 &&
+      Number(row.restarts || 0) < Number(normalized[normalized.length - 1].restarts || 0)
+    ) {
+      normalized.length = 0;
+    }
+    normalized.push({
+      ts: Number(row.ts || now),
+      restarts: Number(row.restarts || 0),
+      uptimeMs: row.uptimeMs ?? null,
+    });
+  }
+  return normalized;
+}
+
 export function parseGemmaBootLine(line: string | null | undefined) {
   const match = String(line || '').match(/GEMMA4 BOOT: TP=([\d.]+)% SL=([\d.]+)% HOLD=([\d.]+)min/i);
   if (!match) return null;
@@ -147,6 +171,9 @@ async function getPm2Summary(now = Date.now()) {
         memoryMb: app.monit?.memory ? Number((app.monit.memory / 1024 / 1024).toFixed(1)) : null,
         cpu: typeof app.monit?.cpu === 'number' ? app.monit.cpu : null,
         scriptPath: String(app.pm2_env?.pm_exec_path || app.pm2_env?.script || ''),
+        scriptArgs: Array.isArray(app.pm2_env?.args)
+          ? app.pm2_env.args.join(' ')
+          : String(app.pm2_env?.args || ''),
       }));
   } catch {
     return [];
@@ -213,13 +240,11 @@ export function detectGuardianAnomalies(input: {
   const { now, services, state } = input;
   const sniper = findService(services, 'pcp-sniper-1');
   if (sniper) {
-    const history = [...(state.restartHistory[sniper.name] || []), {
+    const history = normalizeRestartHistory([...(state.restartHistory[sniper.name] || []), {
       ts: now,
       restarts: Number(sniper.restarts || 0),
       uptimeMs: sniper.uptimeMs,
-    }]
-      .filter((row) => (now - row.ts) <= 5 * 60_000)
-      .slice(-10);
+    }], now);
     const restartDelta = history.length >= 2 ? history[history.length - 1].restarts - history[0].restarts : 0;
     const consecutiveShortUptime =
       history.length >= 2 &&
@@ -331,12 +356,14 @@ export function detectGuardianAnomalies(input: {
   }
 
   const refiner = findService(services, 'pcp-gemma4-refiner');
-  if (refiner && !String(refiner.scriptPath || '').includes('gemma4_slopfest_refiner.py')) {
+  const refinerEntrypoint = `${String(refiner?.scriptPath || '')} ${String(refiner?.scriptArgs || '')}`.trim();
+  if (refiner && !refinerEntrypoint.includes('gemma4_slopfest_refiner.py')) {
     anomalies.push({
       type: 'refiner_entrypoint_drift',
       severity: 'medium',
       evidence: {
         scriptPath: refiner.scriptPath,
+        scriptArgs: refiner.scriptArgs || null,
         expected: 'scripts/maintain/gemma4_slopfest_refiner.py',
       },
     });
@@ -479,13 +506,11 @@ export async function runGuardianCycle() {
   });
 
   for (const service of services) {
-    const history = [...(state.restartHistory[service.name] || []), {
+    const history = normalizeRestartHistory([...(state.restartHistory[service.name] || []), {
       ts: now,
       restarts: Number(service.restarts || 0),
       uptimeMs: service.uptimeMs,
-    }]
-      .filter((row) => (now - row.ts) <= 5 * 60_000)
-      .slice(-10);
+    }], now);
     state.restartHistory[service.name] = history;
   }
 

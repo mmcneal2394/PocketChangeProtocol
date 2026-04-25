@@ -1,26 +1,69 @@
 import { NextResponse } from 'next/server';
 
-export const runtime = 'edge'; 
+export const runtime = 'nodejs';
 
-// Forces Vercel to dynamically fetch this every time to bypass static hydration caching
-export const dynamic = 'force-dynamic'; 
+export const dynamic = 'force-dynamic';
+
+function getSwarmApiUrl() {
+    const exactUrl = process.env.PCP_SWARM_API_URL?.trim();
+    if (exactUrl) {
+        return exactUrl;
+    }
+
+    const baseUrl = process.env.PCP_SWARM_BASE_URL?.trim();
+    if (baseUrl) {
+        return `${baseUrl.replace(/\/+$/, '')}/api/initial`;
+    }
+
+    return null;
+}
 
 export async function GET() {
     try {
-        // Proxy securely to the Droplet IP 
-        const dropletResponse = await fetch('http://64.23.173.160:3002/api/initial', {
-            // NextJS 14 cache buster
-            cache: 'no-store',
-            headers: { 'Cache-Control': 'no-cache' }
-        });
-        
-        if (!dropletResponse.ok) {
-            return NextResponse.json({ error: 'Droplet connection failed' }, { status: 502 });
+        const swarmApiUrl = getSwarmApiUrl();
+        if (!swarmApiUrl) {
+            return NextResponse.json(
+                {
+                    ok: false,
+                    status: 'swarm_backend_not_configured',
+                    message: 'Set PCP_SWARM_API_URL or PCP_SWARM_BASE_URL to enable live swarm hydration.',
+                },
+                { status: 503 },
+            );
         }
-        
-        const data = await dropletResponse.json();
-        return NextResponse.json(data);
-    } catch (error: any) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+
+        const dropletResponse = await fetch(swarmApiUrl, {
+            cache: 'no-store',
+            headers: { 'Cache-Control': 'no-cache' },
+        });
+
+        if (!dropletResponse.ok) {
+            const body = await dropletResponse.text();
+            return new NextResponse(body, {
+                status: dropletResponse.status,
+                headers: {
+                    'content-type': dropletResponse.headers.get('content-type') || 'application/json; charset=utf-8',
+                    'cache-control': 'no-store',
+                },
+            });
+        }
+
+        const data = await dropletResponse.text();
+        return new NextResponse(data, {
+            status: 200,
+            headers: {
+                'content-type': dropletResponse.headers.get('content-type') || 'application/json; charset=utf-8',
+                'cache-control': 'no-store',
+            },
+        });
+    } catch (error) {
+        return NextResponse.json(
+            {
+                ok: false,
+                status: 'swarm_backend_unreachable',
+                error: error instanceof Error ? error.message : 'Unknown swarm backend failure',
+            },
+            { status: 502 },
+        );
     }
 }
