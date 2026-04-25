@@ -16,11 +16,10 @@ const walletRaw = JSON.parse(fs.readFileSync(walletPath, 'utf-8'));
 const { Keypair } = require('@solana/web3.js');
 const wallet = Keypair.fromSecretKey(new Uint8Array(walletRaw));
 
-// ─── Known TX sigs from this session ──────────────────────────────
-const SIGS_TO_CHECK = [
-  '2wLzPTTu7snmHZjUe8Fw7NnFuAZMotTD8BiXRgo9KZ9Z7tW13BnyzEfRNJKHB7W5KLJFoiHWg7UmZ39oBBh3cQSF', // force live test
-  '3FML55FkJmoc2fK3DgPct6G581BPivJiSDygK7ZRUpV4Rf5TE6pUAJG1uP1uE4c7FYrQ8a3jURvfSyV6FXL5BoiV', // first diagnostic test
-];
+const SIGS_TO_CHECK = (process.env.SIGS_TO_CHECK || '')
+  .split(',')
+  .map((sig) => sig.trim())
+  .filter(Boolean);
 
 async function main() {
   console.log('\n========================================');
@@ -52,6 +51,9 @@ async function main() {
 
   // ─── Check specific sigs ───────────────────────────────────────
   console.log(`\n  🔎 Checking specific session transactions:`);
+  if (SIGS_TO_CHECK.length === 0) {
+    console.log('     No SIGS_TO_CHECK provided. Skipping explicit signature verification.');
+  }
   for (const sig of SIGS_TO_CHECK) {
     try {
       const tx = await connection.getTransaction(sig, { maxSupportedTransactionVersion: 0 });

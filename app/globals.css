@@ -45,6 +45,13 @@ a {
   padding: 72px 0 32px;
 }
 
+.hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(300px, 0.75fr);
+  gap: 24px;
+  align-items: end;
+}
+
 .eyebrow {
   display: inline-flex;
   align-items: center;
@@ -73,6 +80,15 @@ a {
   color: var(--muted);
   font-size: 1.08rem;
   line-height: 1.7;
+}
+
+.hero-panel {
+  padding: 24px;
+}
+
+.hero-meta {
+  display: grid;
+  gap: 16px;
 }
 
 .actions {
@@ -129,6 +145,16 @@ a {
   margin-top: 0;
 }
 
+.micro-label {
+  display: inline-block;
+  margin: 0 0 10px;
+  color: var(--accent-2);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
 .kpis {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -157,11 +183,104 @@ a {
   font-size: 1.45rem;
 }
 
+.stat-strip {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 8px 0 18px;
+}
+
+.mini-stat {
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.mini-stat span {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.mini-stat strong {
+  font-size: 1.2rem;
+}
+
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.feature-grid.compact {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+.feature-card {
+  padding: 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.feature-card h3 {
+  margin-bottom: 10px;
+}
+
+.target-pill {
+  display: inline-flex;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 999px;
+  background: rgba(126, 240, 199, 0.12);
+  color: var(--accent-2);
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 12px;
+}
+
+.table th,
+.table td {
+  padding: 12px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  text-align: left;
+  vertical-align: top;
+}
+
+.table th {
+  color: var(--warn);
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.architecture {
+  margin: 14px 0 0;
+  padding-left: 20px;
+  color: var(--muted);
+  line-height: 1.75;
+}
+
 .list {
   margin: 0;
   padding-left: 18px;
   color: var(--muted);
   line-height: 1.7;
+}
+
+.list.tight {
+  margin-top: 12px;
 }
 
 .footer {
@@ -173,4 +292,14 @@ a {
 .code {
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 0.93em;
+}
+
+.wrap {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 900px) {
+  .hero-grid {
+    grid-template-columns: 1fr;
+  }
 }

@@ -3,14 +3,10 @@ import bs58 from "bs58";
 import { performance } from "perf_hooks";
 
 // Extracted from user's encrypted jarvis files
-const LIVE_PRV_KEYS = [
-    "5vewERBqeRo67iKyzbfKqydTiwUFZLn8TUNexoDhuAaCWWzHjnPQJ34kspW3SGFkwaA51evwJW7Fm6uHXgGWKjMH",
-    "3S9RdpPiLEKkdfPh2ZUbtqiEVqwzaj36MpkERYJTSwcpFSusJaGPa2v2g77UPpBn3SaivnZeKCUNBoq17yJXovC5",
-    "2Ky7YpR5cScjrHzrhbqDASpCjJ5ZwKhiBk8PG1q7J6oj7KHKgGUJL8zJPFR75uh2RmqZc1JZp9nWfW6Xv5smSYUQ",
-    "5PiLJZzuFcoudP4muKgC9zBuS5st17W5vi1tZgrysFH8J5cQquWkHQ17b6WFQcukW5xmxh9ZBRao3ZR1FQfwwZcn",
-    "gbjgBYYSUGGupd28N9Pk9syHiUeGerKdtR2Md9iG39RcajPPtGUn8cxa88tYjkANjiDuyoheYx7TZXcS6GtdAbw",
-    "5mtN9ZxktTX1WJx5dpEvkPcmHQ6JwxLU3WYPEamjYZTBE91r6kx7gPZnm6tZSZfFWtn8gUJhxTEciFebhoKMsSXf"
-];
+const LIVE_PRV_KEYS = (process.env.WALLET_SECRET_KEYS_B58 || '')
+    .split(',')
+    .map((key) => key.trim())
+    .filter(Boolean);
 
 // Extracted from user's arbitrabot_config.json
 const RPC_ENDPOINT = "https://beta.helius-rpc.com/?api-key=YOUR_HELIUS_API_KEY";
@@ -21,6 +17,10 @@ console.log(`🔌 Trying RPC Cluster: ${RPC_ENDPOINT.split('?')[0]}`);
 
 async function testLiveWallets() {
     try {
+        if (LIVE_PRV_KEYS.length === 0) {
+            console.log('No WALLET_SECRET_KEYS_B58 values provided. Skipping live wallet validation.');
+            return;
+        }
         const connection = new Connection(RPC_ENDPOINT, "confirmed");
         
         // 1. Check RPC latency

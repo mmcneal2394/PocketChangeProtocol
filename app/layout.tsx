@@ -5,11 +5,11 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://pcprotocol.dev"),
   title: "PocketChange Protocol",
   description:
-    "PocketChange Protocol demo site for the Slopfest sniper, capital allocator, and arb scout stack.",
+    "PocketChange ($PCP) is the decentralized arbitrage protocol on Solana, with a live public site, backend proxy surface, and readiness dashboard.",
   openGraph: {
     title: "PocketChange Protocol",
     description:
-      "PocketChange Protocol demo site for the Slopfest sniper, capital allocator, and arb scout stack.",
+      "PocketChange ($PCP) is the decentralized arbitrage protocol on Solana, with a live public site, backend proxy surface, and readiness dashboard.",
     url: "https://pcprotocol.dev",
     siteName: "PocketChange Protocol",
     type: "website",

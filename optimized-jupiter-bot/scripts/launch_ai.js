@@ -6,15 +6,19 @@ const envPath = path.join(__dirname, '..', '.env');
 
 // Cleanly inject or update GEMINI_API_KEY
 if (fs.existsSync(envPath)) {
-    let env = fs.readFileSync(envPath, 'utf8');
-    const apiKey = 'AIzaSyDJfu4Egz0_TKnuYYoZAkQAKvovABdzoy4';
-    if (env.includes('GEMINI_API_KEY=')) {
-        env = env.replace(/^GEMINI_API_KEY=.*$/gm, `GEMINI_API_KEY=${apiKey}`);
+    const apiKey = process.env.GOOGLE_API_KEY?.trim();
+    if (apiKey) {
+        let env = fs.readFileSync(envPath, 'utf8');
+        if (env.includes('GEMINI_API_KEY=')) {
+            env = env.replace(/^GEMINI_API_KEY=.*$/gm, `GEMINI_API_KEY=${apiKey}`);
+        } else {
+            env += `\nGEMINI_API_KEY=${apiKey}\n`;
+        }
+        fs.writeFileSync(envPath, env);
+        console.log('[AI-LOOP] Injected GEMINI_API_KEY from env.');
     } else {
-        env += `\nGEMINI_API_KEY=${apiKey}\n`;
+        console.warn('[AI-LOOP] GOOGLE_API_KEY not set; leaving .env unchanged.');
     }
-    fs.writeFileSync(envPath, env);
-    console.log('[AI-LOOP] Injected GEMINI_API_KEY correctly.');
 }
 
 function runOptimizerCycle() {

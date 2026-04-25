@@ -1,9 +1,15 @@
 const fs = require('fs');
+const path = require('path');
 
-const envPath = '/mnt/volume_sfo3_01/pcp-engine/optimized-jupiter-bot/.env';
-let env = fs.readFileSync(envPath, 'utf8');
+const envPath = process.env.PCP_ENV_PATH || path.join(__dirname, '..', '.env');
+const apiKey = process.env.GOOGLE_API_KEY?.trim();
 
-const apiKey = 'AIzaSyDJfu4Egz0_TKnuYYoZAkQAKvovABdzoy4';
+if (!apiKey) {
+    console.error('GOOGLE_API_KEY is not set.');
+    process.exit(1);
+}
+
+let env = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : '';
 
 if (env.includes('GEMINI_API_KEY=')) {
     env = env.replace(/^GEMINI_API_KEY=.*$/gm, `GEMINI_API_KEY=${apiKey}`);
@@ -11,5 +17,5 @@ if (env.includes('GEMINI_API_KEY=')) {
     env += `\nGEMINI_API_KEY=${apiKey}\n`;
 }
 
-fs.writeFileSync(envPath, env);
-console.log('Successfully injected GEMINI_API_KEY into .env.');
+fs.writeFileSync(envPath, env.trimStart() ? env : `GEMINI_API_KEY=${apiKey}\n`);
+console.log(`Successfully injected GEMINI_API_KEY into ${envPath}.`);

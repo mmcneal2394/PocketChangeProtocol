@@ -6,6 +6,7 @@ on:
     branches:
       - main
       - demo/slopfest-arb-loop
+      - readiness/full-stack
     paths:
       - ".github/workflows/public-site-smoke.yml"
       - "app/**"

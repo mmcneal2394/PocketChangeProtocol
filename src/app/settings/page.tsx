@@ -52,7 +52,7 @@ export default function SettingsPage() {
                 <div style={{ padding: "16px", background: "rgba(0,0,0,0.3)", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.05)", marginBottom: "24px" }}>
                    <p style={{ color: "var(--text-secondary)", fontSize: "0.85rem", marginBottom: "8px" }}>REST / GraphQL Master Bearer Token</p>
                    <div style={{ display: "flex", gap: "12px" }}>
-                       <input type="password" value="sk_test_arbitrasaas_x9F82nA1" readOnly style={{ flex: 1, padding: "12px", background: "rgba(255,255,255,0.05)", color: "#fff", border: "none", borderRadius: "6px", fontFamily: "monospace", letterSpacing: "2px", outline: "none" }} />
+                       <input type="password" value="demo-token-hidden" readOnly style={{ flex: 1, padding: "12px", background: "rgba(255,255,255,0.05)", color: "#fff", border: "none", borderRadius: "6px", fontFamily: "monospace", letterSpacing: "2px", outline: "none" }} />
                        <button style={{ padding: "0 24px", background: "rgba(255,255,255,0.1)", border: "none", color: "#fff", borderRadius: "6px", cursor: "pointer" }}>Copy</button>
                        <button style={{ padding: "0 24px", background: "transparent", border: "1px solid var(--error)", color: "var(--error)", borderRadius: "6px", cursor: "pointer" }}>Rotate</button>
                    </div>

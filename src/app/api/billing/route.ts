@@ -1,17 +1,25 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 
-// Initialize Stripe with dummy test secret key for MVP demonstration
-// In production, this pulls from process.env.STRIPE_SECRET_KEY
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_51MockStripeSecretKeyForArbitraSaaS', {
-  apiVersion: '2023-10-16' as any, // Target specific API version
-});
+function getStripeClient() {
+  const stripeSecret = process.env.STRIPE_SECRET_KEY;
+  if (!stripeSecret) {
+    return null;
+  }
+  return new Stripe(stripeSecret, {
+    apiVersion: '2023-10-16' as any,
+  });
+}
 
 // The standard base URL configuration
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
 
 export async function POST(req: Request) {
     try {
+        const stripe = getStripeClient();
+        if (!stripe) {
+            return NextResponse.json({ error: "Stripe is not configured." }, { status: 503 });
+        }
         const { planId, maxWallets } = await req.json();
 
         if (!planId) {

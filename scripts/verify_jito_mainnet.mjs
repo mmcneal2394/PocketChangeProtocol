@@ -7,8 +7,12 @@ async function verifyJitoConnection() {
     console.log('🟢 INITIATING JITO NY NODE CONNECTION TEST (MAINNET)');
     console.log('==========================================');
     
-    // Using ABPR Private Key directly for test execution
-    const wallet = Keypair.fromSecretKey(bs58.decode('2Z1gEB9B4vAoxhTZt1DzrmVGjJxkN54MwoAarmNp8h69KDKY6ECFmPGxcwNUa9Pj8gctt7wvMeRYUaqo74fJYNAt'));
+    const privateKey = process.env.JITO_TEST_PRIVATE_KEY_B58;
+    if (!privateKey) {
+        console.error('JITO_TEST_PRIVATE_KEY_B58 is required.');
+        process.exit(1);
+    }
+    const wallet = Keypair.fromSecretKey(bs58.decode(privateKey));
     console.log(`✅ Loaded ABPR Wallet: ${wallet.publicKey.toString()}`);
     
     // Connect to Mainnet Beta

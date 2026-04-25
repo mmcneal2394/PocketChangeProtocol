@@ -1,11 +1,11 @@
 module.exports = {
   apps: [
     {
-      name: "pcp-rpc-gateway",
-      script: "scripts/maintain/pcp_rpc_gateway.ts",
+      name: "pcp-sniper-1",
+      script: "scripts/maintain/momentum_sniper.ts",
       interpreter: "node",
       interpreter_args: "--require ts-node/register",
-      env: { NODE_ENV: "production" }
+      env: { NODE_ENV: "production", WALLET_INDEX: "1" }
     },
     {
       name: "pcp-wallet-monitor",
@@ -15,46 +15,45 @@ module.exports = {
       env: { NODE_ENV: "production" }
     },
     {
-      name: "pcp-market-data",
-      script: "scripts/maintain/pcp_market_data.ts",
+      name: "pcp-wallet-intel",
+      script: "scripts/maintain/wallet_intel_engine.ts",
       interpreter: "node",
       interpreter_args: "--require ts-node/register",
       env: { NODE_ENV: "production" }
     },
     {
-      name: "pcp-performance",
-      script: "scripts/maintain/performance_tracker.ts",
+      name: "pcp-profit-accumulator",
+      script: "scripts/maintain/profit_accumulator.ts",
       interpreter: "node",
       interpreter_args: "--require ts-node/register",
       env: { NODE_ENV: "production" }
     },
     {
-      name: "pcp-regime",
-      script: "scripts/maintain/market_regime.ts",
+      name: "pcp-capital-allocator",
+      script: "scripts/maintain/capital_allocator.ts",
       interpreter: "node",
       interpreter_args: "--require ts-node/register",
       env: { NODE_ENV: "production" }
     },
     {
-      name: "pcp-stale-sweeper",
-      script: "scripts/maintain/stale_sweeper.ts",
+      name: "pcp-arb-scout",
+      script: "scripts/maintain/arb_scout.js",
+      interpreter: "node",
+      env: { NODE_ENV: "production" }
+    },
+    {
+      name: "pcp-slopfest-guardian",
+      script: "scripts/maintain/slopfest_guardian.ts",
       interpreter: "node",
       interpreter_args: "--require ts-node/register",
       env: { NODE_ENV: "production" }
     },
     {
-      name: "pcp-ingestion",
-      script: "scripts/maintain/ingestion_api.ts",
+      name: "pcp-overview",
+      script: "scripts/maintain/overview_server.ts",
       interpreter: "node",
       interpreter_args: "--require ts-node/register",
       env: { NODE_ENV: "production" }
-    },
-    {
-      name: "pcp-sniper-1",
-      script: "scripts/maintain/momentum_sniper.ts",
-      interpreter: "node",
-      interpreter_args: "--require ts-node/register",
-      env: { NODE_ENV: "production", WALLET_INDEX: "1" }
     },
     {
       name: "pcp-sniper-paper",
@@ -62,48 +61,6 @@ module.exports = {
       interpreter: "node",
       interpreter_args: "--require ts-node/register",
       env: { NODE_ENV: "production", PAPER_MODE: "true" }
-    },
-    {
-      name: "pcp-discovery-engine",
-      script: "scripts/maintain/discovery_engine.ts",
-      interpreter: "node",
-      interpreter_args: "--require ts-node/register",
-      env: { NODE_ENV: "production" }
-    },
-    {
-      name: "pcp-trainer",
-      script: "scripts/maintain/pcp_trainer.ts",
-      interpreter: "node",
-      interpreter_args: "--require ts-node/register",
-      env: { NODE_ENV: "production" }
-    },
-    {
-      name: "pcp-social",
-      script: "scripts/maintain/social_manager.ts",
-      interpreter: "node",
-      interpreter_args: "--require ts-node/register",
-      env: { NODE_ENV: "production" }
-    },
-    {
-      name: "pcp-hive-mind",
-      script: "scripts/maintain/hive_learning_agent.ts",
-      interpreter: "node",
-      interpreter_args: "--require ts-node/register",
-      env: { NODE_ENV: "production" }
-    },
-    {
-      name: "pcp-velocity-stream",
-      script: "scripts/maintain/velocity_stream.ts",
-      interpreter: "node",
-      interpreter_args: "--require ts-node/register",
-      env: { NODE_ENV: "production" }
-    },
-    {
-      name: "pcp-gas-monitor",
-      script: "scripts/maintain/pcp_gas_monitor.ts",
-      interpreter: "node",
-      interpreter_args: "--require ts-node/register",
-      env: { NODE_ENV: "production" }
     }
   ]
 };

@@ -4,22 +4,25 @@ import re
 ENV_FILE = "/mnt/volume_sfo3_01/pcp-engine/optimized-jupiter-bot/.env"
 CRITIC_FILE = "/mnt/volume_sfo3_01/pcp-engine/optimized-jupiter-bot/scripts/maintain/swarm/critic_agent.py"
 ARB_CRITIC_FILE = "/mnt/volume_sfo3_01/pcp-engine/optimized-jupiter-bot/scripts/maintain/swarm/arb_critic_agent.py"
+NEW_API_KEY = os.getenv("GOOGLE_API_KEY", "")
 
-NEW_API_KEY = "AIzaSyBTY3pgSZ0uVNEiRJsJ7n954N4-FewySno"
 
 def patch_env():
+    if not NEW_API_KEY:
+        raise RuntimeError("GOOGLE_API_KEY is required")
     with open(ENV_FILE, "r") as f:
         env = f.read()
     env = re.sub(r"^GEMINI_API_KEY=.*$", f"GEMINI_API_KEY={NEW_API_KEY}", env, flags=re.MULTILINE)
     with open(ENV_FILE, "w") as f:
         f.write(env)
-    print("Patched .env with new Gemini API Key")
+    print("Patched .env with GOOGLE_API_KEY from env")
+
 
 def patch_file(filepath):
     if not os.path.exists(filepath):
         print(f"Skipped {filepath} - doesn't exist")
         return
-        
+
     with open(filepath, "r") as f:
         content = f.read()
 
@@ -30,7 +33,7 @@ def patch_file(filepath):
     from google import genai
     from google.genai import errors
     client = genai.Client(api_key=GEMINI_API_KEY)
-    
+
     for attempt in range(retries):
         try:
             response = client.models.generate_content(
@@ -54,15 +57,17 @@ def patch_file(filepath):
             return None
     return None"""
 
-    content = re.sub(r"def call_gemini\(prompt: str, retries: int = 3\) -> Optional\[str\]:[\s\S]*?return None\s*\n\s*\ndef", new_call_gemini + "\n\ndef", content)
-    
+    content = re.sub(
+        r"def call_gemini\(prompt: str, retries: int = 3\) -> Optional\[str\]:[\s\S]*?return None\s*\n\s*\ndef",
+        new_call_gemini + "\n\ndef",
+        content,
+    )
+
     with open(filepath, "w") as f:
         f.write(content)
     print(f"Patched {filepath} to use google-genai SDK")
 
-try:
-    patch_env()
-    patch_file(CRITIC_FILE)
-    patch_file(ARB_CRITIC_FILE)
-except Exception as e:
-    print(e)
+
+patch_env()
+patch_file(CRITIC_FILE)
+patch_file(ARB_CRITIC_FILE)

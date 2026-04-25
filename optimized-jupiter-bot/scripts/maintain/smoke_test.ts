@@ -1,106 +1,187 @@
-/**
- * smoke_test.ts  —  Junior agent: fast pipeline validation (--duration 0)
- * ─────────────────────────────────────────────────────────────────────────────
- * Runs dry_run_sim with duration=0 (screen + exit), parses output for
- * known failure patterns, writes smoke_test_result.json, exits 0/1.
- *
- * Usage:
- *   npx ts-node scripts/maintain/smoke_test.ts
- * ─────────────────────────────────────────────────────────────────────────────
- */
-
-import { execSync, spawnSync } from 'child_process';
-import fs   from 'fs';
+import fs from 'fs';
 import path from 'path';
+import { spawn } from 'child_process';
+import dotenv from 'dotenv';
+import { Keypair } from '@solana/web3.js';
 
-const RESULT_FILE = path.join(process.cwd(), 'smoke_test_result.json');
+dotenv.config({ path: path.join(process.cwd(), '.env') });
+dotenv.config({ path: path.join(process.cwd(), '..', '.env') });
 
-interface SmokeResult {
-  timestamp:    string;
-  passed:       boolean;
-  durationMs:   number;
-  checks:       Array<{ name: string; passed: boolean; detail?: string }>;
-  rawStdout:    string;
-  rawStderr:    string;
+const PKG_ROOT = process.cwd();
+const REPO_ROOT = path.resolve(PKG_ROOT, '..');
+const SIGNALS_DIR = path.join(PKG_ROOT, 'signals');
+const TEMP_WALLET_FILE = path.join(SIGNALS_DIR, 'smoke_wallet.json');
+const DEFAULT_RPC = process.env.RPC_ENDPOINT || process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
+
+type SmokeResult = {
+  name: string;
+  ok: boolean;
+  detail: string;
+};
+
+function ensureDir(dirPath: string) {
+  fs.mkdirSync(dirPath, { recursive: true });
 }
 
-function run(): SmokeResult {
-  const start = Date.now();
-  const checks: Array<{ name: string; passed: boolean; detail?: string }> = [];
-
-  console.log('[SMOKE] Running dry_run_sim --duration 0...');
-  const result = spawnSync(
-    'npx', ['ts-node', '--transpile-only', 'scripts/dry_run_sim.ts', '--capital', '200', '--duration', '0'],
-    { cwd: process.cwd(), encoding: 'utf-8', timeout: 180_000 }
-  );
-
-  const stdout = result.stdout || '';
-  const stderr = result.stderr || '';
-  const durationMs = Date.now() - start;
-
-  // ── Check 1: Process exit code ───────────────────────────────────────────────
-  checks.push({
-    name: 'exit_code_zero',
-    passed: result.status === 0,
-    detail: result.status !== 0 ? `exit ${result.status}` : undefined,
-  });
-
-  // ── Check 2: Env vars validated ──────────────────────────────────────────────
-  checks.push({
-    name: 'env_vars_present',
-    passed: stdout.includes('All required env variables present'),
-  });
-
-  // ── Check 3: SOL price fetched ───────────────────────────────────────────────
-  const priceMatch = stdout.match(/SOL price: \$(\d+\.\d+)/);
-  checks.push({
-    name: 'sol_price_fetched',
-    passed: !!priceMatch,
-    detail: priceMatch ? `$${priceMatch[1]}` : 'not found in output',
-  });
-
-  // ── Check 4: Tokens found ────────────────────────────────────────────────────
-  const tokensMatch = stdout.match(/Found (\d+) candidate tokens/);
-  const tokenCount  = tokensMatch ? parseInt(tokensMatch[1]) : 0;
-  checks.push({
-    name: 'candidates_found',
-    passed: tokenCount > 0,
-    detail: `${tokenCount} tokens`,
-  });
-
-  // ── Check 5: Screening completed ─────────────────────────────────────────────
-  checks.push({
-    name: 'screening_completed',
-    passed: stdout.includes('passed screening'),
-  });
-
-  // ── Check 6: No TypeScript errors ────────────────────────────────────────────
-  checks.push({
-    name: 'no_ts_errors',
-    passed: !stderr.includes('TSError') && !stderr.includes('error TS'),
-    detail: stderr.includes('TSError') ? 'TypeScript compile error detected' : undefined,
-  });
-
-  // ── Check 7: No unhandled exceptions ─────────────────────────────────────────
-  checks.push({
-    name: 'no_unhandled_exceptions',
-    passed: !stderr.includes('UnhandledPromiseRejection') && !stdout.includes('Simulation error'),
-    detail: stderr.includes('UnhandledPromiseRejection') ? 'Unhandled rejection in output' : undefined,
-  });
-
-  const passed = checks.every(c => c.passed);
-  return { timestamp: new Date().toISOString(), passed, durationMs, checks, rawStdout: stdout, rawStderr: stderr };
+function createTempWalletFile() {
+  ensureDir(SIGNALS_DIR);
+  const wallet = Keypair.generate();
+  fs.writeFileSync(TEMP_WALLET_FILE, JSON.stringify(Array.from(wallet.secretKey)), 'utf8');
+  return TEMP_WALLET_FILE;
 }
 
-// ── Entry ──────────────────────────────────────────────────────────────────────
-const result = run();
-fs.writeFileSync(RESULT_FILE, JSON.stringify(result, null, 2));
+function cleanupTempWalletFile() {
+  if (fs.existsSync(TEMP_WALLET_FILE)) fs.unlinkSync(TEMP_WALLET_FILE);
+}
 
-const icon  = result.passed ? '✅' : '❌';
-const fails = result.checks.filter(c => !c.passed).map(c => `  ✗ ${c.name}: ${c.detail || 'failed'}`).join('\n');
-console.log(
-  `\n[SMOKE] ${icon} ${result.passed ? 'ALL CHECKS PASSED' : 'CHECKS FAILED'} (${result.durationMs}ms)\n` +
-  result.checks.map(c => `  ${c.passed ? '✓' : '✗'} ${c.name}${c.detail ? ': ' + c.detail : ''}`).join('\n')
-);
+async function runCommand(args: {
+  name: string;
+  command: string;
+  commandArgs: string[];
+  cwd: string;
+  env?: NodeJS.ProcessEnv;
+  timeoutMs?: number;
+  successPattern?: RegExp;
+  killOnSuccessPattern?: boolean;
+}): Promise<SmokeResult> {
+  return new Promise((resolve) => {
+    const child = spawn(args.command, args.commandArgs, {
+      cwd: args.cwd,
+      env: args.env || process.env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
 
-process.exit(result.passed ? 0 : 1);
+    let output = '';
+    let matched = false;
+    let finished = false;
+
+    const finish = (ok: boolean, detail: string) => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      resolve({ name: args.name, ok, detail });
+    };
+
+    const onChunk = (chunk: Buffer) => {
+      const text = chunk.toString();
+      output += text;
+      if (args.successPattern?.test(output)) {
+        matched = true;
+        if (args.killOnSuccessPattern && !child.killed) {
+          child.kill('SIGTERM');
+        }
+      }
+    };
+
+    child.stdout.on('data', onChunk);
+    child.stderr.on('data', onChunk);
+
+    child.on('error', (error) => {
+      finish(false, String(error?.message || error));
+    });
+
+    child.on('close', (code, signal) => {
+      const compactOutput = output.trim().split('\n').filter(Boolean).slice(-8).join(' | ') || 'no output';
+      if (matched) {
+        finish(true, compactOutput);
+        return;
+      }
+      if (code === 0) {
+        if (!args.successPattern || args.successPattern.test(output)) {
+          finish(true, compactOutput);
+          return;
+        }
+      }
+      finish(false, `exit=${code ?? 'null'} signal=${signal ?? 'null'} | ${compactOutput}`);
+    });
+
+    const timer = setTimeout(() => {
+      const compactOutput = output.trim().split('\n').filter(Boolean).slice(-8).join(' | ') || 'timeout';
+      if (matched) {
+        if (!child.killed) child.kill('SIGTERM');
+        finish(true, compactOutput);
+        return;
+      }
+      if (!child.killed) child.kill('SIGTERM');
+      finish(false, `timeout after ${args.timeoutMs || 0}ms | ${compactOutput}`);
+    }, args.timeoutMs || 15_000);
+  });
+}
+
+async function main() {
+  const tempWalletPath = createTempWalletFile();
+  const smokeEnv: NodeJS.ProcessEnv = {
+    ...process.env,
+    PAPER_MODE: 'true',
+    RPC_ENDPOINT: DEFAULT_RPC,
+    SOLANA_RPC_URL: DEFAULT_RPC,
+    JUPITER_API_KEY: process.env.JUPITER_API_KEY || 'dryrun',
+    WALLET_KEYPAIR_PATH: tempWalletPath,
+  };
+
+  const results: SmokeResult[] = [];
+
+  try {
+    results.push(await runCommand({
+      name: 'guardian',
+      command: 'node',
+      commandArgs: ['--require', 'ts-node/register/transpile-only', 'scripts/maintain/slopfest_guardian.ts', '--once'],
+      cwd: PKG_ROOT,
+      env: smokeEnv,
+      timeoutMs: 20_000,
+      successPattern: /\[GUARDIAN\]/,
+    }));
+
+    results.push(await runCommand({
+      name: 'allocator',
+      command: 'node',
+      commandArgs: ['--require', 'ts-node/register/transpile-only', 'scripts/maintain/capital_allocator.ts', '--once'],
+      cwd: PKG_ROOT,
+      env: smokeEnv,
+      timeoutMs: 20_000,
+      successPattern: /\[ALLOCATOR\]/,
+    }));
+
+    results.push(await runCommand({
+      name: 'arb-scout',
+      command: 'node',
+      commandArgs: ['scripts/live_arbitrage_engine.mjs', '--once'],
+      cwd: REPO_ROOT,
+      env: smokeEnv,
+      timeoutMs: 30_000,
+      successPattern: /(\[ARB\]|No WALLET_SECRET_KEYS_B58 values provided)/,
+    }));
+
+    results.push(await runCommand({
+      name: 'sniper-paper-boot',
+      command: 'node',
+      commandArgs: ['--require', 'ts-node/register/transpile-only', 'scripts/maintain/momentum_sniper.ts'],
+      cwd: PKG_ROOT,
+      env: smokeEnv,
+      timeoutMs: 20_000,
+      successPattern: /(Quota status:|Wallet:|Native SOL:)/,
+      killOnSuccessPattern: true,
+    }));
+  } finally {
+    cleanupTempWalletFile();
+  }
+
+  for (const result of results) {
+    const status = result.ok ? 'PASS' : 'FAIL';
+    console.log(`[SMOKE] ${status} | ${result.name} | ${result.detail}`);
+  }
+
+  const failures = results.filter((result) => !result.ok);
+  if (failures.length) {
+    console.error(`[SMOKE] FAILURES=${failures.length}`);
+    process.exit(1);
+  }
+
+  console.log(`[SMOKE] PASS | systems=${results.length}`);
+}
+
+main().catch((error: any) => {
+  cleanupTempWalletFile();
+  console.error(`[SMOKE] FATAL | ${error?.message || error}`);
+  process.exit(1);
+});

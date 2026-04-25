@@ -1,0 +1,52 @@
+name: Full Readiness
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - demo/slopfest-arb-loop
+      - readiness/full-stack
+    paths:
+      - ".github/workflows/full-readiness.yml"
+      - ".github/workflows/public-site-smoke.yml"
+      - "app/**"
+      - "package.json"
+      - "scripts/**"
+      - "src/**"
+      - "optimized-jupiter-bot/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: full-readiness-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  readiness:
+    name: Build, Scrub, Test, Smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install root dependencies
+        run: npm install
+
+      - name: Install trading stack dependencies
+        run: npm install
+        working-directory: optimized-jupiter-bot
+
+      - name: Run security scrub
+        run: node scripts/pre_push_security.js
+
+      - name: Run readiness suite
+        run: npm run pcp:readiness
