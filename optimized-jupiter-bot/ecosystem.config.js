@@ -33,6 +33,20 @@ module.exports = {
       env: { NODE_ENV: "production" }
     },
     {
+      name: "pcp-wallet-registry-refresh",
+      script: "scripts/maintain/wallet_registry_refresh.ts",
+      interpreter: "node",
+      interpreter_args: "--require ts-node/register",
+      env: { NODE_ENV: "production" }
+    },
+    {
+      name: "pcp-gmgn-bridge",
+      script: "scripts/maintain/gmgn_bridge.remote.ts",
+      interpreter: "node",
+      interpreter_args: "--require ts-node/register",
+      env: { NODE_ENV: "production" }
+    },
+    {
       name: "pcp-profit-accumulator",
       script: "scripts/maintain/profit_accumulator.ts",
       interpreter: "node",
