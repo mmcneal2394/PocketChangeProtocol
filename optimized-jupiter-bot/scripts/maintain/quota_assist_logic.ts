@@ -289,15 +289,30 @@ export function shouldAllowAlphaQuotaCandidate(args: {
   alphaKolCount?: number;
   signalCount?: number;
   quotaQuietRegime?: boolean;
+  walletSignal?: Record<string, any> | null;
+  replayBacked?: boolean;
 }) {
   const candidate = args.candidate || {};
   const alphaKolCount = Math.max(0, toFiniteNumber(args.alphaKolCount));
   const signalCount = Math.max(0, toFiniteNumber(args.signalCount));
   const marketSupport = hasQuotaCandidateMarketSupport(candidate);
   const metadataBlind = isQuotaCandidateMetadataBlind(candidate);
+  const walletSignal = args.walletSignal || null;
+  const walletQuotaScore = computeWalletQuotaSignalScore(walletSignal);
+  const strongWalletSupport =
+    shouldAllowQuotaWalletWithoutExtraMarketSupport(walletSignal) ||
+    (
+      Boolean(walletSignal?.executable) &&
+      walletQuotaScore >= 0.42 &&
+      Math.max(0, toFiniteNumber(walletSignal?.consensusScore)) >= 0.68
+    );
 
   if (metadataBlind) {
-    return false;
+    return (
+      args.replayBacked === true &&
+      strongWalletSupport &&
+      (alphaKolCount > 0 || signalCount >= 2)
+    );
   }
   if (args.quotaQuietRegime === true && alphaKolCount <= 0) {
     return false;

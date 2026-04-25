@@ -141,6 +141,46 @@ test('quota metadata guards identify blind candidates and keep alpha quota from 
     }),
     true,
   );
+  assert.equal(
+    shouldAllowAlphaQuotaCandidate({
+      candidate: { liquidityUsd: 0, marketCapUsd: 0, volume1hUsd: 0, buys1h: 0 },
+      alphaKolCount: 1,
+      signalCount: 2,
+      quotaQuietRegime: false,
+      replayBacked: true,
+      walletSignal: {
+        executable: true,
+        walletCount: 2,
+        wallets: ['a', 'b'],
+        sizeUp: true,
+        consensusScore: 0.84,
+        walletWeightedScore: 0.81,
+        walletPnlScore: 0.74,
+        priority: 'HIGH',
+      },
+    }),
+    true,
+  );
+  assert.equal(
+    shouldAllowAlphaQuotaCandidate({
+      candidate: { liquidityUsd: 0, marketCapUsd: 0, volume1hUsd: 0, buys1h: 0 },
+      alphaKolCount: 1,
+      signalCount: 2,
+      quotaQuietRegime: false,
+      replayBacked: false,
+      walletSignal: {
+        executable: true,
+        walletCount: 2,
+        wallets: ['a', 'b'],
+        sizeUp: true,
+        consensusScore: 0.84,
+        walletWeightedScore: 0.81,
+        walletPnlScore: 0.74,
+        priority: 'HIGH',
+      },
+    }),
+    false,
+  );
 });
 
 test('shouldAllowQuotaWalletWithoutExtraMarketSupport now requires stronger wallet confirmation than a lone scalp tag', () => {

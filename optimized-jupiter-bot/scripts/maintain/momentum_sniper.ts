@@ -158,6 +158,10 @@ const {
   shouldAllowAlphaQuotaCandidate,
 } = require('./quota_assist_logic.ts');
 const {
+  resolveReplayBackedStrategyProfile,
+  evaluateReplayBackedRouteLiveOverride,
+} = require('./replay_gate_logic.ts');
+const {
   classifyExitSwapFailure,
   resolveExitRetryCooldownMs,
 } = require('./exit_failure_logic.ts');
@@ -416,6 +420,37 @@ const GMGN_FOLLOW_MONITOR_FILE = path.join(SIGNALS_DIR, 'gmgn_follow_monitor.jso
 const BAGS_ENRICHMENT_CACHE_FILE = path.join(SIGNALS_DIR, 'bags_enrichment_cache.json');
 const GMGN_TOKEN_INFO_CACHE_FILE = path.join(SIGNALS_DIR, 'gmgn_token_info_cache.json');
 const STRATEGY_PROFILE_FILE = path.resolve(process.cwd(), process.env.STRATEGY_PROFILE_PATH || 'scripts/active.strategy.json');
+
+function loadBootSlopfestParams(): { source: string; payload: any } | null {
+  const candidates = [
+    path.join(process.cwd(), 'strategy_params.json'),
+    path.join(SIGNALS_DIR, 'strategy_params.json'),
+    path.join(SIGNALS_DIR, 'gemma4_recommendations.json'),
+  ];
+  for (const filePath of candidates) {
+    try {
+      if (!fs.existsSync(filePath)) continue;
+      const parsed = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+      if (!parsed || typeof parsed !== 'object') continue;
+      if (
+        parsed.recommended_filters ||
+        parsed.min_5m_change !== undefined ||
+        parsed.min_volume_5m !== undefined ||
+        parsed.fitness_score !== undefined
+      ) {
+        return { source: filePath, payload: parsed };
+      }
+    } catch { }
+  }
+  return null;
+}
+
+const bootSlopfestParams = loadBootSlopfestParams();
+if (bootSlopfestParams?.payload) {
+  GLOBAL_SLOPFEST_PARAMS_ID = 'boot_profile';
+  GLOBAL_SLOPFEST_PARAMS_RAW = bootSlopfestParams.payload;
+  console.log(`[SNIPER]  SLOPFEST BOOT PROFILE: loaded from ${bootSlopfestParams.source}`);
+}
 
 type EntryMode = 'normal' | 'last-stand' | 'micro-scout';
 
@@ -6205,6 +6240,13 @@ async function poll() {
     const freshWalletSignals: any[] = Array.isArray(walletSignalSnapshot?.buy_signals)
       ? walletSignalSnapshot.buy_signals.filter((signal: any) => isWalletSignalFresh(signal))
       : [];
+    const freshWalletSignalMap = new Map(
+      freshWalletSignals
+        .filter((signal: any) => String(signal?.mint || '').trim())
+        .map((signal: any) => [String(signal.mint).trim(), signal]),
+    );
+    const replayBackedProfile = resolveReplayBackedStrategyProfile(GLOBAL_SLOPFEST_PARAMS_RAW);
+    const replayAlphaMomentumFloor = Math.max(0, Math.min(5, Number(replayBackedProfile.min5mChange || 0)));
     const executableWalletBuyCount = freshWalletSignals.filter((signal: any) => signal?.executable === true).length;
     const gmgnFollowCount = Math.max(
       0,
@@ -6432,6 +6474,7 @@ async function poll() {
               alphaKolCount: Number(alphaDecision.uniqueKols || 0),
               signalCount: Number(alphaDecision.signalCount || 0),
               tokenAgeSec,
+              walletSignal: freshWalletSignalMap.get(String(candidate?.mint || '').trim()) || null,
             };
           })
           .filter((row: any) => row.alphaBoost > 0 || row.alphaKolCount > 0);
@@ -6442,6 +6485,14 @@ async function poll() {
               alphaKolCount: row.alphaKolCount,
               signalCount: row.signalCount,
               quotaQuietRegime: quietQuotaRegime,
+              walletSignal: row.walletSignal,
+              replayBacked: replayBackedProfile.active &&
+                Number(row.candidate?.priceChange5m || 0) >= replayAlphaMomentumFloor &&
+                (
+                  row.alphaKolCount > 0 ||
+                  row.signalCount >= 2 ||
+                  Number(row.candidate?.volume1h || 0) >= Math.max(1000, Number(replayBackedProfile.minVolume5m || 0))
+                ),
             })
           )
 	          .sort((left: any, right: any) =>
@@ -7505,15 +7556,36 @@ async function poll() {
                 solVolume60s: v.solVolume60s,
                 terrainSummary: preflightTerrainState?.summary,
               });
+              const replayRouteLiveOverride = evaluateReplayBackedRouteLiveOverride({
+                slopfestParams: GLOBAL_SLOPFEST_PARAMS_RAW,
+                routeLive: true,
+                continuationReady: microScoutContinuationGate.ready,
+                missingMomentum1m: microScoutContinuationGate.source === '1m-missing',
+                priceChange5m: livePair.priceChange5m,
+                liquidityUsd: livePair.liquidity,
+                buys60s: v.buys60s,
+                buyRatio60s: v.buyRatio60s,
+                velocity: v.velocity,
+                solVolume60s: v.solVolume60s,
+                probeLikeFlowReady: microScoutDecision.shouldScout,
+              });
               const routeLiveCanUseMicroScout =
                 microScoutConfig.enabled &&
                 microScoutEntriesThisPoll < microScoutPacing.maxCandidatesPerPoll &&
                 microScoutDecision.shouldScout &&
-                (microScoutContinuationGate.ready || routeLiveContinuationOverride.allow);
+                (
+                  microScoutContinuationGate.ready ||
+                  routeLiveContinuationOverride.allow ||
+                  replayRouteLiveOverride.allowContinuationOverride
+                );
               if (microScoutDecision.shouldScout && !microScoutContinuationGate.ready) {
                 if (routeLiveContinuationOverride.allow) {
                   console.log(
                     `[SNIPER]  ROUTE-LIVE CONTINUATION PASS: ${symbol} ${routeLiveContinuationOverride.reason}.`
+                  );
+                } else if (replayRouteLiveOverride.allowContinuationOverride) {
+                  console.log(
+                    `[SNIPER]  REPLAY CONTINUATION PASS: ${symbol} ${replayRouteLiveOverride.reason}.`
                   );
                 } else if (globalQuotaPressure > 1.5 && !lossStreakRestricted) {
                   console.log(`[SNIPER] ⚠️ DESPERATION BYPASS: ignoring continuation hold for ${symbol}`);
@@ -7632,15 +7704,36 @@ async function poll() {
               solVolume60s: v.solVolume60s,
               terrainSummary: preflightTerrainState?.summary,
             });
+            const replayRouteLiveOverride = evaluateReplayBackedRouteLiveOverride({
+              slopfestParams: GLOBAL_SLOPFEST_PARAMS_RAW,
+              routeLive: true,
+              continuationReady: microScoutContinuationGate.ready,
+              missingMomentum1m: microScoutContinuationGate.source === '1m-missing',
+              priceChange5m: livePair.priceChange5m,
+              liquidityUsd: livePair.liquidity,
+              buys60s: v.buys60s,
+              buyRatio60s: v.buyRatio60s,
+              velocity: v.velocity,
+              solVolume60s: v.solVolume60s,
+              probeLikeFlowReady: microScoutDecision.shouldScout,
+            });
             const routeLiveCanUseMicroScout =
               microScoutConfig.enabled &&
               microScoutEntriesThisPoll < microScoutPacing.maxCandidatesPerPoll &&
               microScoutDecision.shouldScout &&
-              (microScoutContinuationGate.ready || routeLiveContinuationOverride.allow);
+              (
+                microScoutContinuationGate.ready ||
+                routeLiveContinuationOverride.allow ||
+                replayRouteLiveOverride.allowContinuationOverride
+              );
             if (microScoutDecision.shouldScout && !microScoutContinuationGate.ready) {
               if (routeLiveContinuationOverride.allow) {
                 console.log(
                   `[SNIPER]  ROUTE-LIVE CONTINUATION PASS: ${symbol} ${routeLiveContinuationOverride.reason}.`
+                );
+              } else if (replayRouteLiveOverride.allowContinuationOverride) {
+                console.log(
+                  `[SNIPER]  REPLAY CONTINUATION PASS: ${symbol} ${replayRouteLiveOverride.reason}.`
                 );
               } else if (globalQuotaPressure > 1.5 && !lossStreakRestricted) {
                 console.log(`[SNIPER] ⚠️ DESPERATION BYPASS: ignoring continuation hold for ${symbol}`);
@@ -7690,7 +7783,7 @@ async function poll() {
               continue;
             }
             if (microOnlyMode) {
-              if (lossStreakRestricted) {
+              if (lossStreakRestricted && !replayRouteLiveOverride.allowLowLiquidityColdStreakOverride) {
                 console.log(
                   `[SNIPER]  LOW LIQ HOLD: ${symbol} route is live but low-liquidity preservation is disabled ` +
                   `during the current cold streak (${lossStreakState.consecutiveLosses} losses).`
@@ -7698,6 +7791,11 @@ async function poll() {
                 const pub = RedisBus.getPublisher();
                 await setMintCooldown(pub, v.mint, 300, 'COLD_STREAK_LOW_LIQ');
                 continue;
+              }
+              if (lossStreakRestricted && replayRouteLiveOverride.allowLowLiquidityColdStreakOverride) {
+                console.log(
+                  `[SNIPER]  REPLAY LOW LIQ PASS: ${symbol} ${replayRouteLiveOverride.reason}.`
+                );
               }
               console.log(
                 `[SNIPER]  LOW LIQ ROUTE PASS: ${symbol} liq $${livePair.liquidity.toFixed(0)} < $5K, ` +
