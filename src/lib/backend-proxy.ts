@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 
+const LEGACY_BACKEND_BASE_URL = "https://bitte-agent-navy.vercel.app";
+
 function getBackendBaseUrl() {
   const value = process.env.PCP_API_BASE_URL?.trim();
-  if (!value) {
-    return null;
+  if (value) {
+    return value.replace(/\/+$/, "");
   }
-  return value.replace(/\/+$/, "");
+  return LEGACY_BACKEND_BASE_URL;
 }
 
 export function createUnavailableResponse(pathname: string) {
@@ -61,14 +63,6 @@ export async function proxyRequest(req: NextRequest, pathname: string) {
 
 export async function getHealthResponse() {
   const baseUrl = getBackendBaseUrl();
-  if (!baseUrl) {
-    return NextResponse.json({
-      ok: true,
-      site: "pcprotocol.dev",
-      status: "frontend_ready",
-      backendConfigured: false,
-    });
-  }
 
   try {
     const upstream = await fetch(new URL("/api/health", `${baseUrl}/`), {
@@ -88,7 +82,8 @@ export async function getHealthResponse() {
         ok: false,
         site: "pcprotocol.dev",
         status: "backend_unreachable",
-        backendConfigured: true,
+        backendConfigured: Boolean(baseUrl),
+        backendBaseUrl: baseUrl,
         error: error instanceof Error ? error.message : "Unknown backend health failure",
       },
       { status: 502 },
