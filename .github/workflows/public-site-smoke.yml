@@ -1,0 +1,40 @@
+name: Public Site Smoke
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/public-site-smoke.yml"
+      - "app/**"
+      - "package.json"
+      - "scripts/check_public_endpoints.mjs"
+      - "src/lib/backend-proxy.ts"
+  schedule:
+    - cron: "*/30 * * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: public-site-smoke
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: Check pcprotocol.dev
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Run public endpoint smoke test
+        run: node scripts/check_public_endpoints.mjs
