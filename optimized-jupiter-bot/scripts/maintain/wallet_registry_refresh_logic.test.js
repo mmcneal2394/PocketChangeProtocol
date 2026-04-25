@@ -8,6 +8,7 @@ test('buildWalletRegistryDocs refreshes alpha and kol registries from local wall
     alphaDoc: {
       tracked_wallets: [
         { address: 'legacyAlpha', score: 0.41, source: 'manual' },
+        { address: 'trojanAlpha', score: 0.99, source: 'manual', executable: true, immediate_entry: true },
       ],
     },
     kolDoc: {
@@ -55,6 +56,17 @@ test('buildWalletRegistryDocs refreshes alpha and kol registries from local wall
           preferredHoldMs: 300000,
           winRate: 0.67,
         },
+        {
+          walletAddr: 'trojanAlpha',
+          primaryStyle: 'SCALP',
+          weightedScore: 0.88,
+          copyabilityRisk: 'high',
+          executable: false,
+          immediateEntry: false,
+          preferredHoldMs: 120000,
+          winRate: 0.72,
+          tags: ['trojan'],
+        },
       ],
     },
     gmgnSmartMoneyDoc: {
@@ -78,9 +90,9 @@ test('buildWalletRegistryDocs refreshes alpha and kol registries from local wall
   assert.ok(alphaDoc.tracked_wallets.some((row) => row.address === 'alphaTwo'));
   assert.ok(alphaDoc.tracked_wallets.some((row) => row.address === 'flowOne'));
   assert.ok(!alphaDoc.tracked_wallets.some((row) => row.address === 'kolOne'));
+  assert.ok(!alphaDoc.tracked_wallets.some((row) => row.address === 'trojanAlpha'));
   assert.ok(kolDoc.tracked_wallets.some((row) => row.address === 'kolOne'));
   assert.ok(kolDoc.tracked_wallets.some((row) => row.address === 'legacyKol'));
   assert.equal(alphaDoc.summary.top_wallet, 'alphaOne');
   assert.equal(kolDoc.summary.top_wallet, 'kolOne');
 });
-

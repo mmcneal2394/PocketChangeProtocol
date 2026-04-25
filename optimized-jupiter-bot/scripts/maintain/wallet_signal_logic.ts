@@ -369,6 +369,7 @@ export function buildWalletSignalArtifacts(args: {
 }): WalletSignalArtifacts {
   const now = Number(args.now ?? Date.now());
   const trackedWallets = args.trackedWallets || [];
+  const trackedSet = new Set(trackedWallets.map((meta) => meta.address));
   const trackedMap = new Map(trackedWallets.map((meta) => [meta.address, meta]));
   const walletPnlMap = new Map((args.walletPnlRows || []).map((row) => [row.walletAddr, row]));
   const tokenMetadata = args.tokenMetadata || {};
@@ -476,8 +477,17 @@ export function buildWalletSignalArtifacts(args: {
     }
   }
 
-  nextState.buyEvents = nextState.buyEvents.filter((event) => now - event.ts <= EVENT_RETENTION_MS);
-  nextState.sellEvents = nextState.sellEvents.filter((event) => now - event.ts <= EVENT_RETENTION_MS);
+  for (const wallet of Object.keys(nextState.balancesByWallet)) {
+    if (!trackedSet.has(wallet)) delete nextState.balancesByWallet[wallet];
+  }
+
+  for (const key of Object.keys(nextState.positionsByWalletMint)) {
+    const wallet = key.split(':', 1)[0];
+    if (!trackedSet.has(wallet)) delete nextState.positionsByWalletMint[key];
+  }
+
+  nextState.buyEvents = nextState.buyEvents.filter((event) => trackedSet.has(event.walletAddr) && now - event.ts <= EVENT_RETENTION_MS);
+  nextState.sellEvents = nextState.sellEvents.filter((event) => trackedSet.has(event.walletAddr) && now - event.ts <= EVENT_RETENTION_MS);
 
   const recentBuyEvents = nextState.buyEvents.filter((event) => now - event.ts <= BUY_SIGNAL_WINDOW_MS);
   const groupedByMint = new Map<string, WalletEvent[]>();

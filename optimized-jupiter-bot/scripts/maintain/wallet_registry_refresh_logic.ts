@@ -206,6 +206,25 @@ function isKolLike(meta: TrackedWalletMeta, rawRow?: JsonObject): boolean {
   return twitter.length > 0;
 }
 
+function normalizeRisk(value: any): 'lower' | 'medium' | 'high' {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (normalized === 'high') return 'high';
+  if (normalized === 'medium') return 'medium';
+  return 'lower';
+}
+
+function guardHighRiskMeta(meta: TrackedWalletMeta, risk: 'lower' | 'medium' | 'high', lane: 'alpha' | 'kol'): TrackedWalletMeta | null {
+  if (risk !== 'high') return meta;
+  if (lane === 'alpha') return null;
+  return {
+    ...meta,
+    executable: false,
+    immediate_entry: false,
+    style: meta.style === 'KOL' ? meta.style : 'KOL',
+    notes: uniqueStrings([meta.notes, 'risk=high']).join(';') || undefined,
+  };
+}
+
 export function buildWalletRegistryDocs(args: {
   alphaDoc?: JsonObject;
   kolDoc?: JsonObject;
@@ -234,6 +253,10 @@ export function buildWalletRegistryDocs(args: {
     const address = String(row?.walletAddr || row?.address || '').trim();
     if (address && !detailedMap.has(address)) detailedMap.set(address, row);
   }
+  const riskByAddress = new Map<string, 'lower' | 'medium' | 'high'>();
+  for (const [address, row] of detailedMap.entries()) {
+    riskByAddress.set(address, normalizeRisk(row?.copyabilityRisk));
+  }
 
   const flowFallbacks = buildFlowFallbacks(args.gmgnSmartMoneyDoc || {});
 
@@ -246,7 +269,9 @@ export function buildWalletRegistryDocs(args: {
       return risk !== 'high' && !isKolLike(row, raw);
     }),
     ...flowFallbacks,
-  ]).slice(0, alphaLimit);
+  ])
+    .map((row) => guardHighRiskMeta(row, riskByAddress.get(row.address) || 'lower', 'alpha'))
+    .filter(Boolean) as TrackedWalletMeta[];
 
   const kolCandidates = mergeRankedMetas([
     ...existingKol,
@@ -258,32 +283,33 @@ export function buildWalletRegistryDocs(args: {
       const raw = detailedMap.get(row.address) || {};
       return isKolLike(row, raw);
     }),
-  ]).slice(0, kolLimit);
+  ])
+    .map((row) => guardHighRiskMeta(row, riskByAddress.get(row.address) || 'lower', 'kol'))
+    .filter(Boolean) as TrackedWalletMeta[];
 
   const alphaDoc: RefreshDocument = {
     updated_at: nowIso,
     source: 'wallet-registry-refresh',
-    tracked_wallets: alphaCandidates,
+    tracked_wallets: alphaCandidates.slice(0, alphaLimit),
     summary: {
-      tracked_wallet_count: alphaCandidates.length,
-      executable_wallet_count: alphaCandidates.filter((row) => row.executable).length,
-      top_wallet: alphaCandidates[0]?.address || null,
-      top_score: toNumber(alphaCandidates[0]?.score),
+      tracked_wallet_count: alphaCandidates.slice(0, alphaLimit).length,
+      executable_wallet_count: alphaCandidates.slice(0, alphaLimit).filter((row) => row.executable).length,
+      top_wallet: alphaCandidates.slice(0, alphaLimit)[0]?.address || null,
+      top_score: toNumber(alphaCandidates.slice(0, alphaLimit)[0]?.score),
     },
   };
 
   const kolDoc: RefreshDocument = {
     updated_at: nowIso,
     source: 'wallet-registry-refresh',
-    tracked_wallets: kolCandidates,
+    tracked_wallets: kolCandidates.slice(0, kolLimit),
     summary: {
-      tracked_wallet_count: kolCandidates.length,
-      executable_wallet_count: kolCandidates.filter((row) => row.executable).length,
-      top_wallet: kolCandidates[0]?.address || null,
-      top_score: toNumber(kolCandidates[0]?.score),
+      tracked_wallet_count: kolCandidates.slice(0, kolLimit).length,
+      executable_wallet_count: kolCandidates.slice(0, kolLimit).filter((row) => row.executable).length,
+      top_wallet: kolCandidates.slice(0, kolLimit)[0]?.address || null,
+      top_score: toNumber(kolCandidates.slice(0, kolLimit)[0]?.score),
     },
   };
 
   return { alphaDoc, kolDoc };
 }
-

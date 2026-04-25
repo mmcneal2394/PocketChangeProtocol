@@ -170,3 +170,56 @@ test('sell signal captures hold time after prior buy', () => {
   assert.equal(result.document.sell_signals[0].mint, 'mint1');
   assert.ok(result.document.sell_signals[0].holdMs >= 60_000);
 });
+
+test('stale events from untracked wallets are pruned from signal state', () => {
+  const base = 1_700_000_000_000;
+  const trackedWallets = [
+    { address: 'walletA', style: 'SCALP', score: 0.98, executable: true, immediate_entry: true, preferred_hold_ms: 120000 },
+  ];
+
+  const dirtyState = {
+    version: 1,
+    initialized: true,
+    updatedAt: base,
+    balancesByWallet: {
+      walletA: { mint1: 1 },
+      staleWallet: { mint2: 2 },
+    },
+    positionsByWalletMint: {
+      'walletA:mint1': { openedAt: base - 30_000, lastBuyAt: base - 30_000, currentBalance: 1, symbol: 'TOK' },
+      'staleWallet:mint2': { openedAt: base - 30_000, lastBuyAt: base - 30_000, currentBalance: 2, symbol: 'BAD' },
+    },
+    buyEvents: [
+      { type: 'BUY', walletAddr: 'walletA', mint: 'mint1', symbol: 'TOK', ts: base - 10_000, deltaAmount: 1, holdMs: 0, balanceAfter: 1 },
+      { type: 'BUY', walletAddr: 'staleWallet', mint: 'mint2', symbol: 'BAD', ts: base - 10_000, deltaAmount: 2, holdMs: 0, balanceAfter: 2 },
+    ],
+    sellEvents: [
+      { type: 'SELL', walletAddr: 'staleWallet', mint: 'mint2', symbol: 'BAD', ts: base - 5_000, deltaAmount: 1, holdMs: 5_000, balanceAfter: 1 },
+    ],
+  };
+
+  const result = buildWalletSignalArtifacts({
+    state: dirtyState,
+    snapshots: [{ wallet: 'walletA', balances: { mint1: 1 }, timestamp: base }],
+    trackedWallets,
+    tokenMetadata: { mint1: { symbol: 'TOK' }, mint2: { symbol: 'BAD' } },
+    walletPnlRows: [{
+      walletAddr: 'walletA',
+      profitabilityScore: 0.82,
+      weightedScore: 0.84,
+      winRate: 0.61,
+      realizedProfitUsd: 14000,
+      tradeCount: 5400,
+      copyabilityRisk: 'lower',
+      styleProfile: ['SCALP'],
+    }],
+    now: base,
+  });
+
+  assert.equal(result.state.buyEvents.length, 1);
+  assert.equal(result.state.buyEvents[0].walletAddr, 'walletA');
+  assert.equal(result.state.sellEvents.length, 0);
+  assert.equal(Object.keys(result.state.balancesByWallet).includes('staleWallet'), false);
+  assert.equal(Object.keys(result.state.positionsByWalletMint).some((key) => key.startsWith('staleWallet:')), false);
+  assert.equal(result.document.buy_signals.every((signal) => signal.wallets.every((wallet) => wallet !== 'staleWallet')), true);
+});
