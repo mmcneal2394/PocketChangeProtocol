@@ -9,7 +9,7 @@ const statusCards = [
   },
   {
     title: "Vercel Alignment",
-    body: "This root app exists so the Vercel project behind pcprotcol.dev has a coherent Next.js site and health endpoint to deploy.",
+    body: "This root app exists so the Vercel project behind pcprotocol.dev has a coherent Next.js site and health endpoint to deploy.",
   },
 ];
 
@@ -48,7 +48,7 @@ export default function HomePage() {
         <span className="eyebrow">PocketChange Protocol</span>
         <h1>Slopfest signal quota, shared capital allocation, and arb scouting in one demo surface.</h1>
         <p>
-          This deployment gives <span className="code">pcprotcol.dev</span> a real Next.js app, a stable
+          This deployment gives <span className="code">pcprotocol.dev</span> a real Next.js app, a stable
           health endpoint, and Vercel-safe API entry points that can proxy to the backend stack when
           configured.
         </p>
@@ -85,7 +85,7 @@ export default function HomePage() {
           </div>
           <div className="kpi">
             <strong>Domain</strong>
-            <span className="muted code">pcprotcol.dev</span>
+            <span className="muted code">pcprotocol.dev</span>
           </div>
           <div className="kpi">
             <strong>Root App</strong>
