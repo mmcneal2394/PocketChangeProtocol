@@ -4,9 +4,14 @@ const assert = require('node:assert/strict');
 const {
   computeWalletProfitSeekingEdgeScore,
   computeWalletQuotaSignalScore,
+  hasQuotaCandidateMarketSupport,
+  isQuotaCandidateMetadataBlind,
   resolveQuotaAssistLevel,
   sortWalletQuotaSignals,
+  shouldAllowAlphaQuotaCandidate,
+  shouldAllowQuotaWalletWithoutExtraMarketSupport,
   shouldBypassCooldownForQuotaAssist,
+  shouldSuppressQuotaAssistForQuietRegime,
 } = require('./quota_assist_logic.ts');
 
 test('resolveQuotaAssistLevel uses the explicit 15/10 slot thresholds', () => {
@@ -72,5 +77,93 @@ test('shouldBypassCooldownForQuotaAssist only allows level-2 alpha and wallet en
   assert.equal(
     shouldBypassCooldownForQuotaAssist({ quotaAssist: true, quotaAssistLevel: 2, sourceLane: 'wallet', strikeCount: 0, lossStreakActive: true }),
     false,
+  );
+});
+
+test('shouldSuppressQuotaAssistForQuietRegime only trips when quota pressure has no executable wallet or GMGN follow support', () => {
+  assert.equal(
+    shouldSuppressQuotaAssistForQuietRegime({ quotaAssistLevel: 2, executableWalletBuyCount: 0, gmgnFollowCount: 0 }),
+    true,
+  );
+  assert.equal(
+    shouldSuppressQuotaAssistForQuietRegime({ quotaAssistLevel: 2, executableWalletBuyCount: 1, gmgnFollowCount: 0 }),
+    false,
+  );
+  assert.equal(
+    shouldSuppressQuotaAssistForQuietRegime({ quotaAssistLevel: 2, executableWalletBuyCount: 0, gmgnFollowCount: 2 }),
+    false,
+  );
+  assert.equal(
+    shouldSuppressQuotaAssistForQuietRegime({ quotaAssistLevel: 0, executableWalletBuyCount: 0, gmgnFollowCount: 0 }),
+    false,
+  );
+});
+
+test('quota metadata guards identify blind candidates and keep alpha quota from filling into them', () => {
+  assert.equal(isQuotaCandidateMetadataBlind({ liquidityUsd: 0, marketCapUsd: 0 }), true);
+  assert.equal(isQuotaCandidateMetadataBlind({ liquidityUsd: 2500, marketCapUsd: 0 }), false);
+  assert.equal(hasQuotaCandidateMarketSupport({ liquidityUsd: 0, marketCapUsd: 0, volume1hUsd: 1200 }), true);
+  assert.equal(hasQuotaCandidateMarketSupport({ liquidityUsd: 0, marketCapUsd: 0, volume1hUsd: 0, buys1h: 1 }), false);
+
+  assert.equal(
+    shouldAllowAlphaQuotaCandidate({
+      candidate: { liquidityUsd: 0, marketCapUsd: 0, volume1hUsd: 0, buys1h: 0 },
+      alphaKolCount: 0,
+      signalCount: 3,
+      quotaQuietRegime: false,
+    }),
+    false,
+  );
+  assert.equal(
+    shouldAllowAlphaQuotaCandidate({
+      candidate: { liquidityUsd: 12000, marketCapUsd: 45000, volume1hUsd: 2500, buys1h: 4 },
+      alphaKolCount: 0,
+      signalCount: 2,
+      quotaQuietRegime: false,
+    }),
+    true,
+  );
+  assert.equal(
+    shouldAllowAlphaQuotaCandidate({
+      candidate: { liquidityUsd: 12000, marketCapUsd: 45000, volume1hUsd: 2500, buys1h: 4 },
+      alphaKolCount: 0,
+      signalCount: 2,
+      quotaQuietRegime: true,
+    }),
+    false,
+  );
+  assert.equal(
+    shouldAllowAlphaQuotaCandidate({
+      candidate: { liquidityUsd: 12000, marketCapUsd: 45000, volume1hUsd: 2500, buys1h: 4 },
+      alphaKolCount: 1,
+      signalCount: 1,
+      quotaQuietRegime: true,
+    }),
+    true,
+  );
+});
+
+test('shouldAllowQuotaWalletWithoutExtraMarketSupport now requires stronger wallet confirmation than a lone scalp tag', () => {
+  assert.equal(
+    shouldAllowQuotaWalletWithoutExtraMarketSupport({
+      priority: 'SCALP',
+      walletCount: 1,
+      sizeUp: false,
+      kolConfirmed: false,
+      consensusScore: 0.61,
+      walletWeightedScore: 0.58,
+    }),
+    false,
+  );
+  assert.equal(
+    shouldAllowQuotaWalletWithoutExtraMarketSupport({
+      priority: 'HIGH',
+      walletCount: 2,
+      sizeUp: true,
+      kolConfirmed: false,
+      consensusScore: 0.83,
+      walletWeightedScore: 0.79,
+    }),
+    true,
   );
 });

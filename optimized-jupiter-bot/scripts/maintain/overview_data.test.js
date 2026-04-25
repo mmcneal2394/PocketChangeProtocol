@@ -11,7 +11,8 @@ const {
 test('summarizeClosedTrades computes win rate and pnl over cutoff window', () => {
   const now = Date.now();
   const summary = summarizeClosedTrades([
-    { action: 'SELL', pnlSol: 0.1, holdMs: 60_000, ts: now - 1000 },
+    { action: 'SELL', pnlSol: 0.1, holdMs: 60_000, ts: now - 1000, partialExit: true },
+    { action: 'SELL', pnlSol: -0.05, lifecyclePnlSol: 0.05, holdMs: 120_000, ts: now - 900 },
     { action: 'SELL', pnlSol: -0.05, holdMs: 120_000, ts: now - 2000 },
     { action: 'BUY', amountSol: 0.005, ts: now - 3000 },
     { action: 'SELL', pnlSol: 0.25, holdMs: 180_000, ts: now - 48 * 60 * 60 * 1000 },
@@ -20,9 +21,17 @@ test('summarizeClosedTrades computes win rate and pnl over cutoff window', () =>
   assert.equal(summary.trades, 2);
   assert.equal(summary.wins, 1);
   assert.equal(summary.losses, 1);
-  assert.equal(summary.totalPnlSol, 0.05);
+  assert.equal(summary.totalPnlSol, 0);
   assert.equal(summary.winRate, 0.5);
-  assert.equal(summary.avgHoldMinutes, 1.5);
+  assert.equal(summary.avgHoldMinutes, 2);
+});
+
+test('summarizeRecentTrades prefers lifecycle pnl in the overview feed', () => {
+  const rows = summarizeRecentTrades([
+    { action: 'SELL', symbol: 'TAIL', amountSol: 0.006, pnlSol: -0.03, lifecyclePnlSol: 0.004, sig: '5WRv9rxEXYZ987654321', ts: 50 },
+  ], 10);
+
+  assert.equal(rows[0].pnlSol, 0.004);
 });
 
 test('summarizeRejectReasons sorts by count descending', () => {

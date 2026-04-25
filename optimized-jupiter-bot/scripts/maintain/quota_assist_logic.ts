@@ -59,6 +59,26 @@ function copyabilityPenalty(signal: Record<string, any>): number {
   return 0;
 }
 
+function resolveMarketCapUsd(candidate: Record<string, any> | null | undefined): number {
+  return Math.max(
+    0,
+    toFiniteNumber(candidate?.marketCapUsd),
+    toFiniteNumber(candidate?.fdvUsd),
+  );
+}
+
+function resolveLiquidityUsd(candidate: Record<string, any> | null | undefined): number {
+  return Math.max(0, toFiniteNumber(candidate?.liquidityUsd));
+}
+
+function resolveVolume1hUsd(candidate: Record<string, any> | null | undefined): number {
+  return Math.max(0, toFiniteNumber(candidate?.volume1hUsd || candidate?.volume1h));
+}
+
+function resolveBuys1h(candidate: Record<string, any> | null | undefined): number {
+  return Math.max(0, toFiniteNumber(candidate?.buys1h));
+}
+
 export function computeWalletProfitSeekingEdgeScore(signal: Record<string, any> | null | undefined): number {
   if (!signal) return 0;
   const consensusScore = Math.max(0, Math.min(1, toFiniteNumber(signal?.consensusScore)));
@@ -222,12 +242,70 @@ export function isWalletSignalFresh(signal: Record<string, any> | null | undefin
 
 export function shouldAllowQuotaWalletWithoutExtraMarketSupport(signal: Record<string, any> | null | undefined) {
   const walletCount = Array.isArray(signal?.wallets) ? signal.wallets.length : toFiniteNumber(signal?.walletCount);
-  return (
-    Boolean(signal?.sizeUp) ||
-    walletCount >= 2 ||
-    Boolean(signal?.kolConfirmed) ||
-    String(signal?.priority || '').toUpperCase() === 'SCALP'
+  const consensusScore = Math.max(0, Math.min(1, toFiniteNumber(signal?.consensusScore)));
+  const weightedScore = Math.max(
+    0,
+    Math.min(1, toFiniteNumber(signal?.walletWeightedScore || signal?.walletCompositeScore)),
   );
+  const priority = String(signal?.priority || '').toUpperCase();
+  return (
+    walletCount >= 3 ||
+    (walletCount >= 2 && Boolean(signal?.kolConfirmed)) ||
+    (walletCount >= 2 && (Boolean(signal?.sizeUp) || weightedScore >= 0.72 || consensusScore >= 0.80)) ||
+    (Boolean(signal?.kolConfirmed) && weightedScore >= 0.68 && consensusScore >= 0.74) ||
+    (Boolean(signal?.sizeUp) && weightedScore >= 0.76 && consensusScore >= 0.80) ||
+    (priority === 'VERY_HIGH' && walletCount >= 2 && weightedScore >= 0.72)
+  );
+}
+
+export function isQuotaCandidateMetadataBlind(candidate: Record<string, any> | null | undefined) {
+  return resolveLiquidityUsd(candidate) <= 0 && resolveMarketCapUsd(candidate) <= 0;
+}
+
+export function hasQuotaCandidateMarketSupport(candidate: Record<string, any> | null | undefined) {
+  return (
+    resolveLiquidityUsd(candidate) > 0 ||
+    resolveMarketCapUsd(candidate) > 0 ||
+    resolveVolume1hUsd(candidate) >= 1000 ||
+    resolveBuys1h(candidate) >= 3 ||
+    Boolean(candidate?.bagsSignal)
+  );
+}
+
+export function shouldSuppressQuotaAssistForQuietRegime(args: {
+  quotaAssistLevel?: number;
+  executableWalletBuyCount?: number;
+  gmgnFollowCount?: number;
+}) {
+  return (
+    Number(args.quotaAssistLevel || 0) > 0 &&
+    Number(args.executableWalletBuyCount || 0) <= 0 &&
+    Number(args.gmgnFollowCount || 0) <= 0
+  );
+}
+
+export function shouldAllowAlphaQuotaCandidate(args: {
+  candidate?: Record<string, any> | null;
+  alphaKolCount?: number;
+  signalCount?: number;
+  quotaQuietRegime?: boolean;
+}) {
+  const candidate = args.candidate || {};
+  const alphaKolCount = Math.max(0, toFiniteNumber(args.alphaKolCount));
+  const signalCount = Math.max(0, toFiniteNumber(args.signalCount));
+  const marketSupport = hasQuotaCandidateMarketSupport(candidate);
+  const metadataBlind = isQuotaCandidateMetadataBlind(candidate);
+
+  if (metadataBlind) {
+    return false;
+  }
+  if (args.quotaQuietRegime === true && alphaKolCount <= 0) {
+    return false;
+  }
+  if (alphaKolCount > 0) {
+    return true;
+  }
+  return signalCount >= 2 && marketSupport;
 }
 
 module.exports = {
@@ -246,4 +324,8 @@ module.exports = {
   shouldBypassCooldownForQuotaAssist,
   isWalletSignalFresh,
   shouldAllowQuotaWalletWithoutExtraMarketSupport,
+  isQuotaCandidateMetadataBlind,
+  hasQuotaCandidateMarketSupport,
+  shouldSuppressQuotaAssistForQuietRegime,
+  shouldAllowAlphaQuotaCandidate,
 };

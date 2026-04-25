@@ -178,10 +178,15 @@ async function getCurrentPriceSol(mint: string, tokenLamports: number, decimals?
 }
 
 export function summarizeClosedTrades(events: any[], cutoff: number) {
-  const closed = events.filter((evt) => evt.action === 'SELL' && Number(evt.ts || 0) >= cutoff);
-  const wins = closed.filter((evt) => Number(evt.pnlSol || 0) >= 0).length;
-  const losses = closed.filter((evt) => Number(evt.pnlSol || 0) < 0).length;
-  const totalPnlSol = closed.reduce((sum, evt) => sum + Number(evt.pnlSol || 0), 0);
+  const closed = events
+    .filter((evt) => evt.action === 'SELL' && evt.partialExit !== true && Number(evt.ts || 0) >= cutoff)
+    .map((evt) => ({
+      ...evt,
+      effectivePnlSol: evt.lifecyclePnlSol !== undefined ? Number(evt.lifecyclePnlSol) : Number(evt.pnlSol || 0),
+    }));
+  const wins = closed.filter((evt) => Number(evt.effectivePnlSol || 0) >= 0).length;
+  const losses = closed.filter((evt) => Number(evt.effectivePnlSol || 0) < 0).length;
+  const totalPnlSol = closed.reduce((sum, evt) => sum + Number(evt.effectivePnlSol || 0), 0);
   const avgHoldMinutes = closed.length
     ? closed.reduce((sum, evt) => sum + Number(evt.holdMs || 0), 0) / closed.length / 60000
     : 0;
@@ -273,7 +278,9 @@ export function summarizeRecentTrades(journal: any[], limit = 12) {
       symbol: evt.symbol || evt.mint || 'unknown',
       mint: evt.mint,
       amountSol: Number(evt.amountSol || 0),
-      pnlSol: evt.pnlSol !== undefined ? Number(evt.pnlSol) : null,
+      pnlSol: evt.lifecyclePnlSol !== undefined
+        ? Number(evt.lifecyclePnlSol)
+        : (evt.pnlSol !== undefined ? Number(evt.pnlSol) : null),
       reason: evt.reason || null,
       sig: formatShortSig(evt.sig),
     }));

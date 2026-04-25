@@ -152,6 +152,10 @@ const {
   shouldBypassCooldownForQuotaAssist,
   isWalletSignalFresh,
   shouldAllowQuotaWalletWithoutExtraMarketSupport,
+  isQuotaCandidateMetadataBlind,
+  hasQuotaCandidateMarketSupport,
+  shouldSuppressQuotaAssistForQuietRegime,
+  shouldAllowAlphaQuotaCandidate,
 } = require('./quota_assist_logic.ts');
 const {
   computeGmgnBanUntilMs,
@@ -404,6 +408,7 @@ const WALLET_SIG_FILE  = path.join(SIGNALS_DIR, 'wallet_signals.json'); // pcp-w
 const WALLET_HOLDINGS_FILE = path.join(SIGNALS_DIR, 'wallet_holdings.json');
 const GMGN_ACTIVE_POSITIONS_FILE = path.join(SIGNALS_DIR, 'gmgn_active_positions.json');
 const GMGN_TRENDING_FILE = path.join(SIGNALS_DIR, 'gmgn_trending.json');
+const GMGN_FOLLOW_MONITOR_FILE = path.join(SIGNALS_DIR, 'gmgn_follow_monitor.json');
 const BAGS_ENRICHMENT_CACHE_FILE = path.join(SIGNALS_DIR, 'bags_enrichment_cache.json');
 const GMGN_TOKEN_INFO_CACHE_FILE = path.join(SIGNALS_DIR, 'gmgn_token_info_cache.json');
 const STRATEGY_PROFILE_FILE = path.resolve(process.cwd(), process.env.STRATEGY_PROFILE_PATH || 'scripts/active.strategy.json');
@@ -1760,6 +1765,8 @@ export function appendTrade(record: {
   agent: string; action: 'BUY' | 'SELL';
   mint: string; symbol: string;
   amountSol: number; pnlSol?: number;
+  legPnlSol?: number;
+  lifecyclePnlSol?: number;
   tradeId?: string; parentBuyId?: string;
   sig: string; reason?: string;
   taSig?: string; taConf?: number;
@@ -1852,6 +1859,59 @@ export function appendTrade(record: {
     }
     appendTradeProfileArtifacts(normalizedRecord);
   } catch { /* never crash on journal write */ }
+}
+
+function computeLifecyclePnlForClosedTrade(parentBuyId: string, currentRealizedSol: number): {
+  lifecyclePnlSol: number | null;
+  entryCostSol: number | null;
+  proceedsSol: number | null;
+  priorPartialExitCount: number;
+} {
+  try {
+    if (!parentBuyId || !fs.existsSync(JOURNAL_FILE)) {
+      return { lifecyclePnlSol: null, entryCostSol: null, proceedsSol: null, priorPartialExitCount: 0 };
+    }
+    const rows = fs.readFileSync(JOURNAL_FILE, 'utf8')
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        try {
+          return JSON.parse(line);
+        } catch {
+          return null;
+        }
+      })
+      .filter(Boolean);
+
+    const buyRow = rows.find((row: any) =>
+      String(row?.action || '').toUpperCase() === 'BUY' &&
+      String(row?.tradeId || '') === parentBuyId,
+    );
+    const entryCostSol = Number(buyRow?.entryCostSol ?? buyRow?.amountSol ?? NaN);
+    if (!Number.isFinite(entryCostSol)) {
+      return { lifecyclePnlSol: null, entryCostSol: null, proceedsSol: null, priorPartialExitCount: 0 };
+    }
+
+    const priorSells = rows.filter((row: any) =>
+      String(row?.action || '').toUpperCase() === 'SELL' &&
+      String(row?.parentBuyId || '') === parentBuyId &&
+      shouldPersistTradeRecord(row, process.env.PAPER_MODE === 'true'),
+    );
+    const priorProceedsSol = priorSells.reduce((sum: number, row: any) => {
+      const proceeds = Number(row?.amountSol ?? NaN);
+      return Number.isFinite(proceeds) ? sum + proceeds : sum;
+    }, 0);
+    const proceedsSol = priorProceedsSol + currentRealizedSol;
+    return {
+      lifecyclePnlSol: proceedsSol - entryCostSol,
+      entryCostSol,
+      proceedsSol,
+      priorPartialExitCount: priorSells.filter((row: any) => row?.partialExit === true).length,
+    };
+  } catch {
+    return { lifecyclePnlSol: null, entryCostSol: null, proceedsSol: null, priorPartialExitCount: 0 };
+  }
 }
 
 const MISSED_TARGETS_FILE = path.join(SIGNALS_DIR, 'missed_targets.jsonl');
@@ -5559,6 +5619,13 @@ async function checkExits() {
           const closedAt = Date.now();
           const soldTokenAmount = normalizeTokenAmount(activeSwapBal, pos.decimals);
           const isPartialExit = sellFraction < 0.999;
+          const lifecycleSnapshot = !isPartialExit && pos.tradeId
+            ? computeLifecyclePnlForClosedTrade(pos.tradeId, realizedSol)
+            : null;
+          const lifecyclePnlSol = lifecycleSnapshot && Number.isFinite(Number(lifecycleSnapshot.lifecyclePnlSol))
+            ? Number(lifecycleSnapshot.lifecyclePnlSol)
+            : null;
+          const effectivePnlSol = lifecyclePnlSol ?? pnlSol;
           const remainingRawAmount = isPartialExit ? Math.max(0, exactBalanceLamports - activeSwapBal) : 0;
           const remainingTokenAmount = normalizeTokenAmount(remainingRawAmount, pos.decimals);
           const remainingEntryCostSol = isPartialExit ? Math.max(0, pos.buyPriceSol - proratedCostBasis) : 0;
@@ -5571,7 +5638,9 @@ async function checkExits() {
             mint: pos.mint,
             symbol: pos.symbol,
             amountSol: realizedSol,
-            pnlSol,
+            pnlSol: effectivePnlSol,
+            legPnlSol: pnlSol,
+            lifecyclePnlSol: lifecyclePnlSol ?? undefined,
             sig: sellSig,
             reason,
             holdMs: heldMs,
@@ -5622,7 +5691,14 @@ async function checkExits() {
           appendTrade(tradeObj as any);
           PERSIST_JOURNAL_REDIS(tradeObj);
           console.log(`[SNIPER]  SELL TX: https://solscan.io/tx/${sellSig}`);
-          console.log(`[SNIPER]  P&L: ${pnlSol >= 0 ? '+' : ''}${pnlSol.toFixed(6)} SOL | ${pos.symbol} | held ${(heldMs/60000).toFixed(1)}min`);
+          console.log(`[SNIPER]  P&L: ${effectivePnlSol >= 0 ? '+' : ''}${effectivePnlSol.toFixed(6)} SOL | ${pos.symbol} | held ${(heldMs/60000).toFixed(1)}min`);
+          if (!isPartialExit && lifecyclePnlSol !== null && Math.abs(lifecyclePnlSol - pnlSol) > 0.000001) {
+            console.log(
+              `[SNIPER]  LIFECYCLE P&L OVERRIDE: ${pos.symbol} leg=${pnlSol >= 0 ? '+' : ''}${pnlSol.toFixed(6)} SOL ` +
+              `lifecycle=${lifecyclePnlSol >= 0 ? '+' : ''}${lifecyclePnlSol.toFixed(6)} SOL ` +
+              `after ${Number(lifecycleSnapshot?.priorPartialExitCount || 0)} prior partial exits.`,
+            );
+          }
 
           if (isPartialExit) {
             pos.tokenAmount = Math.max(0, exactBalanceLamports - activeSwapBal);
@@ -5639,13 +5715,13 @@ async function checkExits() {
           await pub.publish('guardian:remove_tracking', pos.mint);
 
 
-          store.stats.totalPnlSol += pnlSol;
-          if (pnlSol >= 0) store.stats.wins++; else store.stats.losses++;
+          store.stats.totalPnlSol += effectivePnlSol;
+          if (effectivePnlSol >= 0) store.stats.wins++; else store.stats.losses++;
 
           const isTimeExit = reason.startsWith('TIME_EXIT');
           const pubPublisher = RedisBus.getPublisher();
 
-                    if (pnlSol < 0) {
+                    if (effectivePnlSol < 0) {
               const strikes = await pubPublisher.incr(`strikes:${pos.mint}`);
 
               await setMintCooldownExact(pubPublisher, pos.mint, 1800, 'LOCKED');
@@ -6052,6 +6128,30 @@ async function poll() {
     const microScoutConfig = loadMicroScoutConfig();
     const lossStreakState = getLossStreakState();
     const lossStreakRestricted = lossStreakState.restrictionsActive;
+    const walletSignalSnapshot = readJsonFile<any>(WALLET_SIG_FILE) || {};
+    const followMonitorSnapshot = readJsonFile<any>(GMGN_FOLLOW_MONITOR_FILE) || {};
+    const freshWalletSignals: any[] = Array.isArray(walletSignalSnapshot?.buy_signals)
+      ? walletSignalSnapshot.buy_signals.filter((signal: any) => isWalletSignalFresh(signal))
+      : [];
+    const executableWalletBuyCount = freshWalletSignals.filter((signal: any) => signal?.executable === true).length;
+    const gmgnFollowCount = Math.max(
+      0,
+      Number(
+        followMonitorSnapshot?.count ||
+        (Array.isArray(followMonitorSnapshot?.tokens) ? followMonitorSnapshot.tokens.length : 0),
+      ),
+    );
+    const quietQuotaRegime = shouldSuppressQuotaAssistForQuietRegime({
+      quotaAssistLevel: globalQuotaAssistLevel,
+      executableWalletBuyCount,
+      gmgnFollowCount,
+    });
+    if (quietQuotaRegime) {
+      console.log(
+        `[SNIPER]  QUIET REGIME HOLD: quota assist paused with ` +
+        `${executableWalletBuyCount} executable wallet buys and ${gmgnFollowCount} GMGN follow leads.`
+      );
+    }
     let quotaTrendingMap: Map<string, any> = new Map();
     if (fs.existsSync(TRENDING_FILE)) {
       try {
@@ -6060,9 +6160,9 @@ async function poll() {
       } catch {}
     }
 
-	    if (store.positions.length < MAX_POSITIONS && fs.existsSync(WALLET_SIG_FILE)) {
+	    if (store.positions.length < MAX_POSITIONS && Array.isArray(walletSignalSnapshot?.buy_signals)) {
 	      try {
-	        const wData = JSON.parse(fs.readFileSync(WALLET_SIG_FILE, 'utf-8'));
+	        const wData = walletSignalSnapshot;
 	        const walletScales = resolveWalletQuotaScales(globalQuotaAssistLevel);
 	        const walletCandidateLimit = resolveWalletQuotaCandidateLimit(globalQuotaAssistLevel);
 	        const sortedWalletSignals: any[] = sortWalletQuotaSignals((wData.buy_signals || []).filter((s: any) =>
@@ -6140,19 +6240,19 @@ async function poll() {
 	          const sectorTag = top.sector ? ` [${top.sector}]` : '';
           const hotSector = wData.hot_sector;
           const trendingMeta = quotaTrendingMap.get(top.mint) || {};
-          const walletCount = Array.isArray(top.wallets) ? top.wallets.length : 0;
+          const walletCount = Array.isArray(top.wallets) ? top.wallets.length : Number(top.walletCount || 0);
           const observedTokenAmount = Number(top.observedTokenAmount || 0);
-          const hasMarketSupport =
-            Boolean(trendingMeta?.bagsSignal) ||
-            Number(trendingMeta?.buys1h || 0) >= 3;
+          const metadataBlind = isQuotaCandidateMetadataBlind(trendingMeta);
+          const hasMarketSupport = hasQuotaCandidateMarketSupport(trendingMeta);
           const allowWalletSignal = globalQuotaAssistLevel > 0
-            ? Boolean(top?.executable) && (hasMarketSupport || shouldAllowQuotaWalletWithoutExtraMarketSupport(top))
+            ? Boolean(top?.executable) && !metadataBlind && (hasMarketSupport || shouldAllowQuotaWalletWithoutExtraMarketSupport(top))
             : (top.sizeUp || walletCount >= 2 || hasMarketSupport);
           if (!allowWalletSignal) {
             const pollPub = RedisBus.getPublisher();
             await setMintCooldown(pollPub, top.mint, 20, 'LOCKED');
             console.log(
-              `[SNIPER]  HIGH_CONV HOLD: ${top.symbol || top.mint.slice(0,8)} lacks market support ` +
+              `[SNIPER]  HIGH_CONV HOLD: ${top.symbol || top.mint.slice(0,8)} ` +
+              `${metadataBlind ? 'is missing liquidity / market-cap metadata' : 'lacks market support'} ` +
               `(${walletCount} wallet, bags:${trendingMeta?.bagsSignal ? 'yes' : 'no'}, observed:${observedTokenAmount.toFixed(3)} token units).`
             );
             continue;
@@ -6231,9 +6331,15 @@ async function poll() {
       }
     }
 
-    if (globalQuotaAssistLevel > 0 && store.positions.length < MAX_POSITIONS && quotaTrendingMap.size > 0) {
+    if (globalQuotaAssistLevel > 0 && quietQuotaRegime && store.positions.length < MAX_POSITIONS && quotaTrendingMap.size > 0) {
+      console.log(
+        `[SNIPER]  ALPHA QUOTA HOLD: standing down quota fills until executable wallet or GMGN follow flow returns.`
+      );
+    }
+
+    if (globalQuotaAssistLevel > 0 && !quietQuotaRegime && store.positions.length < MAX_POSITIONS && quotaTrendingMap.size > 0) {
       try {
-	        const alphaBaseShortlist = Array.from(quotaTrendingMap.values())
+	        const alphaBaseCandidates = Array.from(quotaTrendingMap.values())
 	          .filter((candidate: any) =>
 	            candidate?.mint &&
 	            !store.blacklist.includes(candidate.mint) &&
@@ -6256,7 +6362,16 @@ async function poll() {
               tokenAgeSec,
             };
           })
-          .filter((row: any) => row.alphaBoost > 0 || row.alphaKolCount > 0)
+          .filter((row: any) => row.alphaBoost > 0 || row.alphaKolCount > 0);
+	        const alphaBaseShortlist = alphaBaseCandidates
+          .filter((row: any) =>
+            shouldAllowAlphaQuotaCandidate({
+              candidate: row.candidate,
+              alphaKolCount: row.alphaKolCount,
+              signalCount: row.signalCount,
+              quotaQuietRegime: quietQuotaRegime,
+            })
+          )
 	          .sort((left: any, right: any) =>
 	            (right.alphaBoost - left.alphaBoost) ||
 	            (right.alphaKolCount - left.alphaKolCount) ||
@@ -6264,6 +6379,13 @@ async function poll() {
 	            (Number(right.candidate?.priceChange5m || 0) - Number(left.candidate?.priceChange5m || 0))
 	          )
 	          .slice(0, resolveAlphaQuotaCandidateLimit(globalQuotaAssistLevel));
+	        const alphaGuardFilteredCount = Math.max(0, alphaBaseCandidates.length - alphaBaseShortlist.length);
+	        if (alphaGuardFilteredCount > 0) {
+	          console.log(
+	            `[SNIPER]  ALPHA QUALITY HOLD: filtered ${alphaGuardFilteredCount} quota candidate(s) ` +
+	            `for weak confirmation or missing market metadata.`
+	          );
+	        }
 	        const alphaBaseRank = new Map(
 	          alphaBaseShortlist.map((row: any, index: number) => [String(row?.candidate?.mint || ''), index]),
 	        );

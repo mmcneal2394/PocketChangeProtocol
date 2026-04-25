@@ -16,6 +16,7 @@ type JournalTradeRecord = {
   action?: string;
   sig?: string;
   pnlSol?: number | string;
+  lifecyclePnlSol?: number | string;
   ts?: number | string;
   tradeId?: string;
   parentBuyId?: string;
@@ -23,6 +24,8 @@ type JournalTradeRecord = {
   reason?: string;
   symbol?: string;
   mint?: string;
+  amountSol?: number | string;
+  entryCostSol?: number | string;
 };
 
 type RealizedProfitSummary = {
@@ -70,20 +73,84 @@ function readJsonl(filePath: string): JournalTradeRecord[] {
   }
 }
 
+function toFiniteNumber(value: unknown, fallback = NaN): number {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : fallback;
+}
+
+function buildClosedTradeEpisodes(records: JournalTradeRecord[]): Array<JournalTradeRecord & { effectivePnlSol: number; effectiveTs: number }> {
+  const filtered = (Array.isArray(records) ? records : [])
+    .filter((record) => String(record?.action || '').toUpperCase() === 'SELL')
+    .filter((record) => shouldPersistTradeRecord(record, IS_PAPER));
+
+  const buysByTradeId = new Map<string, JournalTradeRecord>();
+  for (const record of (Array.isArray(records) ? records : [])) {
+    if (String(record?.action || '').toUpperCase() !== 'BUY') continue;
+    const tradeId = String(record?.tradeId || '');
+    if (tradeId) buysByTradeId.set(tradeId, record);
+  }
+
+  const grouped = new Map<string, JournalTradeRecord[]>();
+  const standalone: Array<JournalTradeRecord & { effectivePnlSol: number; effectiveTs: number }> = [];
+
+  for (const record of filtered) {
+    const parentBuyId = String(record?.parentBuyId || '');
+    if (!parentBuyId) {
+      const effectivePnlSol = toFiniteNumber(record?.lifecyclePnlSol, toFiniteNumber(record?.pnlSol));
+      if (Number.isFinite(effectivePnlSol)) {
+        standalone.push({
+          ...record,
+          effectivePnlSol,
+          effectiveTs: toFiniteNumber(record?.ts, 0),
+        });
+      }
+      continue;
+    }
+    const rows = grouped.get(parentBuyId) || [];
+    rows.push(record);
+    grouped.set(parentBuyId, rows);
+  }
+
+  const groupedEpisodes: Array<JournalTradeRecord & { effectivePnlSol: number; effectiveTs: number }> = [];
+  for (const [parentBuyId, rows] of grouped.entries()) {
+    const completed = rows
+      .filter((record) => record?.partialExit !== true)
+      .sort((a, b) => toFiniteNumber(a?.ts, 0) - toFiniteNumber(b?.ts, 0));
+    if (completed.length === 0) continue;
+    const finalRow = completed[completed.length - 1];
+    let effectivePnlSol = toFiniteNumber(finalRow?.lifecyclePnlSol, NaN);
+    if (!Number.isFinite(effectivePnlSol)) {
+      const buyRow = buysByTradeId.get(parentBuyId);
+      const entryCostSol = toFiniteNumber(buyRow?.entryCostSol, toFiniteNumber(buyRow?.amountSol, NaN));
+      const proceedsSol = rows.reduce((sum, record) => sum + toFiniteNumber(record?.amountSol, 0), 0);
+      if (Number.isFinite(entryCostSol)) {
+        effectivePnlSol = proceedsSol - entryCostSol;
+      } else {
+        effectivePnlSol = toFiniteNumber(finalRow?.pnlSol, NaN);
+      }
+    }
+    if (!Number.isFinite(effectivePnlSol)) continue;
+    groupedEpisodes.push({
+      ...finalRow,
+      effectivePnlSol,
+      effectiveTs: toFiniteNumber(finalRow?.ts, 0),
+    });
+  }
+
+  return [...standalone, ...groupedEpisodes];
+}
+
 export function summarizeRealizedProfit(records: JournalTradeRecord[], reinvestmentRatio = REINVESTMENT_RATIO): RealizedProfitSummary {
   const normalizedRatio = Math.max(0, Math.min(1, Number.isFinite(Number(reinvestmentRatio)) ? Number(reinvestmentRatio) : REINVESTMENT_RATIO));
-  const closed = (Array.isArray(records) ? records : [])
-    .filter((record) => String(record?.action || '').toUpperCase() === 'SELL')
-    .filter((record) => shouldPersistTradeRecord(record, IS_PAPER))
-    .filter((record) => Number.isFinite(Number(record?.pnlSol)));
+  const closed = buildClosedTradeEpisodes(records);
 
-  const positivePnlSol = closed.reduce((sum, record) => sum + Math.max(0, Number(record?.pnlSol || 0)), 0);
-  const negativePnlSol = closed.reduce((sum, record) => sum + Math.min(0, Number(record?.pnlSol || 0)), 0);
+  const positivePnlSol = closed.reduce((sum, record) => sum + Math.max(0, Number(record?.effectivePnlSol || 0)), 0);
+  const negativePnlSol = closed.reduce((sum, record) => sum + Math.min(0, Number(record?.effectivePnlSol || 0)), 0);
   const totalRealizedPnlSol = positivePnlSol + negativePnlSol;
-  const profitSeeking = summarizeProfitSeekingScores(closed.map((record) => Number(record?.pnlSol || 0)));
-  const wins = closed.filter((record) => Number(record?.pnlSol || 0) >= 0).length;
-  const losses = closed.filter((record) => Number(record?.pnlSol || 0) < 0).length;
-  const lastSellTs = closed.reduce((latest, record) => Math.max(latest, Number(record?.ts || 0) || 0), 0) || null;
+  const profitSeeking = summarizeProfitSeekingScores(closed.map((record) => Number(record?.effectivePnlSol || 0)));
+  const wins = closed.filter((record) => Number(record?.effectivePnlSol || 0) >= 0).length;
+  const losses = closed.filter((record) => Number(record?.effectivePnlSol || 0) < 0).length;
+  const lastSellTs = closed.reduce((latest, record) => Math.max(latest, Number(record?.effectiveTs || 0) || 0), 0) || null;
 
   return {
     generatedAt: new Date().toISOString(),
