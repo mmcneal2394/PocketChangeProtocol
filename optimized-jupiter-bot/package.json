@@ -50,7 +50,6 @@
     "@grpc/grpc-js": "^1.14.3",
     "@grpc/proto-loader": "^0.8.0",
     "@jup-ag/api": "^6.0.48",
-    "@meteora-ag/dlmm-sdk": "^0.6.18",
     "@solana/spl-token": "^0.4.14",
     "@solana/web3.js": "^1.98.4",
     "@triton-one/yellowstone-grpc": "^5.0.8",
@@ -68,7 +67,6 @@
     "node-fetch": "^2.7.0",
     "node-ssh": "^13.2.1",
     "ollama": "^0.6.3",
-    "pumpdotfun-sdk": "^1.4.2",
     "twitter-api-v2": "^1.29.0",
     "zod": "^4.3.6"
   },

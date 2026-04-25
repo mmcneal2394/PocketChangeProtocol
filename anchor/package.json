@@ -23,5 +23,10 @@
     "mocha": "^11.7.5",
     "ts-mocha": "^11.1.0",
     "typescript": "^5.9.3"
+  },
+  "overrides": {
+    "brace-expansion": "^2.0.3",
+    "diff": "^8.0.3",
+    "serialize-javascript": "^7.0.5"
   }
 }
