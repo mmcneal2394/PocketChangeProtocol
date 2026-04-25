@@ -41,7 +41,7 @@ module.exports = {
     },
     {
       name: "pcp-gmgn-bridge",
-      script: "scripts/maintain/gmgn_bridge.remote.ts",
+      script: "scripts/maintain/gmgn_bridge.ts",
       interpreter: "node",
       interpreter_args: "--require ts-node/register",
       env: { NODE_ENV: "production" }
