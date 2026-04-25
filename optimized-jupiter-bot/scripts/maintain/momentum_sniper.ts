@@ -158,6 +158,10 @@ const {
   shouldAllowAlphaQuotaCandidate,
 } = require('./quota_assist_logic.ts');
 const {
+  classifyExitSwapFailure,
+  resolveExitRetryCooldownMs,
+} = require('./exit_failure_logic.ts');
+const {
   computeGmgnBanUntilMs,
   isGmgnRateLimitMessage,
   isGmgnTemporaryBanMessage,
@@ -2104,6 +2108,8 @@ interface Position {
   exitFailureCount?: number;
   lastExitFailureAt?: number;
   lastExitFailureReason?: string;
+  lastExitFailureCode?: number | null;
+  nextExitRetryAt?: number;
   balanceFetchFailureCount?: number;
   lastMarkValueSol?: number;
   lastMarkValueUsd?: number;
@@ -3072,6 +3078,11 @@ async function simulateSignedSwap(tx: VersionedTransaction, routeLabel: string):
       if (logs.length > 0) {
         console.warn(`[EXEC] Simulation logs for ${routeLabel}: ${logs.join(' | ')}`);
       }
+      (tx as any).__pcpLastFailureMeta = classifyExitSwapFailure({
+        simulationErr: sim.value.err,
+        simulationLogs: logs,
+        message: `pre-send simulation failed for ${routeLabel}`,
+      });
       console.warn(`[EXEC] Blocking live send for ${routeLabel} because local simulation already failed.`);
       return null;
     } catch (e: any) {
@@ -3080,10 +3091,17 @@ async function simulateSignedSwap(tx: VersionedTransaction, routeLabel: string):
         console.warn(`[EXEC] Simulation RPC capacity error for ${routeLabel} on ${candidate.label} RPC: ${e?.message || e}. Trying backup RPC.`);
         continue;
       }
+      (tx as any).__pcpLastFailureMeta = classifyExitSwapFailure({
+        providerLimited,
+        message: `simulation rpc error for ${routeLabel}: ${e?.message || e}`,
+      });
       console.warn(`[EXEC] Simulation RPC error for ${routeLabel} on ${candidate.label} RPC: ${e?.message || e}. Blocking live send.`);
       return null;
     }
   }
+  (tx as any).__pcpLastFailureMeta = classifyExitSwapFailure({
+    message: `simulation failed for ${routeLabel} without a successful rpc candidate`,
+  });
   return null;
 }
 
@@ -3103,6 +3121,10 @@ async function confirmSubmittedSignature(
     try {
       const status = (await lifecycleConnection.getSignatureStatuses([signature], { searchTransactionHistory: true })).value?.[0];
       if (status?.err) {
+        (rawTx as any).__pcpLastFailureMeta = classifyExitSwapFailure({
+          statusErr: status.err,
+          message: `tx failed after submission for ${signature}`,
+        });
         console.warn(`[SNIPER] TX failed after submission: ${signature} -> ${JSON.stringify(status.err)}`);
         return false;
       }
@@ -3118,6 +3140,10 @@ async function confirmSubmittedSignature(
       try {
         const currentBlockHeight = await lifecycleConnection.getBlockHeight('confirmed');
         if (currentBlockHeight > (lastValidBlockHeight as number)) {
+          (rawTx as any).__pcpLastFailureMeta = classifyExitSwapFailure({
+            expired: true,
+            message: `transaction expired before confirmation for ${signature}`,
+          });
           console.warn(
             `[SNIPER] TX expired before confirmation: ${signature} ` +
             `(blockheight ${currentBlockHeight} > lastValid ${lastValidBlockHeight})`
@@ -3222,6 +3248,9 @@ export async function executeSwap(quote: any, tipLamports = DEFAULT_PRIORITY_FEE
     }
 
     try {
+      if (quote && typeof quote === 'object') {
+        delete quote.__pcpLastFailureMeta;
+      }
       const usesNativeSolRoute =
         quote?.inputMint === WSOL ||
         quote?.outputMint === WSOL;
@@ -3265,6 +3294,11 @@ export async function executeSwap(quote: any, tipLamports = DEFAULT_PRIORITY_FEE
 	    );
 		    const lifecycleConnection = await simulateSignedSwap(tx, routeLabel);
 		    if (!lifecycleConnection) {
+          if (quote && typeof quote === 'object') {
+            quote.__pcpLastFailureMeta = (tx as any).__pcpLastFailureMeta || classifyExitSwapFailure({
+              message: `swap blocked after simulation for ${routeLabel}`,
+            });
+          }
 		      return null;
 		    }
 		    const rawTx = tx.serialize();
@@ -3314,6 +3348,11 @@ export async function executeSwap(quote: any, tipLamports = DEFAULT_PRIORITY_FEE
 		            if (expectedSig && await confirmSubmittedSignature(expectedSig, rawTx, tx.message.recentBlockhash, swapData.lastValidBlockHeight, false, SWAP_CONFIRM_TIMEOUT_MS, lifecycleConnection)) {
 		              return expectedSig;
 		            }
+              if (quote && typeof quote === 'object') {
+                quote.__pcpLastFailureMeta = (rawTx as any).__pcpLastFailureMeta || classifyExitSwapFailure({
+                  message: `jito bundle accepted but confirmation failed for ${routeLabel}`,
+                });
+              }
 	            console.warn('[JITO-EXEC] Bundle accepted but tx did not confirm in time, falling back to public mempool path');
 	        }
 	      } catch (bundleErr: any) {
@@ -3345,10 +3384,22 @@ export async function executeSwap(quote: any, tipLamports = DEFAULT_PRIORITY_FEE
 	    if (expectedSig && expectedSig !== sig) {
 	      console.warn(`[SNIPER] TX signature mismatch: expected ${expectedSig} but RPC returned ${sig}`);
 	    }
-		    const confirmed = await confirmSubmittedSignature(sig, rawTx, tx.message.recentBlockhash, swapData.lastValidBlockHeight, true, SWAP_CONFIRM_TIMEOUT_MS, activeLifecycleConnection);
-		    if (!confirmed) return null;
+	    const confirmed = await confirmSubmittedSignature(sig, rawTx, tx.message.recentBlockhash, swapData.lastValidBlockHeight, true, SWAP_CONFIRM_TIMEOUT_MS, activeLifecycleConnection);
+		    if (!confirmed) {
+          if (quote && typeof quote === 'object') {
+            quote.__pcpLastFailureMeta = (rawTx as any).__pcpLastFailureMeta || classifyExitSwapFailure({
+              message: `submitted swap failed confirmation for ${routeLabel}`,
+            });
+          }
+          return null;
+        }
 		    return sig;
 	  } catch (e: any) {
+	    if (quote && typeof quote === 'object') {
+        quote.__pcpLastFailureMeta = classifyExitSwapFailure({
+          message: `swap execution exception: ${e?.message || e}`,
+        });
+      }
 	    console.error('[SNIPER] Swap failed:', e.message);
 	    return null;
 	  }
@@ -5404,7 +5455,10 @@ async function checkExits() {
     const isLastStand = pos.entryMode === 'last-stand';
     const gmgnSnapshot = loadGmgnActivePositionSnapshot(pos.mint);
 
-    if (pos.lastExitFailureAt && (now - pos.lastExitFailureAt) < EXIT_RETRY_COOLDOWN_MS) {
+    if (pos.nextExitRetryAt && now < pos.nextExitRetryAt) {
+      continue;
+    }
+    if (!pos.nextExitRetryAt && pos.lastExitFailureAt && (now - pos.lastExitFailureAt) < EXIT_RETRY_COOLDOWN_MS) {
       continue;
     }
 
@@ -5607,6 +5661,8 @@ async function checkExits() {
           pos.exitFailureCount = 0;
           pos.lastExitFailureAt = undefined;
           pos.lastExitFailureReason = undefined;
+          pos.lastExitFailureCode = undefined;
+          pos.nextExitRetryAt = undefined;
           pos.balanceFetchFailureCount = 0;
           const realizedSol = Number(sellQuote.outAmount) / 1e9;
 
@@ -5773,9 +5829,17 @@ async function checkExits() {
 
           exits.push(pos);
         } else {
+          const swapFailureMeta = sellQuote?.__pcpLastFailureMeta || null;
           pos.exitFailureCount = (pos.exitFailureCount || 0) + 1;
           pos.lastExitFailureAt = Date.now();
-          pos.lastExitFailureReason = 'swap-execution-failed';
+          pos.lastExitFailureReason = swapFailureMeta?.category || 'swap-execution-failed';
+          pos.lastExitFailureCode = swapFailureMeta?.code ?? null;
+          const retryCooldownMs = resolveExitRetryCooldownMs(
+            swapFailureMeta,
+            pos.exitFailureCount,
+            EXIT_RETRY_COOLDOWN_MS,
+          );
+          pos.nextExitRetryAt = Date.now() + retryCooldownMs;
           saveStore();
           if (pos.exitFailureCount >= MAX_EXIT_FAILURES) {
             console.warn(`[SNIPER]  EXIT EVICT: ${pos.symbol} failed exit ${pos.exitFailureCount}x. Dropping from active tracker to stop fee churn.`);
@@ -5784,7 +5848,15 @@ async function checkExits() {
             await outerPub.del(REDIS_KEYS.position(pos.mint));
             exits.push(pos);
           } else {
-            console.warn(`[SNIPER]  EXIT RETRY COOLING DOWN: ${pos.symbol} exit failed (${pos.exitFailureCount}/${MAX_EXIT_FAILURES}).`);
+            const retrySeconds = Math.max(1, Math.round(retryCooldownMs / 1000));
+            const detailSuffix = swapFailureMeta?.code
+              ? ` code=${swapFailureMeta.code}`
+              : '';
+            console.warn(
+              `[SNIPER]  EXIT RETRY COOLING DOWN: ${pos.symbol} exit failed ` +
+              `(${pos.exitFailureCount}/${MAX_EXIT_FAILURES}) reason=${pos.lastExitFailureReason}${detailSuffix} ` +
+              `retryIn=${retrySeconds}s.`
+            );
           }
         }
       } else {
