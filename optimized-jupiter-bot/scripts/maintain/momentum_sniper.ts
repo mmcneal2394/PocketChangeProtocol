@@ -2725,6 +2725,9 @@ function loadStore() {
   try {
     if (fs.existsSync(SNIPER_LOG)) {
       const raw = JSON.parse(fs.readFileSync(SNIPER_LOG, 'utf-8'));
+      const journalLossStreak = deriveLossStreakSnapshotFromJournal();
+      const persistedConsecutiveLosses = Math.max(0, Number(raw?.stats?.consecutiveLosses || 0));
+      const recoveredConsecutiveLosses = Math.max(persistedConsecutiveLosses, journalLossStreak.consecutiveLosses);
       store = {
         positions: Array.isArray(raw?.positions)
           ? raw.positions.map((pos: any) => {
@@ -2742,8 +2745,16 @@ function loadStore() {
           wins: Number(raw?.stats?.wins || 0),
           losses: Number(raw?.stats?.losses || 0),
           totalPnlSol: Number(raw?.stats?.totalPnlSol || 0),
+          consecutiveLosses: recoveredConsecutiveLosses,
+          pausedUntil: Math.max(0, Number(raw?.stats?.pausedUntil || 0)),
         },
       };
+      if (recoveredConsecutiveLosses > persistedConsecutiveLosses) {
+        console.log(
+          `[SNIPER]  LOSS STREAK RECOVERY: restored ${recoveredConsecutiveLosses} consecutive losses ` +
+          `from recent journal history.`
+        );
+      }
       const persistedBlacklistLen = Array.isArray(raw?.blacklist) ? raw.blacklist.length : 0;
       if (persistedBlacklistLen > 0) {
         console.log(`[SNIPER] Resetting persisted session blacklist (${persistedBlacklistLen} entries) on boot.`);
@@ -2772,6 +2783,27 @@ function loadRecentTradeJournalRows(limit = 500): any[] {
   } catch {
     return [];
   }
+}
+
+function deriveLossStreakSnapshotFromJournal(limit = 80): { consecutiveLosses: number } {
+  const rows = loadRecentTradeJournalRows(limit)
+    .filter((row: any) => String(row?.action || '').toUpperCase() === 'SELL')
+    .filter((row: any) => {
+      const pnl = Number(row?.pnlSol ?? row?.pnl_sol);
+      return Number.isFinite(pnl) && !isGhostExecutionSignature(row?.sig);
+    });
+
+  let consecutiveLosses = 0;
+  for (let i = rows.length - 1; i >= 0; i -= 1) {
+    const pnl = Number(rows[i]?.pnlSol ?? rows[i]?.pnl_sol ?? 0);
+    if (pnl < 0) {
+      consecutiveLosses += 1;
+      continue;
+    }
+    break;
+  }
+
+  return { consecutiveLosses };
 }
 
 function refreshFamilyPerformanceMemory() {
@@ -3425,15 +3457,55 @@ async function calcBuySize(entryOptions?: EntryOptions): Promise<number> {
 }
 
 //  Loss Streak Cooldown
+const LOSS_STREAK_DEFENSIVE_THRESHOLD = 2;
+const LOSS_STREAK_PAUSE_THRESHOLD = 3;
+
+type LossStreakState = {
+  consecutiveLosses: number;
+  pauseDisabled: boolean;
+  pauseActive: boolean;
+  pauseRemainingMs: number;
+  restrictionsActive: boolean;
+  severeRestrictionsActive: boolean;
+};
+
+function getConsecutiveLosses(): number {
+  return Math.max(0, Number((store.stats as any)?.consecutiveLosses || 0));
+}
+
+function resolveLossStreakPauseMs(consecutiveLosses: number): number {
+  if (consecutiveLosses >= 8) return 90 * 60 * 1000;
+  if (consecutiveLosses >= 6) return 60 * 60 * 1000;
+  if (consecutiveLosses >= 4) return 30 * 60 * 1000;
+  if (consecutiveLosses >= LOSS_STREAK_PAUSE_THRESHOLD) return 15 * 60 * 1000;
+  return 0;
+}
+
+function getLossStreakState(now = Date.now()): LossStreakState {
+  const consecutiveLosses = getConsecutiveLosses();
+  const pauseDisabled = isLossStreakPauseDisabled();
+  const pausedUntil = Math.max(0, Number((store.stats as any)?.pausedUntil || 0));
+  const pauseActive = !pauseDisabled && pausedUntil > now;
+  const pauseRemainingMs = pauseActive ? Math.max(0, pausedUntil - now) : 0;
+  const restrictionsActive = consecutiveLosses >= LOSS_STREAK_DEFENSIVE_THRESHOLD || pauseActive;
+  const severeRestrictionsActive = consecutiveLosses >= LOSS_STREAK_PAUSE_THRESHOLD || pauseActive;
+  return {
+    consecutiveLosses,
+    pauseDisabled,
+    pauseActive,
+    pauseRemainingMs,
+    restrictionsActive,
+    severeRestrictionsActive,
+  };
+}
+
 function isLossStreakPaused(): boolean {
-  if (isLossStreakPauseDisabled()) {
+  const state = getLossStreakState();
+  if (state.pauseDisabled) {
     delete (store.stats as any).pausedUntil;
     return false;
   }
-  if ((store.stats as any).pausedUntil && Date.now() < (store.stats as any).pausedUntil) {
-    return true;
-  }
-  return false;
+  return state.pauseActive;
 }
 
 async function getMintCooldownState(mint: string): Promise<{ active: boolean; value: string | null; ttlSeconds: number | null }> {
@@ -3478,8 +3550,27 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
   const isWalletSignalEntry =
     entryOptions?.sourceLane === 'wallet' ||
     (entryOptions?.sourceLane !== 'alpha' && typeof taSig === 'string' && taSig.startsWith('ALPHA_'));
+  const lossStreakState = getLossStreakState();
+  if (lossStreakState.restrictionsActive && entryOptions?.quotaAssist === true) {
+      console.log(
+        `[SNIPER]  QUOTA ASSIST HOLD: ${symbol} blocked while the bot cools down ` +
+        `(${lossStreakState.consecutiveLosses} consecutive losses).`
+      );
+      return;
+  }
+  if (lossStreakState.restrictionsActive && (entryOptions?.allowRoutableLowLiquidity === true || entryOptions?.routeLiveFastTrack === true)) {
+      console.log(
+        `[SNIPER]  COLD STREAK HOLD: ${symbol} route-live / low-liquidity bypass disabled ` +
+        `after ${lossStreakState.consecutiveLosses} consecutive losses.`
+      );
+      return;
+  }
   let entryMode = entryOptions?.entryMode || 'normal';
-  if (entryOptions?.quotaAssist === true && Number(entryOptions?.quotaAssistLevel || 0) >= 2) {
+  if (
+      entryOptions?.quotaAssist === true &&
+      Number(entryOptions?.quotaAssistLevel || 0) >= 2 &&
+      !lossStreakState.restrictionsActive
+  ) {
       entryMode = 'desperation_bypass';
       if (entryOptions) {
           entryOptions.entryMode = 'desperation_bypass';
@@ -3535,6 +3626,7 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
     sourceLane: entryOptions?.sourceLane,
     entryFamily,
     strikeCount: mintStrikes,
+    lossStreakActive: lossStreakState.restrictionsActive,
   });
   if (isInCooldown && !quotaCooldownBypass) {
       console.log(`[SNIPER]  Skipping ${symbol}  actively cooling down (strikes: ${mintStrikes}).`);
@@ -4211,7 +4303,7 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
         loadRouteLiveZeroLiquidityConfig(),
       );
       if (routeLiveZeroLiqDecision.shouldHold || routeLiveZeroLiqDecision.shouldBlock) {
-        const bypassHunterModeActive = store.positions ? store.positions.length < 8 : false;
+        const bypassHunterModeActive = !lossStreakState.restrictionsActive && (store.positions ? store.positions.length < 8 : false);
         if (bypassHunterModeActive) {
           console.log(`[SNIPER]  HUNTER MODE BYPASS: ${symbol} overriding ZERO LIQ ROUTE BLOCK.`);
         } else {
@@ -4250,7 +4342,7 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
           return;
         }
       }
-      if (routeLiveZeroLiqDecision.code === 'route_live_zero_liq_fast_track') {
+      if (routeLiveZeroLiqDecision.code === 'route_live_zero_liq_fast_track' && !lossStreakState.restrictionsActive) {
         entryOptions = { ...(entryOptions || {}), routeLiveFastTrack: true };
         console.log(
           `[SNIPER]  ZERO LIQ FAST TRACK: ${symbol} exceptional first route-live sample ` +
@@ -4816,6 +4908,7 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
   const allowQuotaEvBypass =
     entryOptions?.quotaAssist === true &&
     Number(entryOptions?.quotaAssistLevel || 0) >= 2 &&
+    !lossStreakState.restrictionsActive &&
     Number(expectedValueDecision.confidence || 0) < 0.75;
   if (expectedValueDecision.shouldSkip && !allowQuotaEvBypass) {
     console.log(
@@ -5564,12 +5657,17 @@ async function checkExits() {
               }
 
               (store.stats as any).consecutiveLosses = ((store.stats as any).consecutiveLosses || 0) + 1;
-              if ((store.stats as any).consecutiveLosses >= 3) {
+              if ((store.stats as any).consecutiveLosses >= LOSS_STREAK_PAUSE_THRESHOLD) {
                 if (isLossStreakPauseDisabled()) {
                   delete (store.stats as any).pausedUntil;
                   console.log('[SNIPER]  LOSS STREAK RECORDED: pause disabled by liveTest config during data-refine window');
                 } else {
-                  (store.stats as any).pausedUntil = Date.now() + 15 * 60 * 1000;
+                  const pauseMs = resolveLossStreakPauseMs(Number((store.stats as any).consecutiveLosses || 0));
+                  (store.stats as any).pausedUntil = Date.now() + pauseMs;
+                  console.log(
+                    `[SNIPER]  LOSS STREAK BRAKE: pausing new entries for ${(pauseMs / 60000).toFixed(0)}min ` +
+                    `after ${(store.stats as any).consecutiveLosses} consecutive losses.`
+                  );
                 }
                 try {
                   pubPublisher.publish('gemma4:refine', JSON.stringify({
@@ -5952,6 +6050,8 @@ async function poll() {
       }
     }
     const microScoutConfig = loadMicroScoutConfig();
+    const lossStreakState = getLossStreakState();
+    const lossStreakRestricted = lossStreakState.restrictionsActive;
     let quotaTrendingMap: Map<string, any> = new Map();
     if (fs.existsSync(TRENDING_FILE)) {
       try {
@@ -7160,7 +7260,7 @@ async function poll() {
                   loadRouteLiveZeroLiquidityConfig(),
                 );
                 if (routeLiveZeroLiqDecision.shouldHold || routeLiveZeroLiqDecision.shouldBlock) {
-                  const bypassHunterModeActive = store.positions.length < 8;
+                  const bypassHunterModeActive = !lossStreakRestricted && store.positions.length < 8;
                   if (bypassHunterModeActive) {
                     console.log(`[SNIPER]  HUNTER MODE BYPASS: ${symbol} overriding ZERO LIQ ROUTE BLOCK.`);
                   } else {
@@ -7221,7 +7321,7 @@ async function poll() {
                   console.log(
                     `[SNIPER]  ROUTE-LIVE CONTINUATION PASS: ${symbol} ${routeLiveContinuationOverride.reason}.`
                   );
-                } else if (globalQuotaPressure > 1.5) {
+                } else if (globalQuotaPressure > 1.5 && !lossStreakRestricted) {
                   console.log(`[SNIPER] ⚠️ DESPERATION BYPASS: ignoring continuation hold for ${symbol}`);
                 } else {
                 console.log(
@@ -7348,7 +7448,7 @@ async function poll() {
                 console.log(
                   `[SNIPER]  ROUTE-LIVE CONTINUATION PASS: ${symbol} ${routeLiveContinuationOverride.reason}.`
                 );
-              } else if (globalQuotaPressure > 1.5) {
+              } else if (globalQuotaPressure > 1.5 && !lossStreakRestricted) {
                 console.log(`[SNIPER] ⚠️ DESPERATION BYPASS: ignoring continuation hold for ${symbol}`);
               } else {
               console.log(
@@ -7396,6 +7496,15 @@ async function poll() {
               continue;
             }
             if (microOnlyMode) {
+              if (lossStreakRestricted) {
+                console.log(
+                  `[SNIPER]  LOW LIQ HOLD: ${symbol} route is live but low-liquidity preservation is disabled ` +
+                  `during the current cold streak (${lossStreakState.consecutiveLosses} losses).`
+                );
+                const pub = RedisBus.getPublisher();
+                await setMintCooldown(pub, v.mint, 300, 'COLD_STREAK_LOW_LIQ');
+                continue;
+              }
               console.log(
                 `[SNIPER]  LOW LIQ ROUTE PASS: ${symbol} liq $${livePair.liquidity.toFixed(0)} < $5K, ` +
                 `but Jupiter route is live. Preserving candidate for micro-sized normal-lane evaluation.`

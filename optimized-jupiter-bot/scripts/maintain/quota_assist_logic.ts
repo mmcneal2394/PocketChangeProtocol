@@ -200,12 +200,14 @@ export function shouldBypassCooldownForQuotaAssist(args: {
   sourceLane?: string | null;
   entryFamily?: string | null;
   strikeCount?: number;
+  lossStreakActive?: boolean;
 }) {
   const lane = String(args.sourceLane || args.entryFamily || '').trim().toLowerCase();
   return (
     args.quotaAssist === true &&
     Number(args.quotaAssistLevel || 0) >= 2 &&
     Number(args.strikeCount || 0) <= 0 &&
+    args.lossStreakActive !== true &&
     (lane === 'wallet' || lane === 'alpha')
   );
 }

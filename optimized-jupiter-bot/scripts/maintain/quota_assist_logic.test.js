@@ -69,4 +69,8 @@ test('shouldBypassCooldownForQuotaAssist only allows level-2 alpha and wallet en
     shouldBypassCooldownForQuotaAssist({ quotaAssist: true, quotaAssistLevel: 2, sourceLane: 'velocity-first', strikeCount: 0 }),
     false,
   );
+  assert.equal(
+    shouldBypassCooldownForQuotaAssist({ quotaAssist: true, quotaAssistLevel: 2, sourceLane: 'wallet', strikeCount: 0, lossStreakActive: true }),
+    false,
+  );
 });
