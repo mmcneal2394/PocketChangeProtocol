@@ -7,6 +7,12 @@ import dotenv from 'dotenv';
 const {
   computeWalletWeightedScore,
 } = require('./wallet_intel_logic.ts');
+const {
+  computeGmgnBanUntilMs,
+  getGmgnBanWaitMs,
+  isGmgnRateLimitMessage,
+  isGmgnTemporaryBanMessage,
+} = require('./gmgn_pressure_logic.ts');
 const fetch = require('node-fetch');
 
 dotenv.config({ path: path.join(process.cwd(), '.env') });
@@ -25,14 +31,15 @@ const GMGN_API_KEY = String(process.env.GMGN_API_KEY || '').trim();
 const IPV4_AGENT = new https.Agent({ family: 4 });
 
 const POLL_MS = Math.max(60_000, Number(process.env.WALLET_INTEL_POLL_MS || 10 * 60_000));
-const REFRESH_BATCH = Math.max(1, Number(process.env.WALLET_INTEL_REFRESH_BATCH || 2));
-const CANDIDATE_LIMIT = Math.max(12, Number(process.env.WALLET_INTEL_CANDIDATE_LIMIT || 48));
-const TRACK_LIMIT = Math.max(8, Number(process.env.WALLET_INTEL_TRACK_LIMIT || 24));
-const TTL_30D_MS = Math.max(30 * 60_000, Number(process.env.WALLET_INTEL_TTL_30D_MS || 4 * 60 * 60_000));
-const TTL_7D_MS = Math.max(15 * 60_000, Number(process.env.WALLET_INTEL_TTL_7D_MS || 60 * 60_000));
-const REQUEST_GAP_MS = Math.max(500, Number(process.env.WALLET_INTEL_REQUEST_GAP_MS || 2_500));
+const REFRESH_BATCH = Math.max(1, Number(process.env.WALLET_INTEL_REFRESH_BATCH || 1));
+const CANDIDATE_LIMIT = Math.max(12, Number(process.env.WALLET_INTEL_CANDIDATE_LIMIT || 32));
+const TRACK_LIMIT = Math.max(8, Number(process.env.WALLET_INTEL_TRACK_LIMIT || 12));
+const TTL_30D_MS = Math.max(30 * 60_000, Number(process.env.WALLET_INTEL_TTL_30D_MS || 12 * 60 * 60_000));
+const TTL_7D_MS = Math.max(15 * 60_000, Number(process.env.WALLET_INTEL_TTL_7D_MS || 6 * 60 * 60_000));
+const REQUEST_GAP_MS = Math.max(500, Number(process.env.WALLET_INTEL_REQUEST_GAP_MS || 8_000));
 const REQUEST_TIMEOUT_MS = Math.max(3_000, Number(process.env.WALLET_INTEL_REQUEST_TIMEOUT_MS || 10_000));
-const BAN_COOLDOWN_MS = Math.max(5 * 60_000, Number(process.env.WALLET_INTEL_BAN_COOLDOWN_MS || 30 * 60_000));
+const BAN_COOLDOWN_MS = Math.max(5 * 60_000, Number(process.env.WALLET_INTEL_BAN_COOLDOWN_MS || 60 * 60_000));
+const MAX_ATTEMPTS = Math.max(1, Number(process.env.WALLET_INTEL_MAX_ATTEMPTS || 2));
 
 type JsonObject = Record<string, any>;
 
@@ -111,21 +118,15 @@ function uniqueStrings(values: Array<string | null | undefined>) {
   );
 }
 
-function getTimestampFromMessage(message: string) {
-  const match = String(message || '').match(/~(\d+)s remaining/);
-  return match ? (Number(match[1]) + 2) * 1000 : null;
-}
-
-function isTemporaryBanMessage(message: string) {
-  return /temporarily banned|rate limit violations/i.test(String(message || ''));
-}
-
 async function gmgnGet(pathname: string, params: Record<string, any>) {
   if (!GMGN_API_KEY) throw new Error('GMGN_API_KEY missing');
+  if (Date.now() < gmgnBanUntilMs) {
+    throw new Error(`GMGN cooldown active until ${new Date(gmgnBanUntilMs).toISOString()}`);
+  }
 
   let attempt = 0;
   let lastMessage = 'unknown';
-  while (attempt < 3) {
+  while (attempt < MAX_ATTEMPTS) {
     attempt += 1;
     const url = new URL(`${OPENAPI_HOST}${pathname}`);
     for (const [key, value] of Object.entries(params || {})) {
@@ -166,9 +167,14 @@ async function gmgnGet(pathname: string, params: Record<string, any>) {
 
     const message = String(json.message || json.error || `HTTP ${response.status}`);
     lastMessage = message;
-    const waitMs = getTimestampFromMessage(message);
-    if (response.status === 429 || json.code === 429 || waitMs !== null) {
-      await sleep(waitMs ?? 15_000);
+    if (isGmgnTemporaryBanMessage(message)) {
+      gmgnBanUntilMs = Math.max(gmgnBanUntilMs, computeGmgnBanUntilMs(message, BAN_COOLDOWN_MS));
+      throw new Error(message);
+    }
+    if (response.status === 429 || json.code === 429 || isGmgnRateLimitMessage(message)) {
+      const waitMs = getGmgnBanWaitMs(message, 15_000);
+      if (attempt >= MAX_ATTEMPTS) break;
+      await sleep(waitMs);
       continue;
     }
     throw new Error(message);
@@ -530,8 +536,8 @@ async function runCycle() {
     } catch (error: any) {
       const message = String(error?.message || error);
       const label = candidate.wallet.slice(0, 12);
-      if (isTemporaryBanMessage(message)) {
-        gmgnBanUntilMs = Math.max(gmgnBanUntilMs, Date.now() + BAN_COOLDOWN_MS);
+      if (isGmgnTemporaryBanMessage(message)) {
+        gmgnBanUntilMs = Math.max(gmgnBanUntilMs, computeGmgnBanUntilMs(message, BAN_COOLDOWN_MS));
       }
       console.error(`[WALLET-INTEL] refresh failed ${label}: ${message}`);
     }

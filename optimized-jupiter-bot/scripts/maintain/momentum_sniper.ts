@@ -153,6 +153,12 @@ const {
   isWalletSignalFresh,
   shouldAllowQuotaWalletWithoutExtraMarketSupport,
 } = require('./quota_assist_logic.ts');
+const {
+  computeGmgnBanUntilMs,
+  isGmgnRateLimitMessage,
+  isGmgnTemporaryBanMessage,
+  normalizeGmgnMessage,
+} = require('./gmgn_pressure_logic.ts');
 const { appendTradeProfileArtifacts } = require('./trade_profile_logic.ts');
 const { loadExpectedValueModel, scoreCandidateExpectedValue } = require('./ev_ranking_logic.ts');
 
@@ -399,6 +405,7 @@ const WALLET_HOLDINGS_FILE = path.join(SIGNALS_DIR, 'wallet_holdings.json');
 const GMGN_ACTIVE_POSITIONS_FILE = path.join(SIGNALS_DIR, 'gmgn_active_positions.json');
 const GMGN_TRENDING_FILE = path.join(SIGNALS_DIR, 'gmgn_trending.json');
 const BAGS_ENRICHMENT_CACHE_FILE = path.join(SIGNALS_DIR, 'bags_enrichment_cache.json');
+const GMGN_TOKEN_INFO_CACHE_FILE = path.join(SIGNALS_DIR, 'gmgn_token_info_cache.json');
 const STRATEGY_PROFILE_FILE = path.resolve(process.cwd(), process.env.STRATEGY_PROFILE_PATH || 'scripts/active.strategy.json');
 
 type EntryMode = 'normal' | 'last-stand' | 'micro-scout';
@@ -2111,6 +2118,8 @@ function classifyDuplicateImageRisk(imageDupCount: number | null): 'none' | 'low
 
 const GMGN_CLI_BIN = process.platform === 'win32' ? 'gmgn-cli.cmd' : '/usr/bin/gmgn-cli';
 const GMGN_CLI_TIMEOUT_MS = 25_000;
+const GMGN_TOKEN_INFO_TTL_MS = Math.max(5 * 60_000, Number(process.env.GMGN_TOKEN_INFO_TTL_MS || 30 * 60_000));
+const GMGN_BAN_COOLDOWN_MS = Math.max(5 * 60_000, Number(process.env.GMGN_BAN_COOLDOWN_MS || 30 * 60_000));
 type DiscoveryRiskMeta = {
   imageDupCount: number | null;
   duplicateImageRisk: string;
@@ -2121,6 +2130,29 @@ type DiscoveryRiskMeta = {
   fetchedAt: number;
 };
 const gmgnImageDupCache = new Map<string, DiscoveryRiskMeta>();
+type GmgnTokenInfoCacheEntry = {
+  meta: DiscoveryRiskMeta;
+  expiresAt: number;
+};
+type GmgnTokenInfoCacheDocument = {
+  version: number;
+  updatedAt: number;
+  banUntilMs: number;
+  entries: Record<string, GmgnTokenInfoCacheEntry>;
+};
+let gmgnBanUntilMs = 0;
+let gmgnBanNoticeUntilMs = 0;
+let gmgnTokenInfoCacheSnapshot: {
+  loadedAt: number;
+  mtimeMs: number;
+  banUntilMs: number;
+  entries: Record<string, GmgnTokenInfoCacheEntry>;
+} = {
+  loadedAt: 0,
+  mtimeMs: 0,
+  banUntilMs: 0,
+  entries: {},
+};
 let bagsEnrichmentCacheSnapshot: {
   loadedAt: number;
   mtimeMs: number;
@@ -2133,7 +2165,106 @@ let bagsEnrichmentCacheSnapshot: {
   jupiter: {},
 };
 
+function loadGmgnTokenInfoCache() {
+  try {
+    if (!fs.existsSync(GMGN_TOKEN_INFO_CACHE_FILE)) {
+      gmgnTokenInfoCacheSnapshot = {
+        loadedAt: Date.now(),
+        mtimeMs: 0,
+        banUntilMs: gmgnBanUntilMs,
+        entries: {},
+      };
+      return gmgnTokenInfoCacheSnapshot;
+    }
+    const stat = fs.statSync(GMGN_TOKEN_INFO_CACHE_FILE);
+    const mtimeMs = Number(stat.mtimeMs || 0);
+    if (gmgnTokenInfoCacheSnapshot.loadedAt && gmgnTokenInfoCacheSnapshot.mtimeMs === mtimeMs) {
+      gmgnBanUntilMs = Math.max(gmgnBanUntilMs, gmgnTokenInfoCacheSnapshot.banUntilMs || 0);
+      return gmgnTokenInfoCacheSnapshot;
+    }
+    const payload = readJsonFile<GmgnTokenInfoCacheDocument>(GMGN_TOKEN_INFO_CACHE_FILE) || {
+      version: 1,
+      updatedAt: 0,
+      banUntilMs: 0,
+      entries: {},
+    };
+    gmgnTokenInfoCacheSnapshot = {
+      loadedAt: Date.now(),
+      mtimeMs,
+      banUntilMs: Math.max(0, Number(payload.banUntilMs || 0)),
+      entries: (payload.entries && typeof payload.entries === 'object') ? payload.entries : {},
+    };
+    gmgnBanUntilMs = Math.max(gmgnBanUntilMs, gmgnTokenInfoCacheSnapshot.banUntilMs || 0);
+  } catch {
+    gmgnTokenInfoCacheSnapshot = {
+      loadedAt: Date.now(),
+      mtimeMs: 0,
+      banUntilMs: gmgnBanUntilMs,
+      entries: {},
+    };
+  }
+  return gmgnTokenInfoCacheSnapshot;
+}
+
+function persistGmgnTokenInfoCache() {
+  const snapshot = loadGmgnTokenInfoCache();
+  const payload: GmgnTokenInfoCacheDocument = {
+    version: 1,
+    updatedAt: Date.now(),
+    banUntilMs: Math.max(gmgnBanUntilMs, snapshot.banUntilMs || 0),
+    entries: snapshot.entries || {},
+  };
+  fs.writeFileSync(GMGN_TOKEN_INFO_CACHE_FILE, `${JSON.stringify(payload, null, 2)}\n`, 'utf-8');
+  try {
+    const stat = fs.statSync(GMGN_TOKEN_INFO_CACHE_FILE);
+    gmgnTokenInfoCacheSnapshot = {
+      loadedAt: Date.now(),
+      mtimeMs: Number(stat.mtimeMs || 0),
+      banUntilMs: payload.banUntilMs,
+      entries: payload.entries,
+    };
+  } catch {
+    gmgnTokenInfoCacheSnapshot = {
+      loadedAt: Date.now(),
+      mtimeMs: 0,
+      banUntilMs: payload.banUntilMs,
+      entries: payload.entries,
+    };
+  }
+}
+
+function getCachedGmgnTokenInfoMeta(mint: string, now = Date.now()): DiscoveryRiskMeta | null {
+  const snapshot = loadGmgnTokenInfoCache();
+  const entry = snapshot.entries?.[mint];
+  if (!entry) return null;
+  if (Number(entry.expiresAt || 0) <= now) return null;
+  return entry.meta || null;
+}
+
+function rememberGmgnTokenInfoMeta(mint: string, meta: DiscoveryRiskMeta, ttlMs = GMGN_TOKEN_INFO_TTL_MS) {
+  const snapshot = loadGmgnTokenInfoCache();
+  snapshot.entries[mint] = {
+    meta,
+    expiresAt: Date.now() + ttlMs,
+  };
+  persistGmgnTokenInfoCache();
+}
+
+function recordGmgnTemporaryBan(message: string) {
+  gmgnBanUntilMs = Math.max(gmgnBanUntilMs, computeGmgnBanUntilMs(message, GMGN_BAN_COOLDOWN_MS));
+  const snapshot = loadGmgnTokenInfoCache();
+  snapshot.banUntilMs = gmgnBanUntilMs;
+  persistGmgnTokenInfoCache();
+  if (Date.now() >= gmgnBanNoticeUntilMs) {
+    console.warn(
+      `[SNIPER] GMGN cooldown active until ${new Date(gmgnBanUntilMs).toISOString()} — using cached/local metadata only.`,
+    );
+    gmgnBanNoticeUntilMs = gmgnBanUntilMs;
+  }
+}
+
 function runGmgnCliJson(args: string): any | null {
+  if (Date.now() < gmgnBanUntilMs) return null;
   try {
     const argv = args.split(/\s+/).filter(Boolean);
     const res = spawnSync(GMGN_CLI_BIN, [...argv, '--raw'], {
@@ -2150,7 +2281,23 @@ function runGmgnCliJson(args: string): any | null {
     }
     return JSON.parse(String(res.stdout || '').trim());
   } catch (error: any) {
-    console.warn(`[SNIPER] GMGN metadata lookup failed: ${error.message?.split('\n')[0] || error}`);
+    const rawMessage = normalizeGmgnMessage(String(error?.message || error));
+    const message =
+      rawMessage
+        .split('\n')
+        .map((line) => line.trim())
+        .find(Boolean)
+      || rawMessage
+      || 'gmgn-cli failed';
+    const shouldCooldown =
+      isGmgnTemporaryBanMessage(rawMessage)
+      || isGmgnRateLimitMessage(rawMessage)
+      || (/^token\s+info\b/i.test(args) && /\bfailed\b/i.test(rawMessage));
+    if (shouldCooldown) {
+      recordGmgnTemporaryBan(rawMessage || message);
+      return null;
+    }
+    console.warn(`[SNIPER] GMGN metadata lookup failed: ${message}`);
     return null;
   }
 }
@@ -2249,6 +2396,11 @@ function loadBagsEnrichmentMeta(mint: string): DiscoveryRiskMeta | null {
 function loadGmgnImageDupMeta(mint: string, allowCliFallback = false) {
   const cached = gmgnImageDupCache.get(mint);
   if (cached && (Date.now() - cached.fetchedAt) < (10 * 60_000)) return cached;
+  const persistedMeta = getCachedGmgnTokenInfoMeta(mint);
+  if (persistedMeta) {
+    gmgnImageDupCache.set(mint, persistedMeta);
+    return persistedMeta;
+  }
   const bagsMeta = loadBagsEnrichmentMeta(mint);
 
   const trendingRows = readJsonFile<any[]>(TRENDING_FILE);
@@ -2284,6 +2436,7 @@ function loadGmgnImageDupMeta(mint: string, allowCliFallback = false) {
   }
 
   if (!allowCliFallback) return null;
+  if (Date.now() < gmgnBanUntilMs) return null;
   const info = runGmgnCliJson(`token info --chain sol --address ${mint}`);
   const infoMeta = mergeDiscoveryRiskMeta(
     extractGmgnImageDupMeta(info, 'gmgn-cli'),
@@ -2291,6 +2444,7 @@ function loadGmgnImageDupMeta(mint: string, allowCliFallback = false) {
   );
   if (infoMeta) {
     gmgnImageDupCache.set(mint, infoMeta);
+    rememberGmgnTokenInfoMeta(mint, infoMeta);
     return infoMeta;
   }
   return null;
