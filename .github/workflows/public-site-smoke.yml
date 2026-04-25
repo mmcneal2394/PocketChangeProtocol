@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - demo/slopfest-arb-loop
     paths:
       - ".github/workflows/public-site-smoke.yml"
       - "app/**"
