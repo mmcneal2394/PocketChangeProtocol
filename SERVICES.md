@@ -2,7 +2,7 @@
 
 > **Billing**: USDC on Solana | **Response time**: < 2 hours | **Delivery**: Automated outputs in under 30 min
 
-**Live demo**: [bitte-agent-navy.vercel.app/api/health](https://bitte-agent-navy.vercel.app/api/health)
+**Live demo**: [pcprotcol.dev/api/health](https://pcprotcol.dev/api/health)
 **Payment wallet**: `97guBNXZZstLqqERvUmcoMH4ghFvp7y95wqugQXT1J3v`
 
 ---
@@ -24,7 +24,7 @@ What you get:
 
 **Try the demo free**:
 ```bash
-curl -X POST https://bitte-agent-navy.vercel.app/api/code-audit \
+curl -X POST https://pcprotcol.dev/api/code-audit \
   -H "Content-Type: application/json" \
   -d '{"code": "const secret = \"myPrivateKey123loooooooooong\";", "language": "typescript"}'
 ```
@@ -40,7 +40,7 @@ Subscribe to live SOL→Token→SOL arbitrage windows across Jupiter, Raydium, a
 - Returns net bps after gas + Jito tip
 - JSON output — plug directly into your bot
 
-**Endpoint**: `GET https://bitte-agent-navy.vercel.app/api/arb-windows?capitalSol=1.0&minBps=3`
+**Endpoint**: `GET https://pcprotcol.dev/api/arb-windows?capitalSol=1.0&minBps=3`
 
 ---
 
@@ -52,7 +52,7 @@ Multi-source token momentum detection:
 - Pump.fun graduation events
 - Cross-DEX price divergence signals
 
-**Endpoint**: `GET https://bitte-agent-navy.vercel.app/api/alpha-signals`
+**Endpoint**: `GET https://pcprotcol.dev/api/alpha-signals`
 
 ---
 
@@ -61,7 +61,7 @@ Multi-source token momentum detection:
 Scored list of high-momentum Solana tokens from DexScreener + seeded mint list.
 Filters: min liquidity, volume, age. Scores on safety + momentum.
 
-**Endpoint**: `GET https://bitte-agent-navy.vercel.app/api/token-scan?minLiq=10000&limit=20`
+**Endpoint**: `GET https://pcprotcol.dev/api/token-scan?minLiq=10000&limit=20`
 
 ---
 
@@ -92,7 +92,7 @@ Transform your `trade_log.jsonl` into:
 | Claim | Proof |
 |-------|-------|
 | Live bot engine | 480 routes/5min dry run, exit code 0 |
-| Real arb quotes | [bitte-agent-navy.vercel.app/api/arb-windows](https://bitte-agent-navy.vercel.app/api/arb-windows) |
+| Real arb quotes | [pcprotcol.dev/api/arb-windows](https://pcprotcol.dev/api/arb-windows) |
 | Jito MEV bundles | Chainstack Geyser gRPC + Jito block engine |
 | Code auditor works | Scanned PCP's own engine: 11 HIGH, 3 MEDIUM found |
 | No BS | 0% markup on API calls, results in < 30 min |
