@@ -26,6 +26,12 @@ SAFETY_PROMOTION_MIN_PROFIT_FACTOR = 1.75
 SAFETY_PROMOTION_MIN_WIN_RATE = 50.0
 SAFETY_PROMOTION_MIN_TOTAL_PNL_SOL = 0.05
 SAFETY_PROMOTION_STALE_HOURS = 6
+REPAIR_PROMOTION_MIN_FITNESS_RATIO = 0.95
+WEAK_BOOK_MIN_5M_CHANGE = 2.0
+WEAK_BOOK_MIN_LIQUIDITY_USD = 18000.0
+WEAK_BOOK_MIN_VOLUME_5M = 500.0
+WEAK_BOOK_MAX_HOLD_MINUTES = 4.0
+WEAK_BOOK_MAX_HUNTER_MULTIPLIER = 0.25
 
 def try_float(value, default=0.0) -> float:
     try:
@@ -82,6 +88,32 @@ def should_safety_promote(current: dict, best: dict) -> tuple[bool, str]:
         f"thin stale baseline ({current_trades} trades) replaced by broader positive candidate "
         f"({best_trades} trades, PF {try_float(best.get('profit_factor', 0), 0):.2f}, "
         f"PnL {try_float(best.get('total_pnl_sol', 0), 0):+.4f} SOL)"
+    )
+
+def violates_weak_book_safety(payload: dict) -> bool:
+    return (
+        read_filter_value(payload, "min_5m_change", 0) < WEAK_BOOK_MIN_5M_CHANGE or
+        read_filter_value(payload, "min_liquidity_usd", 0) < WEAK_BOOK_MIN_LIQUIDITY_USD or
+        read_filter_value(payload, "min_volume_5m", 0) < WEAK_BOOK_MIN_VOLUME_5M or
+        read_filter_value(payload, "max_hold_minutes", WEAK_BOOK_MAX_HOLD_MINUTES) > WEAK_BOOK_MAX_HOLD_MINUTES or
+        read_filter_value(payload, "hunterModeMultiplier", WEAK_BOOK_MAX_HUNTER_MULTIPLIER) > WEAK_BOOK_MAX_HUNTER_MULTIPLIER
+    )
+
+def should_repair_promote(current: dict, best: dict, current_fitness: float, best_fitness: float) -> tuple[bool, str]:
+    current_trades = try_int(current.get("trades_sim", 0), 0)
+    if current_trades >= THIN_BASELINE_TRADES:
+        return False, "baseline sample is already broad enough"
+    if not violates_weak_book_safety(current):
+        return False, "current live strategy does not violate weak-book safety floors"
+    if violates_weak_book_safety(best):
+        return False, "candidate still violates weak-book safety floors"
+    if try_float(best.get("total_pnl_sol", 0), 0) <= 0:
+        return False, "candidate PnL is not positive"
+    if best_fitness < current_fitness * REPAIR_PROMOTION_MIN_FITNESS_RATIO:
+        return False, "candidate fitness is too far below the current baseline"
+    return True, (
+        "repairing legacy loose live filters with an equivalent safer candidate "
+        f"({try_int(best.get('trades_sim', 0), 0)} trades, fitness {best_fitness:.4f})"
     )
 
 def load_current_params() -> dict:
@@ -160,7 +192,8 @@ def run() -> dict:
     promotion_reason = ""
     normal_promotion = best_fitness > current_fitness * PROMOTE_THRESHOLD and best_fitness > 0
     safety_promotion, safety_reason = should_safety_promote(current, best)
-    if normal_promotion or safety_promotion:
+    repair_promotion, repair_reason = should_repair_promote(current, best, current_fitness, best_fitness)
+    if normal_promotion or safety_promotion or repair_promotion:
         # Build new strategy_params by merging best candidate into current
         new_params = dict(current)
         new_params.update(extract_promotable_fields(best))
@@ -171,24 +204,40 @@ def run() -> dict:
         new_params["trades_sim"]     = best.get("trades_sim", 0)
         new_params["generation"]     = current.get("generation", 0) + 1
         new_params["last_updated"]   = datetime.now(timezone.utc).isoformat()
-        new_params["source"]         = "optimizer_swarm" if normal_promotion else "optimizer_swarm_safety"
+        new_params["source"]         = (
+            "optimizer_swarm" if normal_promotion
+            else "optimizer_swarm_safety" if safety_promotion
+            else "optimizer_swarm_repair"
+        )
         new_params["param_hash"]     = best.get("param_hash", "")
-        new_params["promotion_reason"] = "fitness_upgrade" if normal_promotion else safety_reason
+        new_params["promotion_reason"] = (
+            "fitness_upgrade" if normal_promotion
+            else safety_reason if safety_promotion
+            else repair_reason
+        )
 
         write_strategy_params(new_params)
         promoted = True
-        promotion_reason = "fitness upgrade" if normal_promotion else safety_reason
+        promotion_reason = (
+            "fitness upgrade" if normal_promotion
+            else safety_reason if safety_promotion
+            else repair_reason
+        )
         if normal_promotion:
             print(f"[MemoryAgent] ✅ PROMOTED {best.get('param_hash','?')} | "
                   f"fitness {current_fitness:.3f} → {best_fitness:.3f} "
                   f"(+{(best_fitness/max(current_fitness,0.001)-1)*100:.1f}%)")
-        else:
+        elif safety_promotion:
             print(f"[MemoryAgent] ✅ SAFETY PROMOTED {best.get('param_hash','?')} | {safety_reason}")
+        else:
+            print(f"[MemoryAgent] ✅ REPAIR PROMOTED {best.get('param_hash','?')} | {repair_reason}")
     else:
-        reason = safety_reason if current.get("trades_sim") and not normal_promotion and not safety_promotion else (
+        reason = (
+            repair_reason if current.get("trades_sim") and not normal_promotion and not safety_promotion and not repair_promotion else
+            safety_reason if current.get("trades_sim") and not normal_promotion and not safety_promotion else (
             f"fitness {best_fitness:.3f} not >{PROMOTE_THRESHOLD}x current {current_fitness:.3f}"
             if current_fitness > 0 else "current fitness = 0, no baseline"
-        )
+        ))
         print(f"[MemoryAgent] No promotion — {reason}")
 
     # Log all experiments to experiment_log.jsonl

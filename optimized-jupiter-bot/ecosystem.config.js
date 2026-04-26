@@ -64,6 +64,8 @@ module.exports = {
       name: "pcp-arb-scout",
       script: "scripts/maintain/arb_scout.js",
       interpreter: "node",
+      autorestart: false,
+      cron_restart: "4-59/5 * * * *",
       env: { NODE_ENV: "production" }
     },
     {

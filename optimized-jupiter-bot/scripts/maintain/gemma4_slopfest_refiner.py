@@ -47,10 +47,13 @@ LOOKBACK_HOURS = float(os.environ.get('GEMMA4_LOOKBACK_HOURS', '6'))
 OLLAMA_URL = os.environ.get('OLLAMA_URL', 'http://127.0.0.1:11434/api/chat')
 OLLAMA_MODEL = os.environ.get('GEMMA4_MODEL') or os.environ.get('OLLAMA_MODEL') or 'dmind-risk'
 LIVE_INFERENCE_ENABLED = os.environ.get('GEMMA4_LIVE_INFERENCE', 'true').lower() != 'false'
-OLLAMA_TIMEOUT_SECONDS = int(os.environ.get('GEMMA4_TIMEOUT_SECONDS', '600'))
-OLLAMA_RETRY_COUNT = int(os.environ.get('GEMMA4_RETRY_COUNT', '2'))
+OLLAMA_TIMEOUT_SECONDS = max(15, min(int(os.environ.get('GEMMA4_TIMEOUT_SECONDS', '45')), 90))
+OLLAMA_RETRY_COUNT = max(1, min(int(os.environ.get('GEMMA4_RETRY_COUNT', '1')), 2))
 OLLAMA_RETRY_BACKOFF_SECONDS = float(os.environ.get('GEMMA4_RETRY_BACKOFF_SECONDS', '3'))
-OLLAMA_RETRY_TIMEOUT_SECONDS = int(os.environ.get('GEMMA4_RETRY_TIMEOUT_SECONDS', str(max(180, OLLAMA_TIMEOUT_SECONDS))))
+OLLAMA_RETRY_TIMEOUT_SECONDS = max(
+    15,
+    min(int(os.environ.get('GEMMA4_RETRY_TIMEOUT_SECONDS', str(OLLAMA_TIMEOUT_SECONDS))), 60),
+)
 DATA_ROOT = os.path.join(PROJECT_ROOT, 'signals')
 SIGNAL_DB_PATH = os.path.join(PROJECT_ROOT, 'signals', 'signal_history.sqlite')
 GHOST_SIG_PREFIX = 'PAPER_TRADE_'
@@ -89,6 +92,12 @@ def calculate_profit_seeking_score(pnl_sol):
 def round_metric(value, digits=6):
     numeric = try_float(value, 0) or 0
     return round(numeric, digits)
+
+def write_json_atomic(path, payload):
+    tmp_path = f'{path}.tmp'
+    with open(tmp_path, 'w', encoding='utf-8') as handle:
+        json.dump(payload, handle, indent=2)
+    os.replace(tmp_path, path)
 
 def summarize_profit_seeking_pairs(pairs):
     positive_score = 0.0
@@ -230,8 +239,16 @@ def select_replay_pairs(pairs):
 
 def _build_grid_recommended_filters(candidate, base_filters=None):
     merged = dict(base_filters or {})
-    merged['min_5m_change'] = clamp(round_metric(candidate.get('minMomentum', 0), 3), *BOUNDS['min_5m_change'])
-    merged['min_volume_5m'] = clamp(round_metric(candidate.get('minVolume', 0), 3), *BOUNDS['min_volume_5m'])
+    base_momentum_floor = try_float(merged.get('min_5m_change'), 0) or 0
+    base_volume_floor = try_float(merged.get('min_volume_5m'), 0) or 0
+    merged['min_5m_change'] = clamp(
+        max(round_metric(candidate.get('minMomentum', 0), 3), base_momentum_floor),
+        *BOUNDS['min_5m_change']
+    )
+    merged['min_volume_5m'] = clamp(
+        max(round_metric(candidate.get('minVolume', 0), 3), base_volume_floor),
+        *BOUNDS['min_volume_5m']
+    )
     merged['tp1_pct'] = clamp(round_metric((candidate.get('takeProfit', 0) or 0) * 100, 3), *BOUNDS['tp1_pct'])
     if 'max_hold_minutes' in merged:
         merged['max_hold_minutes'] = clamp(round_metric(merged.get('max_hold_minutes', 0), 3), *BOUNDS['max_hold_minutes'])
@@ -248,8 +265,12 @@ def generate_autonomous_grid_search_results(pairs, base_filters=None):
     if not replay_pairs:
         return []
 
-    vol_floors = [0, 500, 1000, 2500, 5000]
-    mom_floors = [0.0, 2.0, 5.0, 10.0, 20.0]
+    base_filters = dict(base_filters or {})
+    base_volume_floor = clamp(round_metric(try_float(base_filters.get('min_volume_5m'), 0) or 0, 3), *BOUNDS['min_volume_5m'])
+    base_momentum_floor = clamp(round_metric(try_float(base_filters.get('min_5m_change'), 0) or 0, 3), *BOUNDS['min_5m_change'])
+
+    vol_floors = sorted({float(v) for v in [0, 500, 1000, 2500, 5000] if v >= base_volume_floor} | {float(base_volume_floor)})
+    mom_floors = sorted({float(m) for m in [0.0, 2.0, 5.0, 10.0, 20.0] if m >= base_momentum_floor} | {float(base_momentum_floor)})
     trails = [0.03, 0.05, 0.08, 0.12]
     tps = [0.20, 0.50, 1.00]
 
@@ -342,7 +363,15 @@ def generate_autonomous_grid_search_results(pairs, base_filters=None):
         ),
         reverse=True,
     )
-    return results
+    deduped = []
+    seen_hashes = set()
+    for item in results:
+        param_hash = item.get('param_hash')
+        if param_hash in seen_hashes:
+            continue
+        seen_hashes.add(param_hash)
+        deduped.append(item)
+    return deduped
 
 def run_autonomous_grid_search(pairs, base_filters=None):
     results = generate_autonomous_grid_search_results(pairs, base_filters=base_filters)
@@ -593,19 +622,19 @@ You are the Slopfest Refiner for the Antigravity Pipeline, an autonomous HFT swa
 {best_profile_msg}Your input context contains the recent trade journal history of trades explicitly executed during "desperation bypass" (extremely low-liquidity, high-risk, messy meme-coin launches). Your output must be a strict JSON object.
 
 ### MISSION OBJECTIVE
-Your goal is to become the most efficient "trash-picker" on the chain. Do NOT try to avoid the trash by raising liquidity floors.
+Your goal is to become the most efficient "trash-picker" on the chain without reopening obviously weak flow.
 Maximize Net Realized SOL Profit by identifying the microscopic differences between the 80% that instantly rug and the 20% that explode into massive runners.
 
 ### CRITICAL RULES FOR SLOPFEST MODE
 1. EXPECT LOSSES: Accept that the win rate will be low. The goal is asymmetrical returns (small rapid losses, massive trailing wins).
-2. DO NOT RAISE LIQUIDITY FLOORS: Keep `min_liquidity_usd` extremely low (e.g. 0 to 2000). The 100x returns come from tokens with near-zero initial liquidity.
-3. FIND THE SIGNAL: Focus on `min_5m_change`, `min_volume_5m`, and `buy_ratio`. What did the few winners have in common right before they launched?
+2. RESPECT DETERMINISTIC FLOORS: Do not lower liquidity, momentum, or 5m volume floors beneath the mathematically-derived base recommendation when the broader book is weak.
+3. FIND THE SIGNAL: Focus on `min_5m_change`, `min_volume_5m`, `buy_ratio`, and hold-time compression. What did the few winners have in common right before they launched?
 
 ### PHASE 3: PARAMETER FEEDBACK LOOP
 Here are the aggregated performance metrics of the previous parameter combinations you suggested:
 {json.dumps({'top_performers': top_params, 'bottom_performers': bottom_params}, indent=2)}
 
-CRITICAL INSTRUCTION: Improve upon the top performers while avoiding characteristics of the bottom performers. Do NOT raise liquidity floors. Focus on momentum and volume tuning.
+CRITICAL INSTRUCTION: Improve upon the top performers while avoiding characteristics of the bottom performers. When broader live performance is weak, preserve or tighten deterministic liquidity/volume floors instead of loosening them.
 
 ### ANALYSIS TASKS (Chain-of-Thought Required)
 Before finalizing the JSON, reason through the following steps internally. Be ruthlessly data-driven.
@@ -620,14 +649,14 @@ You MUST return ONLY a JSON payload. Do not include markdown blocks or text outs
   "key_insight": "A single sentence summarizing the critical change logic for trash-picking.",
   "confidence": 85,
   "recommended_filters": {{
-    "min_5m_change": 0.0,
-    "min_liquidity_usd": 0.0,
-    "min_volume_5m": 0.0,
-    "max_top10_holder_pct": 0.0,
-    "tp1_pct": 0.0,
-    "stop_loss_pct": 0.0,
-    "max_hold_minutes": 0,
-    "overbought_ceiling": 0.0
+    "min_5m_change": 3.0,
+    "min_liquidity_usd": 18000.0,
+    "min_volume_5m": 500.0,
+    "max_top10_holder_pct": 40.0,
+    "tp1_pct": 20.0,
+    "stop_loss_pct": 12.0,
+    "max_hold_minutes": 4,
+    "overbought_ceiling": 20.0
   }}
 }}
 
@@ -742,6 +771,8 @@ def query_ollama_with_retries(prompt, lean_prompt=None):
 
 def apply_live_inference(base_recs, pairs, missed, wallet_ctx, entry_analysis, signal_profile=None, live_signal_context=None):
     result = dict(base_recs)
+    base_filters = dict(base_recs.get('recommended_filters', {}))
+    broader_book_weak = bool(base_recs.get('broader_book_weak'))
     metadata = {
         'enabled': LIVE_INFERENCE_ENABLED,
         'model': OLLAMA_MODEL,
@@ -771,17 +802,43 @@ def apply_live_inference(base_recs, pairs, missed, wallet_ctx, entry_analysis, s
             return result
 
         llm_filters = sanitize_filters((llm_json or {}).get('recommended_filters', {}))
-        merged_filters = dict(base_recs.get('recommended_filters', {}))
+        merged_filters = dict(base_filters)
         merged_filters.update(llm_filters)
         if (
             wallet_ctx.get('executable_buy_count', 0) == 0 and
             wallet_ctx.get('info_only_buy_count', 0) == 0 and
             base_recs.get('win_rate', 0) >= 35 and
-            base_recs.get('total_pnl_sol', 0) >= 0
+            base_recs.get('total_pnl_sol', 0) >= 0 and
+            not broader_book_weak
         ):
             merged_filters['min_liquidity_usd'] = clamp(min(merged_filters.get('min_liquidity_usd', 12000), 12000), *BOUNDS['min_liquidity_usd'])
             merged_filters['min_volume_5m'] = clamp(min(merged_filters.get('min_volume_5m', 500), 500), *BOUNDS['min_volume_5m'])
             merged_filters['overbought_ceiling'] = clamp(max(merged_filters.get('overbought_ceiling', 20), 20), 10, 50)
+        if broader_book_weak:
+            merged_filters['min_5m_change'] = clamp(
+                max(try_float(merged_filters.get('min_5m_change'), 0) or 0, try_float(base_filters.get('min_5m_change'), 0) or 0),
+                *BOUNDS['min_5m_change']
+            )
+            merged_filters['min_liquidity_usd'] = clamp(
+                max(try_float(merged_filters.get('min_liquidity_usd'), 0) or 0, try_float(base_filters.get('min_liquidity_usd'), 0) or 0),
+                *BOUNDS['min_liquidity_usd']
+            )
+            merged_filters['min_volume_5m'] = clamp(
+                max(try_float(merged_filters.get('min_volume_5m'), 0) or 0, try_float(base_filters.get('min_volume_5m'), 0) or 0),
+                *BOUNDS['min_volume_5m']
+            )
+            merged_filters['max_hold_minutes'] = clamp(
+                min(try_float(merged_filters.get('max_hold_minutes'), base_filters.get('max_hold_minutes', 5)) or 5, try_float(base_filters.get('max_hold_minutes'), 5) or 5),
+                *BOUNDS['max_hold_minutes']
+            )
+            merged_filters['hunterModeMultiplier'] = clamp(
+                min(try_float(merged_filters.get('hunterModeMultiplier'), base_filters.get('hunterModeMultiplier', 0.5)) or 0.5, try_float(base_filters.get('hunterModeMultiplier'), 0.5) or 0.5),
+                *BOUNDS['hunterModeMultiplier']
+            )
+            merged_filters['overbought_ceiling'] = clamp(
+                min(try_float(merged_filters.get('overbought_ceiling'), base_filters.get('overbought_ceiling', 20)) or 20, try_float(base_filters.get('overbought_ceiling'), 20) or 20),
+                *BOUNDS['overbought_ceiling']
+            )
         result['recommended_filters'] = merged_filters
 
         llm_confidence = try_float((llm_json or {}).get('confidence'))
@@ -1584,6 +1641,14 @@ def generate_recommendations(pairs, missed, wallet_ctx=None, signal_profile=None
         confidence = min(confidence + 5, 95)
         insight += f" LIVE MATCH: {live_match_count} current inflow candidate(s) resemble recent winning entries."
 
+    if broader_book_weak:
+        recs['min_5m_change'] = clamp(max(recs['min_5m_change'], 2), *BOUNDS['min_5m_change'])
+        recs['min_liquidity_usd'] = clamp(max(recs['min_liquidity_usd'], 18000), *BOUNDS['min_liquidity_usd'])
+        recs['min_volume_5m'] = clamp(max(recs['min_volume_5m'], 500), *BOUNDS['min_volume_5m'])
+        recs['max_hold_minutes'] = clamp(min(recs['max_hold_minutes'], 4), *BOUNDS['max_hold_minutes'])
+        recs['hunterModeMultiplier'] = min(recs.get('hunterModeMultiplier', 0.5), 0.25)
+        recs['overbought_ceiling'] = clamp(min(recs.get('overbought_ceiling', 20), 20), 10, 50)
+
     return {
         'analysis': analysis,
         'key_insight': insight,
@@ -1598,6 +1663,7 @@ def generate_recommendations(pairs, missed, wallet_ctx=None, signal_profile=None
         'win_rate': win_rate,
         'total_pnl_sol': sum(p['pnl'] for p in pairs),
         'profit_objective': profit_objective,
+        'broader_book_weak': broader_book_weak,
         'generated_at': datetime.now(timezone.utc).isoformat(),
     }
 
@@ -1746,6 +1812,7 @@ def run_cycle():
     recs = generate_recommendations(pairs, missed, wallet_ctx, signal_profile, live_signal_context)
     recs['paper_mode'] = PAPER_MODE
     recs['history_db'] = None # get_history_stats(SIGNAL_DB_PATH)
+    write_json_atomic(RECS, recs)
 
     backtest_payload = persist_swarm_backtest_results(pairs, recs)
     memory_result = run_swarm_memory_cycle()
@@ -1776,8 +1843,7 @@ def run_cycle():
     recs = apply_live_inference(recs, pairs, missed, wallet_ctx, entry_analysis, signal_profile, live_signal_context)
 
     # Save recommendations
-    with open(RECS, 'w', encoding='utf-8') as f:
-        json.dump(recs, f, indent=2)
+    write_json_atomic(RECS, recs)
     if 'store_gemma_cycle' in globals():
         try:
             store_gemma_cycle(recs, len(trades), len(pairs), len(missed), db_path=SIGNAL_DB_PATH)
