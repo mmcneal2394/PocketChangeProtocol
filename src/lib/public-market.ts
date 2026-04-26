@@ -62,6 +62,21 @@ export async function fetchSolPriceUsd(): Promise<number> {
   }
 
   try {
+    const response = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd", {
+      headers: { "User-Agent": BROWSER_UA },
+      signal: AbortSignal.timeout(6000),
+      cache: "no-store",
+    });
+    if (response.ok) {
+      const payload = await response.json();
+      const usdPrice = Number(payload?.solana?.usd || 0);
+      if (usdPrice > 0) return usdPrice;
+    }
+  } catch {
+    // Fall through to the next source.
+  }
+
+  try {
     const pairs = await fetchDexScreenerSolanaSearch("SOL USDC");
     const pair = pairs.find((item: any) => Number(item?.priceUsd || 0) > 0);
     const usdPrice = Number(pair?.priceUsd || 0);

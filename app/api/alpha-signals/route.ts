@@ -142,9 +142,22 @@ export async function GET(req: NextRequest) {
     merged.set(signal.mint, { ...signal });
   }
 
-  const signals = Array.from(merged.values())
-    .filter((signal) => signal.score >= minScore)
-    .sort((left, right) => right.score - left.score);
+  const mergedSignals = Array.from(merged.values()).sort((left, right) => right.score - left.score);
+  const primarySignals = mergedSignals.filter((signal) => signal.score >= minScore);
+  const signals =
+    primarySignals.length > 0
+      ? primarySignals
+      : mergedSignals
+          .filter((signal) => signal.score >= 25)
+          .slice(0, 5)
+          .map((signal) => ({
+            ...signal,
+            action: "MONITOR",
+            evidence: {
+              ...(signal.evidence || {}),
+              fallback_floor: true,
+            },
+          }));
 
   return NextResponse.json(
     { signals, generated_at: new Date().toISOString() },
