@@ -99,6 +99,11 @@ function buildMetricsSnapshot() {
   });
 
   return {
+    ok: true,
+    degraded: false,
+    stale: false,
+    status: 'swarm_private_live',
+    message: 'Live private swarm snapshot from VPS.',
     ts: Date.now(),
     agents,
     portfolio: {
@@ -152,8 +157,13 @@ function buildMetricsSnapshot() {
 async function mirrorSnapshotToUpstash() {
   if (!upstash) return false;
   try {
-    if (upstash.status === 'wait') {
-      await upstash.connect();
+    if (upstash.status !== 'ready') {
+      try {
+        await upstash.connect();
+      } catch (error) {
+        const message = String(error?.message || error || '');
+        if (!message.toLowerCase().includes('already')) throw error;
+      }
     }
     const snapshot = buildMetricsSnapshot();
     await upstash.set(UPSTASH_SWARM_KEY, JSON.stringify(snapshot), 'EX', UPSTASH_SWARM_TTL_SEC);
@@ -167,7 +177,7 @@ async function mirrorSnapshotToUpstash() {
 app.get('/metrics', async (req, res) => {
   const snapshot = buildMetricsSnapshot();
   if (upstash) {
-    mirrorSnapshotToUpstash().catch(() => {});
+    await mirrorSnapshotToUpstash().catch(() => {});
   }
   res.json(snapshot);
 });

@@ -125,7 +125,17 @@ async function getUpstashPayload() {
         message: "Swarm snapshot is available but stale.",
       };
     }
-    return payload;
+    return {
+      ...payload,
+      ok: typeof (parsed as any)?.ok === "boolean" ? Boolean((parsed as any).ok) : true,
+      stale: false,
+      degraded: typeof (parsed as any)?.degraded === "boolean" ? Boolean((parsed as any).degraded) : false,
+      status: typeof (parsed as any)?.status === "string" ? String((parsed as any).status) : "swarm_upstash_live",
+      message:
+        typeof (parsed as any)?.message === "string"
+          ? String((parsed as any).message)
+          : "Live swarm snapshot from Upstash.",
+    };
   } catch {
     return null;
   }
