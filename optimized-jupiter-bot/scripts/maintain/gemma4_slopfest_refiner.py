@@ -1774,6 +1774,26 @@ def apply_recommendations(recs):
         return True # still true because .env got updated
 
 def should_sync_boot_profile(current_filters, desired_filters):
+    current_source = str((current_filters or {}).get('__source') or '')
+    if current_source == 'gemma4_runtime_sync':
+        sync_keys = (
+            'min_5m_change',
+            'min_liquidity_usd',
+            'min_volume_5m',
+            'max_top10_holder_pct',
+            'tp1_pct',
+            'stop_loss_pct',
+            'max_hold_minutes',
+            'hunterModeMultiplier',
+            'overbought_ceiling',
+        )
+        for key in sync_keys:
+            desired = desired_filters.get(key)
+            current = current_filters.get(key)
+            if desired != current:
+                return True
+        return False
+
     tighter_floor_keys = ('min_5m_change', 'min_liquidity_usd', 'min_volume_5m')
     shorter_exposure_keys = ('max_hold_minutes', 'hunterModeMultiplier', 'overbought_ceiling')
     for key in tighter_floor_keys:
@@ -1813,6 +1833,7 @@ def sync_strategy_boot_profile(recs):
     )
     desired_filters = {key: filters.get(key) for key in sync_keys if key in filters}
     current_filters = {key: current.get(key) for key in sync_keys}
+    current_filters['__source'] = current.get('source')
     if not should_sync_boot_profile(current_filters, desired_filters):
         return False
 
