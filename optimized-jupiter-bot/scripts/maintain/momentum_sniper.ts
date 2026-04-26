@@ -1433,6 +1433,7 @@ async function fetchDexScreenerPair(mint: string): Promise<{
   liquidity: number,
   marketCap: number,
   fdv: number,
+  priceChange1m: number,
   priceChange5m: number,
   priceChange1h: number,
   volume5m: number,
@@ -3921,9 +3922,22 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
   if (entryOptions?.sourceLane === 'alpha') {
     const alphaMinLiquidityUsd = Math.max(0, Number(normalLaneConfig.minLiquidityUsd || 0));
     entryOptions.minLiquidityUsd = Math.max(alphaMinLiquidityUsd, Number(entryOptions?.minLiquidityUsd || 0));
-    if ((momentum5m ?? 0) <= 0 || (momentum1m ?? 0) <= 0) {
+    const alphaSignalCount = Math.max(0, Number(entryOptions?.signalCount || 0));
+    const alphaStrongFiveMinuteContinuation =
+      Number(momentum5m || 0) >= 8 &&
+      Number(buyRatio || 0) >= 0.7 &&
+      Number(buys1h || 0) >= 8 &&
+      (
+        Number(entryOptions?.alphaKolCount || 0) > 0 ||
+        alphaSignalCount >= 2
+      );
+    const alphaContinuationConfirmed =
+      ((momentum5m ?? 0) > 0 && (momentum1m ?? 0) > 0) ||
+      alphaStrongFiveMinuteContinuation;
+    if (!alphaContinuationConfirmed) {
       console.log(
         `[SNIPER]  ALPHA CONTINUATION REJECT: ${symbol} requires positive 1m and 5m continuation ` +
+        `or a strong 5m alpha tape ` +
         `(1m=${Number(momentum1m || 0).toFixed(1)}%, 5m=${Number(momentum5m || 0).toFixed(1)}%).`
       );
       await setMintCooldownExact(pub, mint, 30, 'ALPHA_CONTINUATION');
@@ -6646,13 +6660,13 @@ async function poll() {
 
     if (globalQuotaAssistLevel > 0 && quietQuotaRegime && store.positions.length < MAX_POSITIONS && quotaTrendingMap.size > 0) {
       console.log(
-        `[SNIPER]  ALPHA QUOTA HOLD: standing down quota fills until executable wallet or GMGN follow flow returns.`
+        `[SNIPER]  ALPHA QUIET REGIME: wallet quota is paused, but alpha names may still pass the strict quiet-regime filter.`
       );
     }
 
-    if (globalQuotaAssistLevel > 0 && !quietQuotaRegime && store.positions.length < MAX_POSITIONS && quotaTrendingMap.size > 0) {
+    if (globalQuotaAssistLevel > 0 && store.positions.length < MAX_POSITIONS && quotaTrendingMap.size > 0) {
       try {
-	        const alphaBaseCandidates = Array.from(quotaTrendingMap.values())
+		        const alphaBaseCandidates = Array.from(quotaTrendingMap.values())
 	          .filter((candidate: any) =>
 	            candidate?.mint &&
 	            !store.blacklist.includes(candidate.mint) &&
@@ -6748,12 +6762,34 @@ async function poll() {
 	          const candidate = row.candidate;
 	          const symbol = candidate.symbol || candidate.mint.slice(0, 8);
 	          const ta = loadSignal(candidate.mint);
-            const alphaMomentum5m = Number(candidate.priceChange5m || 0);
-            const alphaMomentum1m = Number(candidate.priceChange1m || 0);
-            const alphaLiquidityUsd = Number(candidate.liquidityUsd || 0);
-            if (alphaMomentum5m <= 0 || alphaMomentum1m <= 0) {
+            let alphaMomentum5m = Number(candidate.priceChange5m || 0);
+            let alphaMomentum1m = Number(candidate.priceChange1m || 0);
+            let alphaLiquidityUsd = Number(candidate.liquidityUsd || 0);
+            if (alphaMomentum5m <= 0 || alphaMomentum1m <= 0 || alphaLiquidityUsd <= 0) {
+              try {
+                const liveAlphaPair = await fetchDexScreenerPair(candidate.mint);
+                if (liveAlphaPair) {
+                  alphaMomentum5m = Math.max(alphaMomentum5m, Number(liveAlphaPair.priceChange5m || 0));
+                  alphaMomentum1m = Math.max(alphaMomentum1m, Number(liveAlphaPair.priceChange1m || 0));
+                  alphaLiquidityUsd = Math.max(alphaLiquidityUsd, Number(liveAlphaPair.liquidity || 0));
+                }
+              } catch {}
+            }
+            const alphaBuyRatio = Number(candidate.buyRatio || 0);
+            const alphaBuys1h = Number(candidate.buys1h || 0);
+            const alphaSignalCount = Math.max(0, Number(row.signalCount || 0));
+            const alphaStrongFiveMinuteContinuation =
+              alphaMomentum5m >= 8 &&
+              alphaBuyRatio >= 0.7 &&
+              alphaBuys1h >= 8 &&
+              (row.alphaKolCount > 0 || alphaSignalCount >= 2);
+            const alphaContinuationConfirmed =
+              (alphaMomentum5m > 0 && alphaMomentum1m > 0) ||
+              alphaStrongFiveMinuteContinuation;
+            if (!alphaContinuationConfirmed) {
               console.log(
                 `[SNIPER]  ALPHA MOMENTUM HOLD: ${symbol} needs positive 1m and 5m continuation ` +
+                `or a strong 5m alpha tape ` +
                 `(1m=${alphaMomentum1m.toFixed(1)}%, 5m=${alphaMomentum5m.toFixed(1)}%).`
               );
               const pollPub = RedisBus.getPublisher();
@@ -6803,6 +6839,7 @@ async function poll() {
               minLiquidityUsd: alphaMinLiquidityUsd,
               alphaBoost: row.alphaBoost,
               alphaKolCount: row.alphaKolCount,
+              signalCount: row.signalCount,
               kolConfirmed: row.alphaKolCount > 0,
               walletConfirmed: isWalletConfirmedSignal(row.walletSignal),
             },

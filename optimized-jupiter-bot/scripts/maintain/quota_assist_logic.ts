@@ -314,8 +314,8 @@ export function shouldAllowAlphaQuotaCandidate(args: {
       (alphaKolCount > 0 || signalCount >= 2)
     );
   }
-  if (args.quotaQuietRegime === true && alphaKolCount <= 0) {
-    return false;
+  if (args.quotaQuietRegime === true) {
+    return alphaKolCount > 0 || (signalCount >= 2 && marketSupport);
   }
   if (alphaKolCount > 0) {
     return true;

@@ -7,6 +7,7 @@ export type NormalizedDexScreenerPair = {
   liquidity: number;
   marketCap: number;
   fdv: number;
+  priceChange1m: number;
   priceChange5m: number;
   priceChange1h: number;
   volume5m: number;
@@ -21,6 +22,7 @@ export function normalizeDexScreenerPair(pair: any): NormalizedDexScreenerPair {
     liquidity: toFiniteNumber(pair?.liquidity?.usd, 0),
     marketCap: toFiniteNumber(pair?.marketCap, 0),
     fdv: toFiniteNumber(pair?.fdv ?? pair?.marketCap, 0),
+    priceChange1m: toFiniteNumber(pair?.priceChange?.m1, 0),
     priceChange5m: toFiniteNumber(pair?.priceChange?.m5, 0),
     priceChange1h: toFiniteNumber(pair?.priceChange?.h1, 0),
     volume5m: toFiniteNumber(pair?.volume?.m5, 0),

@@ -1812,13 +1812,17 @@ def sync_strategy_boot_profile(recs):
     filters = (recs or {}).get('recommended_filters') or {}
     if not filters:
         return False
-    if not (recs or {}).get('broader_book_weak'):
-        return False
 
     current = load_json(STRATEGY_PARAMS_FILE, {})
     if not current:
         current = load_json(STRATEGY_PARAMS_MIRROR, {})
     current = dict(current or {})
+    current_source = str(current.get('source') or '')
+
+    # Once runtime sync owns the boot profile, keep it aligned to the latest
+    # recommendation instead of freezing on the last weak-book promotion.
+    if not ((recs or {}).get('broader_book_weak') or current_source == 'gemma4_runtime_sync'):
+        return False
 
     sync_keys = (
         'min_5m_change',

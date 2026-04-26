@@ -1257,6 +1257,7 @@ async function fetchDexScreenerPair(mint: string): Promise<{
   liquidity: number,
   marketCap: number,
   fdv: number,
+  priceChange1m: number,
   priceChange5m: number,
   priceChange1h: number,
   volume5m: number,
