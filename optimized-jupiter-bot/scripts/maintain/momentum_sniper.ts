@@ -147,8 +147,6 @@ const {
   sortWalletQuotaSignals,
   resolveWalletQuotaCandidateLimit,
   resolveAlphaQuotaCandidateLimit,
-  resolveWalletQuotaScales,
-  resolveAlphaQualifierScale,
   shouldBypassCooldownForQuotaAssist,
   isWalletSignalFresh,
   shouldAllowQuotaWalletWithoutExtraMarketSupport,
@@ -410,6 +408,7 @@ const SNIPER_LOG       = path.join(SIGNALS_DIR, process.env.PAPER_MODE === 'true
 const STRATEGY_FILE    = path.join(SIGNALS_DIR, 'chart_strategy.json');
 const JOURNAL_FILE     = path.join(SIGNALS_DIR, process.env.PAPER_MODE === 'true' ? 'trade_journal_paper.jsonl' : 'trade_journal.jsonl');
 const ALLOCATION_FILE  = path.join(SIGNALS_DIR, 'allocation.json');  // HarmonyAgent capital weight
+const CAPITAL_ALLOCATOR_STATE_FILE = path.join(SIGNALS_DIR, 'capital_allocator_state.json');
 const VELOCITY_FILE    = path.join(SIGNALS_DIR, 'velocity.json');     // pcp-velocity real-time swap feed
 const VELOCITY_HYDRATION_STATS_FILE = path.join(SIGNALS_DIR, 'velocity_hydration_stats.json');
 const TERRAIN_MEMORY_FILE = path.join(SIGNALS_DIR, 'terrain_memory.json');
@@ -505,6 +504,8 @@ interface EntryOptions {
   alphaBoost?: number;
   alphaKolCount?: number;
   preferredHoldMs?: number;
+  walletConfirmed?: boolean;
+  strongRecentFlowConfirmed?: boolean;
   expectedValueSol?: number;
   expectedValueConfidence?: number;
   expectedValueRankScore?: number;
@@ -1690,7 +1691,7 @@ async function runLastStandScan(context: LastStandContext): Promise<boolean> {
       Number(trending?.liquidityUsd || 0),
       Number(livePair?.liquidity || 0),
     );
-    const requiredLiquidityUsd = (ageKnown ? config.minLiquidityUsd : config.minLiquidityUsd * 1.5) * Math.max(0.1, 1.0 - (globalQuotaPressure * 0.5));
+    const requiredLiquidityUsd = ageKnown ? config.minLiquidityUsd : config.minLiquidityUsd * 1.5;
     if (liquidityUsd < requiredLiquidityUsd) {
       rejectCounts.lowLiquidity += 1;
       continue;
@@ -2222,6 +2223,47 @@ function readJsonFile<T = any>(file: string): T | null {
   } catch {
     return null;
   }
+}
+
+function getCurrentRealizedPnlSol(): number {
+  const allocatorState =
+    readJsonFile<any>(CAPITAL_ALLOCATOR_STATE_FILE) ||
+    readJsonFile<any>(ALLOCATION_FILE) ||
+    null;
+  const candidates = [
+    allocatorState?.total_realized_pnl_sol,
+    allocatorState?.totalRealizedPnlSol,
+    allocatorState?.totalPnlSol,
+    store?.stats?.totalPnlSol,
+  ];
+  for (const candidate of candidates) {
+    const numeric = Number(candidate);
+    if (Number.isFinite(numeric)) return numeric;
+  }
+  return 0;
+}
+
+function isWalletConfirmedSignal(signal: any) {
+  if (!signal || signal?.executable !== true) return false;
+  const walletCount = Array.isArray(signal?.wallets) ? signal.wallets.length : Number(signal?.walletCount || 0);
+  const consensus = Number(signal?.consensusScore || 0);
+  const composite = Number(signal?.walletCompositeScore || signal?.walletWeightedScore || signal?.walletPnlScore || 0);
+  return walletCount > 0 || consensus > 0 || composite > 0;
+}
+
+function hasStrongRecentFlowConfirmation(input: {
+  terrainSummary?: any;
+  buys60s?: number;
+  solVolume60s?: number;
+  velocity?: number;
+}) {
+  const terrainConfig = loadTerrainMemoryConfig();
+  return (
+    Number(input?.terrainSummary?.strongFlowSamples || 0) >= terrainConfig.minStrongFlowSamples &&
+    Number(input?.buys60s || 0) >= terrainConfig.minStrongFlowBuys60s &&
+    Number(input?.solVolume60s || 0) >= terrainConfig.minStrongFlowSolVolume60s &&
+    Number(input?.velocity || 0) >= terrainConfig.minStrongFlowVelocity
+  );
 }
 
 function parseOptionalNumber(value: any): number | null {
@@ -3807,14 +3849,22 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
       }
   }
   let entryMode = entryOptions?.entryMode || 'normal';
+  const realizedPnlSol = getCurrentRealizedPnlSol();
   if (
       entryOptions?.quotaAssist === true &&
       Number(entryOptions?.quotaAssistLevel || 0) >= 2 &&
       !lossStreakState.restrictionsActive
   ) {
-      entryMode = 'desperation_bypass';
-      if (entryOptions) {
-          entryOptions.entryMode = 'desperation_bypass';
+      if (realizedPnlSol < 0) {
+          console.log(
+            `[SNIPER]  DESPERATION HOLD: ${symbol} quota-driven bypass disabled while realized PnL is ` +
+            `${realizedPnlSol.toFixed(6)} SOL.`
+          );
+      } else {
+          entryMode = 'desperation_bypass';
+          if (entryOptions) {
+              entryOptions.entryMode = 'desperation_bypass';
+          }
       }
   }
   const isNormalEntry = entryMode === 'normal';
@@ -3826,6 +3876,18 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
   const routeLiveFastTrack = entryOptions?.routeLiveFastTrack === true;
   const applyNormalLaneFilters = isNormalEntry && !isMicroDownshiftEntry;
   const normalLaneConfig = loadNormalLaneConfig();
+  if (entryOptions?.sourceLane === 'alpha') {
+    const alphaMinLiquidityUsd = Math.max(0, Number(normalLaneConfig.minLiquidityUsd || 0));
+    entryOptions.minLiquidityUsd = Math.max(alphaMinLiquidityUsd, Number(entryOptions?.minLiquidityUsd || 0));
+    if ((momentum5m ?? 0) <= 0 || (momentum1m ?? 0) <= 0) {
+      console.log(
+        `[SNIPER]  ALPHA CONTINUATION REJECT: ${symbol} requires positive 1m and 5m continuation ` +
+        `(1m=${Number(momentum1m || 0).toFixed(1)}%, 5m=${Number(momentum5m || 0).toFixed(1)}%).`
+      );
+      await setMintCooldownExact(pub, mint, 30, 'ALPHA_CONTINUATION');
+      return;
+    }
+  }
   const entryFamily = normalizeEntryFamily({
     entryFamily: entryOptions?.entryFamily,
     sourceLane: entryOptions?.sourceLane,
@@ -4147,6 +4209,27 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
      await setMintCooldown(pub, mint, 120, '1');
      return;
   }
+  const lowLiquidityMicroScoutFloor = Math.max(0, Number(normalLaneConfig.minLiquidityUsd || 0));
+  const lowLiquidityMicroScout =
+    entryMode === 'micro-scout' &&
+    entryOptions?.sourceLane !== 'wallet' &&
+    lowLiquidityMicroScoutFloor > 0 &&
+    poolLiq >= 0 &&
+    poolLiq < lowLiquidityMicroScoutFloor;
+  if (lowLiquidityMicroScout) {
+    const riskyProbeConfirmed =
+      entryOptions?.walletConfirmed === true &&
+      entryOptions?.routeLiveFastTrack === true &&
+      entryOptions?.strongRecentFlowConfirmed === true;
+    if (!riskyProbeConfirmed) {
+      console.log(
+        `[SNIPER]  LOW LIQ MICRO REJECT: ${symbol} liq $${poolLiq.toFixed(0)} < $${lowLiquidityMicroScoutFloor.toFixed(0)} ` +
+        `without wallet-confirmed fast-track flow.`
+      );
+      await setMintCooldownExact(pub, mint, 60, 'LOW_LIQ_MICRO_REJECT');
+      return;
+    }
+  }
   if (poolLiq > 0 && poolLiq < 5000) {
      console.log(`[SNIPER]  MCAP/LIQ REJECT: ${symbol} liquidity $${poolLiq.toFixed(0)} < $5K floor`);
      logMissedTarget({ mint, symbol, reason: "Below $5K liquidity floor", poolLiq });
@@ -4168,9 +4251,8 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
   const penaltyFactor = penaltyStr ? parseFloat(penaltyStr) : 1;
 
   const mult = GLOBAL_HUNTER_MULT;
-  const quotaRatioSlack = Math.max(0.2, 1.0 - (globalQuotaPressure * 0.3));
-  const reqBuys = Math.max(1, MIN_BUYS_1H * penaltyFactor * Math.max(0.25, entryOptions?.buyCountThresholdScale ?? 1) * mult * quotaRatioSlack);
-  const reqRatio = Math.max(1.05, MIN_BUY_RATIO * penaltyFactor * Math.max(0.25, entryOptions?.buyRatioThresholdScale ?? 1) * mult * quotaRatioSlack);
+  const reqBuys = Math.max(1, MIN_BUYS_1H * penaltyFactor * Math.max(0.25, entryOptions?.buyCountThresholdScale ?? 1) * mult);
+  const reqRatio = Math.max(1.05, MIN_BUY_RATIO * penaltyFactor * Math.max(0.25, entryOptions?.buyRatioThresholdScale ?? 1) * mult);
 
 
   //  Real-time velocity gate (pcp-velocity gRPC stream)
@@ -4181,9 +4263,8 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
       console.log(`[SNIPER] VELOCITY ARBITRAGE: bypassing buyRatio checks for ${symbol}`);
   }
   if (vel) {
-    const quotaSlack = Math.max(0.2, 1.0 - (globalQuotaPressure * 0.3));
-    const MIN_VEL_BUYS   = Math.max(1, Math.ceil(1 * mult * quotaSlack));
-    const MIN_VEL_RATIO  = Math.max(0.50, 0.50 * penaltyFactor * mult * quotaSlack);
+    const MIN_VEL_BUYS   = Math.max(1, Math.ceil(1 * mult));
+    const MIN_VEL_RATIO  = Math.max(0.50, 0.50 * penaltyFactor * mult);
 
     // VELOCITY OVERRIDE: If a token has massive speed right now (15+ tx/min and 3+ buys in 60s),
     if (vel.buys60s >= MIN_VEL_BUYS && vel.velocity >= 15 && vel.solVolume60s >= 1.0) {
@@ -4877,7 +4958,7 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
     liquidityUsd: liveLiquidityUsd,
     routeLive: liveRouteProbe?.routable ?? null,
   }, terrainConfig);
-  if ((terrainGuard.shouldHold || terrainGuard.shouldBlock) && globalQuotaPressure < 1.5) {
+  if (terrainGuard.shouldHold || terrainGuard.shouldBlock) {
     const terrainSummary = terrainState?.summary || {};
     const terrainLabel = terrainGuard.shouldHold ? 'TERRAIN HOLD' : 'TERRAIN REJECT';
     console.log(
@@ -4924,8 +5005,6 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
       terrainGuard.shouldHold ? 'TERRAIN_WAIT' : 'TERRAIN_BLOCK',
     );
     return;
-  } else if (terrainGuard.shouldHold || terrainGuard.shouldBlock) {
-    console.log(`[SNIPER] ⚠️ DESPERATION BYPASS: ignoring terrain guard for ${symbol}`);
   }
   if (terrainGuard.shouldWarn) {
     const terrainSummary = terrainState?.summary || {};
@@ -4948,17 +5027,8 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
     priceDelta5mPct: terrainState?.summary?.priceDelta5m,
     priceOffPeak5mPct: terrainState?.summary?.priceOffPeak5m,
     strongFlowSamples: terrainState?.summary?.strongFlowSamples,
-  }, (() => {
-      const qcfg = loadMicroScoutQualityConfig();
-      if (globalQuotaPressure > 0) {
-          const relax = Math.max(0.2, 1.0 - (globalQuotaPressure * 0.4));
-          qcfg.minRouteStrengthPct *= relax;
-          qcfg.minPriceDelta5mPct *= relax;
-          qcfg.minStrongFlowSamples = Math.max(1, Math.floor(qcfg.minStrongFlowSamples * relax));
-      }
-      return qcfg;
-  })());
-  if ((microScoutQualityGate.shouldHold || microScoutQualityGate.shouldBlock) && entryMode !== 'velocity-arbitrage' && globalQuotaPressure < 1.5) {
+  }, loadMicroScoutQualityConfig());
+  if ((microScoutQualityGate.shouldHold || microScoutQualityGate.shouldBlock) && entryMode !== 'velocity-arbitrage') {
     const terrainSummary = terrainState?.summary || {};
     console.log(
       `[SNIPER] ${microScoutQualityGate.shouldHold ? '' : ''} MICRO SCOUT QUALITY ${microScoutQualityGate.shouldHold ? 'HOLD' : 'BLOCK'}: ` +
@@ -5003,8 +5073,6 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
       microScoutQualityGate.shouldHold ? 'QUALITY_WAIT' : 'QUALITY_BLOCK',
     );
     return;
-  } else if ((microScoutQualityGate.shouldHold || microScoutQualityGate.shouldBlock) && entryMode !== 'velocity-arbitrage') {
-    console.log(`[SNIPER] ⚠️ DESPERATION BYPASS: ignoring micro-scout quality block for ${symbol}`);
   }
 
   const bundlerGuard = evaluateBundlerSuspicion({
@@ -5090,7 +5158,7 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
     bullishSignals,
     rugCheckWarnings: rugResult.softRiskNames,
   });
-  if (entryRiskDecision.reject && globalQuotaPressure < 1.5) {
+  if (entryRiskDecision.reject) {
     console.log(
       `[SNIPER]  ENTRY RISK REJECT: ${symbol} score=${entryRiskDecision.riskScore} ` +
       `reasons=${entryRiskDecision.reasons.join('; ') || 'none'}`
@@ -5104,8 +5172,6 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
     });
     await setMintCooldownExact(pub, mint, 180, 'ENTRY_RISK_REJECT');
     return;
-  } else if (entryRiskDecision.reject) {
-    console.log(`[SNIPER] ⚠️ DESPERATION BYPASS: ignoring entry risk reject for ${symbol}`);
   }
   if (entryRiskDecision.riskScore > 0) {
     console.log(
@@ -5151,11 +5217,7 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
   }, {
     model: getExpectedValueModelSnapshot(),
   });
-  const allowQuotaEvBypass =
-    entryOptions?.quotaAssist === true &&
-    Number(entryOptions?.quotaAssistLevel || 0) >= 2 &&
-    !lossStreakState.restrictionsActive &&
-    Number(expectedValueDecision.confidence || 0) < 0.75;
+  const allowQuotaEvBypass = false;
   if (expectedValueDecision.shouldSkip && !allowQuotaEvBypass) {
     console.log(
       `[SNIPER]  EV REJECT: ${symbol} ${expectedValueDecision.skipReason} ` +
@@ -5191,8 +5253,6 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
     });
     await setMintCooldownExact(pub, mint, 45, 'NEG_EV');
     return;
-  } else if (expectedValueDecision.shouldSkip) {
-    console.log(`[SNIPER] ⚠️ QUOTA EV BYPASS: keeping ${symbol} despite negative EV because evidence is still weak.`);
   }
   if (entryOptions) {
     entryOptions.expectedValueSol = expectedValueDecision.expectedPnlSol;
@@ -5292,7 +5352,7 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
     tokenAgeSec,
     liveMarketCapUsd,
   );
-  if (pumpMayhemGuard.block && globalQuotaPressure < 1.5) {
+  if (pumpMayhemGuard.block) {
     const launchpad = String(pumpMayhemGuard.meta?.launchpad || '');
     const standard = String(pumpMayhemGuard.meta?.standard || '');
     console.log(
@@ -5311,8 +5371,6 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
     });
     await setMintCooldownExact(pub, mint, pumpMayhemGuard.config.cooldownSeconds, 'PUMP_MAYHEM_BLOCK');
     return;
-  } else if (pumpMayhemGuard.block) {
-    console.log(`[SNIPER] ⚠️ DESPERATION BYPASS: ignoring pump mayhem risk reject for ${symbol}`);
   }
 
   // Phase 1: Slopfest Fast Gate (Require at least $500 5m volume)
@@ -6269,8 +6327,7 @@ async function poll() {
   if (globalQuotaPressure > 0) {
     console.log(
       `[SNIPER] Quota status: open=${openPositions}, min=${MIN_POSITIONS}, target=${TARGET_POSITIONS}, ` +
-      `pressure=${globalQuotaPressure.toFixed(2)}, level=${globalQuotaAssistLevel} | ` +
-      `relaxed liq=${(1 - globalQuotaPressure * 0.5).toFixed(2)}x, qual=${(1 - globalQuotaPressure * 0.4).toFixed(2)}x`
+      `pressure=${globalQuotaPressure.toFixed(2)}, level=${globalQuotaAssistLevel} | strict entry standards active`
     );
   }
   //  PATH 0 (pre): Force-sell queue  execute orphan sweep sells
@@ -6379,7 +6436,11 @@ async function poll() {
 	    if (store.positions.length < MAX_POSITIONS && Array.isArray(walletSignalSnapshot?.buy_signals)) {
 	      try {
 	        const wData = walletSignalSnapshot;
-	        const walletScales = resolveWalletQuotaScales(globalQuotaAssistLevel);
+	        const walletScales = {
+            qualifierThresholdScale: 1,
+            buyCountThresholdScale: 1,
+            buyRatioThresholdScale: 1,
+          };
 	        const walletCandidateLimit = resolveWalletQuotaCandidateLimit(globalQuotaAssistLevel);
 	        const sortedWalletSignals: any[] = sortWalletQuotaSignals((wData.buy_signals || []).filter((s: any) =>
 	          s?.executable === true &&
@@ -6614,6 +6675,7 @@ async function poll() {
 	        const alphaBaseRank = new Map(
 	          alphaBaseShortlist.map((row: any, index: number) => [String(row?.candidate?.mint || ''), index]),
 	        );
+          const alphaMinLiquidityUsd = Math.max(0, Number(loadNormalLaneConfig().minLiquidityUsd || 0));
 	        const alphaShortlist = annotateCandidatesWithExpectedValue(
 	          alphaBaseShortlist,
 	          (row: any) => ({
@@ -6650,6 +6712,27 @@ async function poll() {
 	          const candidate = row.candidate;
 	          const symbol = candidate.symbol || candidate.mint.slice(0, 8);
 	          const ta = loadSignal(candidate.mint);
+            const alphaMomentum5m = Number(candidate.priceChange5m || 0);
+            const alphaMomentum1m = Number(candidate.priceChange1m || 0);
+            const alphaLiquidityUsd = Number(candidate.liquidityUsd || 0);
+            if (alphaMomentum5m <= 0 || alphaMomentum1m <= 0) {
+              console.log(
+                `[SNIPER]  ALPHA MOMENTUM HOLD: ${symbol} needs positive 1m and 5m continuation ` +
+                `(1m=${alphaMomentum1m.toFixed(1)}%, 5m=${alphaMomentum5m.toFixed(1)}%).`
+              );
+              const pollPub = RedisBus.getPublisher();
+              await setMintCooldown(pollPub, candidate.mint, 30, 'ALPHA_CONTINUATION');
+              continue;
+            }
+            if (alphaLiquidityUsd > 0 && alphaLiquidityUsd < alphaMinLiquidityUsd) {
+              console.log(
+                `[SNIPER]  ALPHA LIQUIDITY HOLD: ${symbol} liquidity $${alphaLiquidityUsd.toFixed(0)} ` +
+                `< $${alphaMinLiquidityUsd.toFixed(0)} floor.`
+              );
+              const pollPub = RedisBus.getPublisher();
+              await setMintCooldown(pollPub, candidate.mint, 45, 'ALPHA_LIQUIDITY');
+              continue;
+            }
 	          const rowEv = row.expectedValueDecision || {};
 	          console.log(
 	            `[SNIPER]  ALPHA QUOTA ASSIST: ${symbol} | boost=${row.alphaBoost >= 0 ? '+' : ''}${(row.alphaBoost * 100).toFixed(1)}% ` +
@@ -6680,10 +6763,12 @@ async function poll() {
               entryFamily: 'alpha',
               quotaAssist: true,
               quotaAssistLevel: globalQuotaAssistLevel,
-              qualifierThresholdScale: resolveAlphaQualifierScale(globalQuotaAssistLevel),
+              qualifierThresholdScale: 1,
+              minLiquidityUsd: alphaMinLiquidityUsd,
               alphaBoost: row.alphaBoost,
               alphaKolCount: row.alphaKolCount,
               kolConfirmed: row.alphaKolCount > 0,
+              walletConfirmed: isWalletConfirmedSignal(row.walletSignal),
             },
           );
         }
@@ -6792,7 +6877,7 @@ async function poll() {
           const softCooldownRecheck =
             softCooldownRechecks < velocitySelectionConfig.maxSoftRechecksPerPoll &&
             shouldAllowVelocitySoftRecheck(cooldownState, candidate, velocitySelectionConfig);
-          if (cooldownState.active && !softCooldownRecheck && globalQuotaPressure < 1.5) {
+          if (cooldownState.active && !softCooldownRecheck) {
             cooldownFiltered += 1;
             if (scannedCandidates >= 120 && eligible.length === 0) break;
             continue;
@@ -7011,7 +7096,7 @@ async function poll() {
         const cooldownState = await getMintCooldownState(v.mint);
         const softCooldownRecheck = Boolean((v as any).softCooldownRecheck) &&
           shouldAllowVelocitySoftRecheck(cooldownState, v, velocitySelectionConfig);
-        if (cooldownState.active && !softCooldownRecheck && globalQuotaPressure < 1.5) {
+        if (cooldownState.active && !softCooldownRecheck) {
           continue;
         }
         if (softCooldownRecheck) {
@@ -7712,8 +7797,6 @@ async function poll() {
                   console.log(
                     `[SNIPER]  REPLAY CONTINUATION PASS: ${symbol} ${replayRouteLiveOverride.reason}.`
                   );
-                } else if (globalQuotaPressure > 1.5 && !lossStreakRestricted) {
-                  console.log(`[SNIPER] ⚠️ DESPERATION BYPASS: ignoring continuation hold for ${symbol}`);
                 } else {
                 console.log(
                   `[SNIPER]  MICRO SCOUT CONTINUATION HOLD: ${symbol} raw flow passed scout floor, ` +
@@ -7733,6 +7816,7 @@ async function poll() {
                   `${symbol} is already routable despite Dex liquidity ${livePair.liquidity.toFixed(0)}. ` +
 		                  `Probing with ${describeMicroScoutSizing(microScoutConfig)} (${microScoutDecision.limitingReason}${microScoutPacingTag}).`
                 );
+                const routeLiveWalletSignal = freshWalletSignalMap.get(String(v.mint || '').trim()) || null;
                 await trySnipe(
                   v.mint,
                   symbol,
@@ -7759,6 +7843,13 @@ async function poll() {
 	                    allowRoutableLowLiquidity: true,
 	                    bypassAgeFloor: true,
 	                    routeLiveFastTrack,
+                      walletConfirmed: isWalletConfirmedSignal(routeLiveWalletSignal),
+                      strongRecentFlowConfirmed: hasStrongRecentFlowConfirmation({
+                        terrainSummary: preflightTerrainState?.summary,
+                        buys60s: v.buys60s,
+                        solVolume60s: v.solVolume60s,
+                        velocity: v.velocity,
+                      }),
                       ...replayRecoveryEntryOptions,
 	                  }
                 );
@@ -7883,8 +7974,6 @@ async function poll() {
                 console.log(
                   `[SNIPER]  REPLAY CONTINUATION PASS: ${symbol} ${replayRouteLiveOverride.reason}.`
                 );
-              } else if (globalQuotaPressure > 1.5 && !lossStreakRestricted) {
-                console.log(`[SNIPER] ⚠️ DESPERATION BYPASS: ignoring continuation hold for ${symbol}`);
               } else {
               console.log(
                 `[SNIPER]  MICRO SCOUT CONTINUATION HOLD: ${symbol} low-liq route is live, ` +
@@ -7901,6 +7990,7 @@ async function poll() {
                 `[SNIPER]  LOW LIQ MICRO-SCOUT: ${symbol} liq $${livePair.liquidity.toFixed(0)} < $5K but raw flow is scout-worthy. ` +
 	                `Probing with ${describeMicroScoutSizing(microScoutConfig)} (${microScoutDecision.limitingReason}${microScoutPacingTag}).`
               );
+              const routeLiveWalletSignal = freshWalletSignalMap.get(String(v.mint || '').trim()) || null;
               await trySnipe(
                 v.mint,
                 symbol,
@@ -7926,6 +8016,13 @@ async function poll() {
 		                  minLiquidityUsd: 0,
 	                  allowRoutableLowLiquidity: true,
 	                  bypassAgeFloor: true,
+                      walletConfirmed: isWalletConfirmedSignal(routeLiveWalletSignal),
+                      strongRecentFlowConfirmed: hasStrongRecentFlowConfirmation({
+                        terrainSummary: preflightTerrainState?.summary,
+                        buys60s: v.buys60s,
+                        solVolume60s: v.solVolume60s,
+                        velocity: v.velocity,
+                      }),
                       ...replayRecoveryEntryOptions,
 	                }
               );
@@ -8150,30 +8247,22 @@ async function poll() {
           } else {
             const noDexDecision = microScoutDecision;
             if (!noDexDecision.shouldScout) {
-              if (globalQuotaPressure > 1.5) {
-                console.log(`[SNIPER] ⚠️ DESPERATION BYPASS: ignoring no dex data skip for ${symbol}`);
-              } else {
-                console.log(
-                  `[SNIPER]  NO DEX DATA SKIP: ${symbol} raw flow missed the scout floor ` +
-                  `(${noDexDecision.limitingReason}${microScoutPacingTag}; ${v.buys60s}B/${v.sells60s}S, ${v.solVolume60s.toFixed(3)} SOL/60s, vel ${v.velocity}).`
-                );
-                const pub = RedisBus.getPublisher();
-                await setMintCooldown(pub, v.mint, microScoutConfig.noDexCooldownSeconds, '1');
-                continue;
-              }
+              console.log(
+                `[SNIPER]  NO DEX DATA SKIP: ${symbol} raw flow missed the scout floor ` +
+                `(${noDexDecision.limitingReason}${microScoutPacingTag}; ${v.buys60s}B/${v.sells60s}S, ${v.solVolume60s.toFixed(3)} SOL/60s, vel ${v.velocity}).`
+              );
+              const pub = RedisBus.getPublisher();
+              await setMintCooldown(pub, v.mint, microScoutConfig.noDexCooldownSeconds, '1');
+              continue;
             }
             if (!microScoutContinuationGate.ready) {
-              if (globalQuotaPressure > 1.5) {
-                console.log(`[SNIPER] ⚠️ DESPERATION BYPASS: ignoring continuation hold for ${symbol}`);
-              } else {
-                console.log(
-                  `[SNIPER]  MICRO SCOUT CONTINUATION HOLD: ${symbol} raw flow passed scout floor, ` +
-                  `but continuation is not confirmed (${microScoutContinuationGate.source}).`
-                );
-                const pub = RedisBus.getPublisher();
-                await setMintCooldown(pub, v.mint, 20, 'MICRO_CONTINUATION');
-                continue;
-              }
+              console.log(
+                `[SNIPER]  MICRO SCOUT CONTINUATION HOLD: ${symbol} raw flow passed scout floor, ` +
+                `but continuation is not confirmed (${microScoutContinuationGate.source}).`
+              );
+              const pub = RedisBus.getPublisher();
+              await setMintCooldown(pub, v.mint, 20, 'MICRO_CONTINUATION');
+              continue;
             }
             if (
               microScoutConfig.enabled &&
@@ -8387,7 +8476,7 @@ async function poll() {
         }
 
         const cooldownState = await getMintCooldownState(trending.mint);
-        if (cooldownState.active && globalQuotaPressure < 1.5) {
+        if (cooldownState.active) {
           matureCooldownFiltered += 1;
           continue;
         }
