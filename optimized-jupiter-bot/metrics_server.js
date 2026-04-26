@@ -13,6 +13,7 @@ const app  = express();
 const PORT = 3333;
 const BASE = path.join(__dirname, 'signals');
 const SWARM= path.join(BASE, 'swarm');
+const REALIZED_PROFIT_FILE = path.join(BASE, 'realized_profit.json');
 const UPSTASH_REDIS_URL = (process.env.PCP_SWARM_UPSTASH_REDIS_URL || process.env.UPSTASH_REDIS_URL || '').trim();
 const UPSTASH_SWARM_KEY = (process.env.PCP_SWARM_UPSTASH_KEY || 'pcp:swarm:latest').trim();
 const UPSTASH_SWARM_TTL_SEC = Math.max(30, Number(process.env.PCP_SWARM_UPSTASH_TTL_SEC || 120));
@@ -55,6 +56,7 @@ function buildMetricsSnapshot() {
   const positions = readJson(path.join(BASE, 'sniper_positions.json'));
   const trending  = readJson(path.join(BASE, 'trending.json'));
   const alloc     = readJson(path.join(BASE, 'allocation.json'));
+  const realized  = readJson(REALIZED_PROFIT_FILE, {});
   const findings  = readJson(path.join(SWARM, 'findings.json'));
   const proposals = readJson(path.join(SWARM, 'proposals.json'));
   const cycles    = (() => {
@@ -67,12 +69,25 @@ function buildMetricsSnapshot() {
 
   // Portfolio stats
   const sells = journal.filter(t => t.action === 'SELL' && t.agent === 'pcp-sniper');
-  const wins  = sells.filter(t => (t.pnlSol || 0) > 0);
-  const netPnl= sells.reduce((s, t) => s + (t.pnlSol || 0), 0);
-  const pf    = (() => {
-    const gross = wins.reduce((s, t) => s + (t.pnlSol || 0), 0);
-    const loss  = Math.abs(sells.filter(t => (t.pnlSol || 0) < 0).reduce((s, t) => s + (t.pnlSol || 0), 0));
-    return loss > 0 ? Number((gross / loss).toFixed(3)) : 'N/A';
+  const rowWins  = sells.filter(t => Number(t.pnlSol || 0) > 0).length;
+  const rowLosses = sells.filter(t => Number(t.pnlSol || 0) < 0).length;
+  const rowNetPnl = sells.reduce((sum, t) => sum + Number(t.pnlSol || 0), 0);
+  const rowGross = sells.reduce((sum, t) => sum + Math.max(0, Number(t.pnlSol || 0)), 0);
+  const rowLossAbs = Math.abs(sells.reduce((sum, t) => sum + Math.min(0, Number(t.pnlSol || 0)), 0));
+  const closedSellCount = Number(realized.closedSellCount);
+  const lifecycleWins = Number(realized.wins);
+  const lifecycleLosses = Number(realized.losses);
+  const lifecycleNetPnl = Number(realized.totalRealizedPnlSol);
+  const lifecyclePositivePnl = Number(realized.positivePnlSol);
+  const lifecycleNegativePnlAbs = Math.abs(Number(realized.negativePnlSol));
+  const trades = Number.isFinite(closedSellCount) && closedSellCount > 0 ? closedSellCount : sells.length;
+  const wins = Number.isFinite(lifecycleWins) ? lifecycleWins : rowWins;
+  const losses = Number.isFinite(lifecycleLosses) ? lifecycleLosses : rowLosses;
+  const netPnl = Number.isFinite(lifecycleNetPnl) ? lifecycleNetPnl : rowNetPnl;
+  const positivePnl = Number.isFinite(lifecyclePositivePnl) ? lifecyclePositivePnl : rowGross;
+  const negativePnlAbs = Number.isFinite(lifecycleNegativePnlAbs) ? lifecycleNegativePnlAbs : rowLossAbs;
+  const pf = (() => {
+    return negativePnlAbs > 0 ? Number((positivePnl / negativePnlAbs).toFixed(3)) : 'N/A';
   })();
   const exits = sells.reduce((acc, t) => {
     const cause = (t.reason || 'UNK').split(' ')[0].split(':')[0];
@@ -119,10 +134,10 @@ function buildMetricsSnapshot() {
     ts: Date.now(),
     agents,
     portfolio: {
-      trades: sells.length,
-      wins: wins.length,
-      losses: sells.length - wins.length,
-      wr_pct: sells.length > 0 ? Number(((wins.length / sells.length) * 100).toFixed(1)) : 0,
+      trades,
+      wins,
+      losses,
+      wr_pct: trades > 0 ? Number(((wins / trades) * 100).toFixed(1)) : 0,
       net_pnl: Number(netPnl.toFixed(6)),
       profit_factor: pf,
       exits,
