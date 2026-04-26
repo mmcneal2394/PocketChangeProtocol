@@ -89,6 +89,8 @@ async function checkSwarm(label, url) {
 
   if (response.status === 200) {
     assert(data && typeof data === "object", "expected object payload");
+    assert(Array.isArray(data.trending), "expected trending array");
+    assert(Array.isArray(data.last_trades), "expected last_trades array");
     pushResult("PASS", label, `200 JSON from ${url}`);
     return data;
   }
@@ -134,10 +136,9 @@ async function main() {
     excludes: ["pcprotcol.dev"],
   });
 
-  const [publicHealth, legacyHealth] = await Promise.all([publicHealthPromise, legacyHealthPromise]);
-
-  assert(publicHealth.agent === legacyHealth.agent, "public health agent no longer matches legacy backend");
-  pushResult("PASS", "Health parity", "public and legacy health agents match");
+  const [publicHealth] = await Promise.all([publicHealthPromise, legacyHealthPromise]);
+  assert(publicHealth.agent === "PocketChange Protocol Open Agent", "unexpected public health agent");
+  pushResult("PASS", "Public health agent", "public health agent is the expected direct implementation");
 
   await Promise.all([
     checkJson(
@@ -167,23 +168,8 @@ async function main() {
     ),
     checkSwarm("Public swarm", `${PUBLIC_BASE_URL}/api/swarm`),
     checkJson(
-      "Legacy alpha signals",
-      `${LEGACY_BASE_URL}/api/alpha-signals`,
-      async (data) => {
-        assert(Array.isArray(data.signals), "expected signals array");
-      },
-    ),
-    checkJson(
       "Public token scan",
       `${PUBLIC_BASE_URL}/api/token-scan?minLiq=10000&limit=3`,
-      async (data) => {
-        assert(Array.isArray(data.tokens), "expected tokens array");
-        assert(typeof data.sol_price_usd === "number" && data.sol_price_usd > 0, "expected positive sol_price_usd");
-      },
-    ),
-    checkJson(
-      "Legacy token scan",
-      `${LEGACY_BASE_URL}/api/token-scan?minLiq=10000&limit=3`,
       async (data) => {
         assert(Array.isArray(data.tokens), "expected tokens array");
         assert(typeof data.sol_price_usd === "number" && data.sol_price_usd > 0, "expected positive sol_price_usd");
