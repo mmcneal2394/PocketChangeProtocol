@@ -1332,6 +1332,12 @@ def generate_recommendations(pairs, missed, wallet_ctx=None, signal_profile=None
     realized_summary = wallet_ctx.get('realized_profit_summary', {}) or {}
     realized_psr = try_float(realized_summary.get('profit_seeking_ratio'), 0) or 0
     realized_score = try_float(realized_summary.get('total_profit_seeking_score'), 0) or 0
+    realized_total_pnl = try_float(realized_summary.get('total_realized_pnl_sol'), 0) or 0
+    broader_book_weak = total >= 10 and (
+        realized_total_pnl < 0 or
+        realized_score < 0 or
+        (realized_psr > 0 and realized_psr < 1)
+    )
 
     # Decision logic based on data patterns
     if total < 10:
@@ -1388,6 +1394,17 @@ def generate_recommendations(pairs, missed, wallet_ctx=None, signal_profile=None
         confidence = max(30, confidence - 4)
         insight += (
             f" REALIZED OBJECTIVE: cumulative score {realized_score:+.2f} with PSR {realized_psr:.2f} argues for more conservative hunter deployment."
+        )
+    if broader_book_weak:
+        recs['min_5m_change'] = clamp(max(recs['min_5m_change'], 2), *BOUNDS['min_5m_change'])
+        recs['min_liquidity_usd'] = clamp(max(recs['min_liquidity_usd'], 18000), *BOUNDS['min_liquidity_usd'])
+        recs['min_volume_5m'] = clamp(max(recs['min_volume_5m'], 500), *BOUNDS['min_volume_5m'])
+        recs['max_hold_minutes'] = clamp(min(recs['max_hold_minutes'], 4), *BOUNDS['max_hold_minutes'])
+        recs['hunterModeMultiplier'] = min(recs.get('hunterModeMultiplier', 0.5), 0.25)
+        confidence = max(35, confidence - 3)
+        insight += (
+            f" BROADER BOOK WEAK: realized PnL {realized_total_pnl:+.4f} SOL, score {realized_score:+.2f}, and PSR {realized_psr:.2f} "
+            "override drought-era loosening, so Gemma is enforcing tighter liquidity, 5m flow, and hold-time floors."
         )
 
     weak_bridge = source_performance.get('bridge', {})
@@ -1537,7 +1554,13 @@ def generate_recommendations(pairs, missed, wallet_ctx=None, signal_profile=None
         confidence = min(confidence + 4, 95)
         insight += f" WALLET PNL: active tracked wallets remain profitable (score={avg_active_wallet_profitability:.2f}, win={avg_active_wallet_win_rate:.2f})."
 
-    if executable_buy_count == 0 and info_only_buy_count == 0 and win_rate >= 35 and sum(p['pnl'] for p in pairs) >= 0:
+    if (
+        executable_buy_count == 0 and
+        info_only_buy_count == 0 and
+        win_rate >= 35 and
+        sum(p['pnl'] for p in pairs) >= 0 and
+        not broader_book_weak
+    ):
         recs['min_liquidity_usd'] = clamp(min(recs['min_liquidity_usd'], 12000), *BOUNDS['min_liquidity_usd'])
         recs['min_volume_5m'] = clamp(min(recs['min_volume_5m'], 500), *BOUNDS['min_volume_5m'])
         recs['overbought_ceiling'] = clamp(max(recs.get('overbought_ceiling', 10), 20), 10, 50)
@@ -1554,7 +1577,7 @@ def generate_recommendations(pairs, missed, wallet_ctx=None, signal_profile=None
         )
 
     live_match_count = int(live_signal_context.get('profile_match_count', 0) or 0)
-    if live_match_count > 0:
+    if live_match_count > 0 and not broader_book_weak:
         recs['min_liquidity_usd'] = clamp(min(recs['min_liquidity_usd'], 10000), *BOUNDS['min_liquidity_usd'])
         recs['min_volume_5m'] = clamp(min(recs['min_volume_5m'], 350), *BOUNDS['min_volume_5m'])
         recs['overbought_ceiling'] = clamp(max(recs.get('overbought_ceiling', 20), 18), 10, 50)
