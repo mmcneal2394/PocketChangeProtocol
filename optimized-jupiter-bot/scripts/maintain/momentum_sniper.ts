@@ -2174,6 +2174,7 @@ interface PositionStore {
     pausedUntil: number;
     lastRecoveryProbeAt: number;
     lastLossAt: number;
+    lossStreakJournalSuppressedThrough: number;
   };
 }
 
@@ -2207,6 +2208,7 @@ let store: PositionStore = {
     pausedUntil: 0,
     lastRecoveryProbeAt: 0,
     lastLossAt: 0,
+    lossStreakJournalSuppressedThrough: 0,
   },
 };
 loadStore();
@@ -2264,6 +2266,36 @@ function hasStrongRecentFlowConfirmation(input: {
     Number(input?.solVolume60s || 0) >= terrainConfig.minStrongFlowSolVolume60s &&
     Number(input?.velocity || 0) >= terrainConfig.minStrongFlowVelocity
   );
+}
+
+function getLowLiquidityMicroRejectReason(input: {
+  entryMode?: string;
+  sourceLane?: string;
+  liquidityUsd?: number;
+  minLiquidityUsd?: number;
+  walletConfirmed?: boolean;
+  routeLiveFastTrack?: boolean;
+  strongRecentFlowConfirmed?: boolean;
+}) {
+  const lowLiquidityFloor = Math.max(0, Number(input?.minLiquidityUsd || 0));
+  const liquidityUsd = Number(input?.liquidityUsd || 0);
+  const entryMode = String(input?.entryMode || '');
+  const sourceLane = String(input?.sourceLane || '');
+  if (
+    entryMode !== 'micro-scout' ||
+    sourceLane === 'wallet' ||
+    lowLiquidityFloor <= 0 ||
+    liquidityUsd < 0 ||
+    liquidityUsd >= lowLiquidityFloor
+  ) {
+    return null;
+  }
+  const riskyProbeConfirmed =
+    input?.walletConfirmed === true &&
+    input?.routeLiveFastTrack === true &&
+    input?.strongRecentFlowConfirmed === true;
+  if (riskyProbeConfirmed) return null;
+  return `liq $${liquidityUsd.toFixed(0)} < $${lowLiquidityFloor.toFixed(0)} without wallet-confirmed fast-track flow.`;
 }
 
 function parseOptionalNumber(value: any): number | null {
@@ -2890,10 +2922,15 @@ function loadStore() {
     if (fs.existsSync(SNIPER_LOG)) {
       const raw = JSON.parse(fs.readFileSync(SNIPER_LOG, 'utf-8'));
       const journalLossStreak = deriveLossStreakSnapshotFromJournal();
+      const journalSuppressedThrough = Math.max(0, Number(raw?.stats?.lossStreakJournalSuppressedThrough || 0));
+      const effectiveJournalLossStreak =
+        journalLossStreak.lastLossAt > journalSuppressedThrough
+          ? journalLossStreak
+          : { consecutiveLosses: 0, lastLossAt: 0 };
       const persistedConsecutiveLosses = Math.max(0, Number(raw?.stats?.consecutiveLosses || 0));
-      const recoveredConsecutiveLosses = Math.max(persistedConsecutiveLosses, journalLossStreak.consecutiveLosses);
+      const recoveredConsecutiveLosses = Math.max(persistedConsecutiveLosses, effectiveJournalLossStreak.consecutiveLosses);
       const persistedLastLossAt = Math.max(0, Number(raw?.stats?.lastLossAt || 0));
-      const recoveredLastLossAt = Math.max(persistedLastLossAt, journalLossStreak.lastLossAt);
+      const recoveredLastLossAt = Math.max(persistedLastLossAt, effectiveJournalLossStreak.lastLossAt);
       store = {
         positions: Array.isArray(raw?.positions)
           ? raw.positions.map((pos: any) => {
@@ -2915,6 +2952,7 @@ function loadStore() {
           pausedUntil: Math.max(0, Number(raw?.stats?.pausedUntil || 0)),
           lastRecoveryProbeAt: Math.max(0, Number(raw?.stats?.lastRecoveryProbeAt || 0)),
           lastLossAt: recoveredLastLossAt,
+          lossStreakJournalSuppressedThrough: journalSuppressedThrough,
         },
       };
       if (recoveredConsecutiveLosses > persistedConsecutiveLosses) {
@@ -3732,6 +3770,10 @@ function maybeDecayLossStreak(now = Date.now()): number {
     `after ${(recoveryElapsedMs / 60000).toFixed(0)}m flat-book recovery.`
   );
   (store.stats as any).consecutiveLosses = 0;
+  (store.stats as any).lossStreakJournalSuppressedThrough = Math.max(
+    Number((store.stats as any)?.lossStreakJournalSuppressedThrough || 0),
+    lastLossAt,
+  );
   (store.stats as any).lastLossAt = 0;
   delete (store.stats as any).pausedUntil;
   saveStore();
@@ -4210,25 +4252,19 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
      return;
   }
   const lowLiquidityMicroScoutFloor = Math.max(0, Number(normalLaneConfig.minLiquidityUsd || 0));
-  const lowLiquidityMicroScout =
-    entryMode === 'micro-scout' &&
-    entryOptions?.sourceLane !== 'wallet' &&
-    lowLiquidityMicroScoutFloor > 0 &&
-    poolLiq >= 0 &&
-    poolLiq < lowLiquidityMicroScoutFloor;
-  if (lowLiquidityMicroScout) {
-    const riskyProbeConfirmed =
-      entryOptions?.walletConfirmed === true &&
-      entryOptions?.routeLiveFastTrack === true &&
-      entryOptions?.strongRecentFlowConfirmed === true;
-    if (!riskyProbeConfirmed) {
-      console.log(
-        `[SNIPER]  LOW LIQ MICRO REJECT: ${symbol} liq $${poolLiq.toFixed(0)} < $${lowLiquidityMicroScoutFloor.toFixed(0)} ` +
-        `without wallet-confirmed fast-track flow.`
-      );
-      await setMintCooldownExact(pub, mint, 60, 'LOW_LIQ_MICRO_REJECT');
-      return;
-    }
+  const lowLiquidityMicroRejectReason = getLowLiquidityMicroRejectReason({
+    entryMode,
+    sourceLane: entryOptions?.sourceLane,
+    liquidityUsd: poolLiq,
+    minLiquidityUsd: lowLiquidityMicroScoutFloor,
+    walletConfirmed: entryOptions?.walletConfirmed,
+    routeLiveFastTrack: entryOptions?.routeLiveFastTrack,
+    strongRecentFlowConfirmed: entryOptions?.strongRecentFlowConfirmed,
+  });
+  if (lowLiquidityMicroRejectReason) {
+    console.log(`[SNIPER]  LOW LIQ MICRO REJECT: ${symbol} ${lowLiquidityMicroRejectReason}`);
+    await setMintCooldownExact(pub, mint, 60, 'LOW_LIQ_MICRO_REJECT');
+    return;
   }
   if (poolLiq > 0 && poolLiq < 5000) {
      console.log(`[SNIPER]  MCAP/LIQ REJECT: ${symbol} liquidity $${poolLiq.toFixed(0)} < $5K floor`);
@@ -7610,12 +7646,13 @@ async function poll() {
         let routeLiveShouldBypassLowVolumeFloor = false;
         let routeLiveQualifierReason: string | null = null;
         let routeLiveRecoveryEntryOptions: Partial<EntryOptions> | null = null;
+        let preflightTerrainState = null as ReturnType<typeof recordTerrainObservation> | null;
+        let livePair = null as Awaited<ReturnType<typeof fetchDexScreenerPair>> | null;
 
         // If no cached trending data, do a LIVE DexScreener lookup
         if (!trending) {
-          let preflightTerrainState = null;
           let routeLivePreflight = false;
-          const livePair = await fetchDexScreenerPair(v.mint);
+          livePair = await fetchDexScreenerPair(v.mint);
           const tradabilityProbeLamports = Math.max(1_000_000, Math.floor(microScoutConfig.fixedBuySol * 1e9));
           const microScoutPacing = resolveActiveMicroScoutPacing(store.positions.length, MAX_POSITIONS, microScoutConfig);
           const microScoutDecision = evaluateNoDexMicroScoutProbe({
@@ -7817,6 +7854,27 @@ async function poll() {
 		                  `Probing with ${describeMicroScoutSizing(microScoutConfig)} (${microScoutDecision.limitingReason}${microScoutPacingTag}).`
                 );
                 const routeLiveWalletSignal = freshWalletSignalMap.get(String(v.mint || '').trim()) || null;
+                const routeLiveStrongRecentFlowConfirmed = hasStrongRecentFlowConfirmation({
+                  terrainSummary: preflightTerrainState?.summary,
+                  buys60s: v.buys60s,
+                  solVolume60s: v.solVolume60s,
+                  velocity: v.velocity,
+                });
+                const earlyLowLiquidityMicroRejectReason = getLowLiquidityMicroRejectReason({
+                  entryMode: 'micro-scout',
+                  sourceLane: 'velocity-first',
+                  liquidityUsd: Number(livePair.liquidity || 0),
+                  minLiquidityUsd: loadNormalLaneConfig().minLiquidityUsd,
+                  walletConfirmed: isWalletConfirmedSignal(routeLiveWalletSignal),
+                  routeLiveFastTrack,
+                  strongRecentFlowConfirmed: routeLiveStrongRecentFlowConfirmed,
+                });
+                if (earlyLowLiquidityMicroRejectReason) {
+                  console.log(`[SNIPER]  LOW LIQ MICRO REJECT: ${symbol} ${earlyLowLiquidityMicroRejectReason}`);
+                  const pub = RedisBus.getPublisher();
+                  await setMintCooldownExact(pub, v.mint, 60, 'LOW_LIQ_MICRO_REJECT');
+                  continue;
+                }
                 await trySnipe(
                   v.mint,
                   symbol,
@@ -7844,12 +7902,7 @@ async function poll() {
 	                    bypassAgeFloor: true,
 	                    routeLiveFastTrack,
                       walletConfirmed: isWalletConfirmedSignal(routeLiveWalletSignal),
-                      strongRecentFlowConfirmed: hasStrongRecentFlowConfirmation({
-                        terrainSummary: preflightTerrainState?.summary,
-                        buys60s: v.buys60s,
-                        solVolume60s: v.solVolume60s,
-                        velocity: v.velocity,
-                      }),
+                      strongRecentFlowConfirmed: routeLiveStrongRecentFlowConfirmed,
                       ...replayRecoveryEntryOptions,
 	                  }
                 );
@@ -7991,6 +8044,27 @@ async function poll() {
 	                `Probing with ${describeMicroScoutSizing(microScoutConfig)} (${microScoutDecision.limitingReason}${microScoutPacingTag}).`
               );
               const routeLiveWalletSignal = freshWalletSignalMap.get(String(v.mint || '').trim()) || null;
+              const routeLiveStrongRecentFlowConfirmed = hasStrongRecentFlowConfirmation({
+                terrainSummary: preflightTerrainState?.summary,
+                buys60s: v.buys60s,
+                solVolume60s: v.solVolume60s,
+                velocity: v.velocity,
+              });
+              const earlyLowLiquidityMicroRejectReason = getLowLiquidityMicroRejectReason({
+                entryMode: 'micro-scout',
+                sourceLane: 'velocity-first',
+                liquidityUsd: Number(livePair.liquidity || 0),
+                minLiquidityUsd: loadNormalLaneConfig().minLiquidityUsd,
+                walletConfirmed: isWalletConfirmedSignal(routeLiveWalletSignal),
+                routeLiveFastTrack: false,
+                strongRecentFlowConfirmed: routeLiveStrongRecentFlowConfirmed,
+              });
+              if (earlyLowLiquidityMicroRejectReason) {
+                console.log(`[SNIPER]  LOW LIQ MICRO REJECT: ${symbol} ${earlyLowLiquidityMicroRejectReason}`);
+                const pub = RedisBus.getPublisher();
+                await setMintCooldownExact(pub, v.mint, 60, 'LOW_LIQ_MICRO_REJECT');
+                continue;
+              }
               await trySnipe(
                 v.mint,
                 symbol,
@@ -8017,12 +8091,7 @@ async function poll() {
 	                  allowRoutableLowLiquidity: true,
 	                  bypassAgeFloor: true,
                       walletConfirmed: isWalletConfirmedSignal(routeLiveWalletSignal),
-                      strongRecentFlowConfirmed: hasStrongRecentFlowConfirmation({
-                        terrainSummary: preflightTerrainState?.summary,
-                        buys60s: v.buys60s,
-                        solVolume60s: v.solVolume60s,
-                        velocity: v.velocity,
-                      }),
+                      strongRecentFlowConfirmed: routeLiveStrongRecentFlowConfirmed,
                       ...replayRecoveryEntryOptions,
 	                }
               );
@@ -8051,6 +8120,30 @@ async function poll() {
                 console.log(
                   `[SNIPER]  RECOVERY PROBE READY: ${symbol} ${replayRecoveryProbeDecision.reason}.`
                 );
+              }
+              if (microOnlyMode) {
+                const routeLiveWalletSignal = freshWalletSignalMap.get(String(v.mint || '').trim()) || null;
+                const routeLiveStrongRecentFlowConfirmed = hasStrongRecentFlowConfirmation({
+                  terrainSummary: preflightTerrainState?.summary,
+                  buys60s: v.buys60s,
+                  solVolume60s: v.solVolume60s,
+                  velocity: v.velocity,
+                });
+                const earlyLowLiquidityMicroRejectReason = getLowLiquidityMicroRejectReason({
+                  entryMode: 'micro-scout',
+                  sourceLane: 'velocity-first',
+                  liquidityUsd: Number(livePair.liquidity || 0),
+                  minLiquidityUsd: loadNormalLaneConfig().minLiquidityUsd,
+                  walletConfirmed: isWalletConfirmedSignal(routeLiveWalletSignal),
+                  routeLiveFastTrack: false,
+                  strongRecentFlowConfirmed: routeLiveStrongRecentFlowConfirmed,
+                });
+                if (earlyLowLiquidityMicroRejectReason) {
+                  console.log(`[SNIPER]  LOW LIQ MICRO REJECT: ${symbol} ${earlyLowLiquidityMicroRejectReason}`);
+                  const pub = RedisBus.getPublisher();
+                  await setMintCooldownExact(pub, v.mint, 60, 'LOW_LIQ_MICRO_REJECT');
+                  continue;
+                }
               }
               console.log(
                 `[SNIPER]  LOW LIQ ROUTE PASS: ${symbol} liq $${livePair.liquidity.toFixed(0)} < $5K, ` +
@@ -8320,6 +8413,13 @@ async function poll() {
           bypassNormalMomentumFloor: true,
           continuationApproved: continuation.hasContinuation,
         };
+        const routeLiveWalletSignal = freshWalletSignalMap.get(String(v.mint || '').trim()) || null;
+        const routeLiveStrongRecentFlowConfirmed = hasStrongRecentFlowConfirmation({
+          terrainSummary: preflightTerrainState?.summary,
+          buys60s: v.buys60s,
+          solVolume60s: v.solVolume60s,
+          velocity: v.velocity,
+        });
 
         if (microOnlyMode) {
 	          console.log(
@@ -8350,6 +8450,23 @@ async function poll() {
           }
           if (routeLiveRecoveryEntryOptions) {
             Object.assign(normalEntryOptions, routeLiveRecoveryEntryOptions);
+          }
+          normalEntryOptions.walletConfirmed = isWalletConfirmedSignal(routeLiveWalletSignal);
+          normalEntryOptions.strongRecentFlowConfirmed = routeLiveStrongRecentFlowConfirmed;
+          const earlyLowLiquidityMicroRejectReason = getLowLiquidityMicroRejectReason({
+            entryMode: normalEntryOptions.entryMode,
+            sourceLane: normalEntryOptions.sourceLane,
+            liquidityUsd: Number(livePair?.liquidity || 0),
+            minLiquidityUsd: loadNormalLaneConfig().minLiquidityUsd,
+            walletConfirmed: normalEntryOptions.walletConfirmed,
+            routeLiveFastTrack: normalEntryOptions.routeLiveFastTrack,
+            strongRecentFlowConfirmed: normalEntryOptions.strongRecentFlowConfirmed,
+          });
+          if (earlyLowLiquidityMicroRejectReason) {
+            console.log(`[SNIPER]  LOW LIQ MICRO REJECT: ${symbol} ${earlyLowLiquidityMicroRejectReason}`);
+            const pub = RedisBus.getPublisher();
+            await setMintCooldownExact(pub, v.mint, 60, 'LOW_LIQ_MICRO_REJECT');
+            continue;
           }
         }
 
