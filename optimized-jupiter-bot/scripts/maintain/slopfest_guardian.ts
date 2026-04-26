@@ -29,6 +29,9 @@ const LEGACY_GUARDIAN_STATUS_FILE = path.join(SIGNALS_DIR, 'slopfest_guardian_st
 const SWARM_INCIDENTS_FILE = path.join(SIGNALS_DIR, 'swarm_incidents.jsonl');
 const GUARDIAN_STATE_FILE = path.join(SIGNALS_DIR, 'swarm_guardian_state.json');
 const SNIPER_OUT_LOG = path.join(os.homedir(), '.pm2', 'logs', 'pcp-sniper-1-out.log');
+const JOURNAL_STALE_MS = 30 * 60_000;
+const WALLET_SIGNALS_STALE_MS = 10 * 60_000;
+const PROFILE_STALE_MS = 20 * 60_000;
 const SNIPER_ERR_LOG = path.join(os.homedir(), '.pm2', 'logs', 'pcp-sniper-1-error.log');
 const POLL_MS = Math.max(30_000, Number(process.env.SLOPFEST_GUARDIAN_POLL_MS || 60_000));
 const INCIDENT_DEDUP_MS = 10 * 60_000;
@@ -268,7 +271,18 @@ export function detectGuardianAnomalies(input: {
     isServiceOnline(services, 'pcp-wallet-monitor') &&
     (isServiceOnline(services, 'pcp-velocity-stream') || isServiceOnline(services, 'pcp-gmgn-bridge'));
 
-  if (input.journalAgeMs !== null && input.journalAgeMs > 10 * 60_000 && upstreamOnline) {
+  const walletSignalsStale =
+    input.walletSignalsAgeMs !== null && input.walletSignalsAgeMs > WALLET_SIGNALS_STALE_MS;
+  const profileStale =
+    (input.profileEventsAgeMs !== null && input.profileEventsAgeMs > PROFILE_STALE_MS) ||
+    (input.profileStatsAgeMs !== null && input.profileStatsAgeMs > PROFILE_STALE_MS);
+
+  if (
+    input.journalAgeMs !== null &&
+    input.journalAgeMs > JOURNAL_STALE_MS &&
+    upstreamOnline &&
+    (walletSignalsStale || profileStale)
+  ) {
     anomalies.push({
       type: 'journal_stale',
       severity: 'high',
@@ -279,7 +293,7 @@ export function detectGuardianAnomalies(input: {
     });
   }
 
-  if (input.walletSignalsAgeMs !== null && input.walletSignalsAgeMs > 5 * 60_000) {
+  if (walletSignalsStale) {
     anomalies.push({
       type: 'feed_stale',
       severity: 'medium',
@@ -290,14 +304,11 @@ export function detectGuardianAnomalies(input: {
     });
   }
 
-  const profileStale =
+  const profileLikelyStaleDuringActiveFlow =
     input.journalAgeMs !== null &&
-    input.journalAgeMs <= 10 * 60_000 &&
-    (
-      (input.profileEventsAgeMs !== null && input.profileEventsAgeMs > 20 * 60_000) ||
-      (input.profileStatsAgeMs !== null && input.profileStatsAgeMs > 20 * 60_000)
-    );
-  if (profileStale) {
+    input.journalAgeMs <= JOURNAL_STALE_MS &&
+    profileStale;
+  if (profileLikelyStaleDuringActiveFlow) {
     anomalies.push({
       type: 'profile_stale',
       severity: 'high',
@@ -314,9 +325,8 @@ export function detectGuardianAnomalies(input: {
     const underfillSince = state.underfilledSince || now;
     const sustainedMs = now - underfillSince;
     const quotaRelatedStale =
-      (input.walletSignalsAgeMs !== null && input.walletSignalsAgeMs > 5 * 60_000) ||
-      profileStale ||
-      (input.journalAgeMs !== null && input.journalAgeMs > 10 * 60_000);
+      walletSignalsStale ||
+      profileLikelyStaleDuringActiveFlow;
     if (quotaRelatedStale && sustainedMs >= 10 * 60_000) {
       anomalies.push({
         type: 'quota_degraded',
