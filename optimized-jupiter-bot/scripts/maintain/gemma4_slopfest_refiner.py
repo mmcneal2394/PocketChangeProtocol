@@ -212,7 +212,20 @@ def infer_signal_source(buy, sell=None):
 def is_ghost_trade(trade):
     sig = str((trade or {}).get('sig') or (trade or {}).get('signature') or '')
     mode = str((trade or {}).get('mode') or (trade or {}).get('entryMode') or '').strip().lower()
-    return mode != 'desperation_bypass'
+    return sig.startswith(GHOST_SIG_PREFIX) or mode == 'paper' or mode == 'desperation_bypass'
+
+
+def select_replay_pairs(pairs):
+    slopfest_pairs = [p for p in (pairs or []) if p.get('slopfest_id')]
+    broad_pairs = [
+        p for p in (pairs or [])
+        if p.get('entry_volume5m') is not None or p.get('entry_momentum5m') is not None
+    ]
+    if len(slopfest_pairs) >= MIN_TRADE_SAMPLE:
+        return slopfest_pairs, 'slopfest'
+    if broad_pairs:
+        return broad_pairs, 'all_recent'
+    return [], 'none'
 
 
 def _build_grid_recommended_filters(candidate, base_filters=None):
@@ -231,11 +244,7 @@ def _build_grid_recommended_filters(candidate, base_filters=None):
     return merged
 
 def generate_autonomous_grid_search_results(pairs, base_filters=None):
-    slopfest_pairs = [p for p in pairs if p.get('slopfest_id')]
-    replay_pairs = slopfest_pairs or [
-        p for p in pairs
-        if p.get('entry_volume5m') is not None or p.get('entry_momentum5m') is not None
-    ]
+    replay_pairs, _replay_scope = select_replay_pairs(pairs)
     if not replay_pairs:
         return []
 
@@ -342,6 +351,7 @@ def run_autonomous_grid_search(pairs, base_filters=None):
 def persist_swarm_backtest_results(pairs, recs):
     base_filters = ((recs or {}).get('recommended_filters') or {})
     slopfest_pair_count = len([p for p in (pairs or []) if p.get('slopfest_id')])
+    replay_pairs, replay_scope = select_replay_pairs(pairs)
     results = generate_autonomous_grid_search_results(pairs, base_filters=base_filters)
     payload = {
         'generated_at': datetime.now(timezone.utc).isoformat(),
@@ -351,7 +361,8 @@ def persist_swarm_backtest_results(pairs, recs):
         'lookback_hours': LOOKBACK_HOURS,
         'pair_count': len(pairs or []),
         'slopfest_pair_count': slopfest_pair_count,
-        'replay_scope': 'slopfest' if slopfest_pair_count else 'all_recent',
+        'replay_pair_count': len(replay_pairs),
+        'replay_scope': replay_scope,
         'results': results[:25],
     }
     os.makedirs(SWARM_DIR, exist_ok=True)
@@ -1719,13 +1730,19 @@ def run_cycle():
         best_backtest = backtest_payload['results'][0]
         print(
             '[GEMMA4] Backtest replay: '
+            f'scope={backtest_payload.get("replay_scope")} '
+            f'pairs={backtest_payload.get("replay_pair_count", backtest_payload.get("pair_count", 0))} | '
             f'{len(backtest_payload.get("results", []))} candidate(s) | '
             f'best={best_backtest.get("param_hash")} '
             f'fitness={best_backtest.get("fitness", 0):.4f} '
             f'pnl={best_backtest.get("total_pnl_sol", 0):+.4f} SOL'
         )
     else:
-        print('[GEMMA4] Backtest replay: no eligible slopfest candidates this cycle')
+        print(
+            '[GEMMA4] Backtest replay: '
+            f'no eligible {backtest_payload.get("replay_scope", "replay")} candidates this cycle '
+            f'from {backtest_payload.get("replay_pair_count", backtest_payload.get("pair_count", 0))} replay pair(s)'
+        )
     if memory_result:
         print(
             '[GEMMA4] Swarm memory: '
