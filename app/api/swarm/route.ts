@@ -95,24 +95,29 @@ function getCandidateUrls() {
 
 export async function GET() {
   try {
-    for (const swarmApiUrl of getCandidateUrls()) {
+    const attempts = getCandidateUrls().map(async (swarmApiUrl) => {
       try {
         const upstream = await fetch(swarmApiUrl, {
           cache: "no-store",
           headers: { "Cache-Control": "no-cache" },
           signal: AbortSignal.timeout(1000),
         });
-        if (!upstream.ok) continue;
+        if (!upstream.ok) return null;
 
         const text = await upstream.text();
         const payload = text ? JSON.parse(text) : {};
-        return NextResponse.json(normalizePayload(payload), {
-          status: 200,
-          headers: { "cache-control": "no-store" },
-        });
+        return normalizePayload(payload);
       } catch {
-        // Try the next candidate.
+        return null;
       }
+    });
+
+    const payload = (await Promise.all(attempts)).find(Boolean);
+    if (payload) {
+      return NextResponse.json(payload, {
+        status: 200,
+        headers: { "cache-control": "no-store" },
+      });
     }
 
     return NextResponse.json(
