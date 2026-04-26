@@ -3634,6 +3634,7 @@ async function calcBuySize(entryOptions?: EntryOptions): Promise<number> {
 //  Loss Streak Cooldown
 const LOSS_STREAK_DEFENSIVE_THRESHOLD = 2;
 const LOSS_STREAK_PAUSE_THRESHOLD = 3;
+const LOSS_STREAK_DEFENSIVE_RECOVERY_MS = 10 * 60 * 1000;
 
 type LossStreakState = {
   consecutiveLosses: number;
@@ -3660,12 +3661,22 @@ function resolveLossStreakPauseMs(consecutiveLosses: number): number {
   return 0;
 }
 
+function resolveLossStreakRecoveryMs(consecutiveLosses: number): number {
+  if (consecutiveLosses >= LOSS_STREAK_PAUSE_THRESHOLD) {
+    return resolveLossStreakPauseMs(consecutiveLosses);
+  }
+  if (consecutiveLosses >= LOSS_STREAK_DEFENSIVE_THRESHOLD) {
+    return LOSS_STREAK_DEFENSIVE_RECOVERY_MS;
+  }
+  return 0;
+}
+
 function maybeDecayLossStreak(now = Date.now()): number {
   const consecutiveLosses = getConsecutiveLosses();
-  if (consecutiveLosses < LOSS_STREAK_PAUSE_THRESHOLD) return consecutiveLosses;
+  if (consecutiveLosses < LOSS_STREAK_DEFENSIVE_THRESHOLD) return consecutiveLosses;
   const pausedUntil = Math.max(0, Number((store.stats as any)?.pausedUntil || 0));
   const lastLossAt = getLastLossAt();
-  const recoveryWindowMs = resolveLossStreakPauseMs(consecutiveLosses);
+  const recoveryWindowMs = resolveLossStreakRecoveryMs(consecutiveLosses);
   const flatBook = (store.positions?.length || 0) === 0;
   if (!flatBook || pausedUntil > now || lastLossAt <= 0 || recoveryWindowMs <= 0) {
     return consecutiveLosses;
