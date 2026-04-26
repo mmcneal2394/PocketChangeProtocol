@@ -17,6 +17,10 @@ const upstashClient =
       })
     : null;
 
+function getPublicBaseUrl() {
+  return (process.env.PCP_PUBLIC_SITE_URL || "https://pcprotocol.dev").replace(/\/+$/, "");
+}
+
 function createFallbackPayload(status: string, message: string): SwarmPayload {
   return {
     ok: false,
@@ -127,9 +131,127 @@ async function getUpstashPayload() {
   }
 }
 
+async function fetchPublicJson(pathname: string) {
+  try {
+    const response = await fetch(`${getPublicBaseUrl()}${pathname}`, {
+      cache: "no-store",
+      headers: { "Cache-Control": "no-cache" },
+      signal: AbortSignal.timeout(2500),
+    });
+    if (!response.ok) return null;
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
+async function persistUpstashPayload(payload: SwarmPayload) {
+  if (!upstashClient) return;
+  try {
+    await upstashClient.set(UPSTASH_SWARM_KEY, payload);
+  } catch {
+    // Ignore write-back failures and continue serving the fresh payload.
+  }
+}
+
+async function buildPublicSwarmSnapshot(seed?: SwarmPayload | null) {
+  const [health, alpha, arb, tokenScan] = await Promise.all([
+    fetchPublicJson("/api/health"),
+    fetchPublicJson("/api/alpha-signals?limit=5"),
+    fetchPublicJson("/api/arb-windows?capitalSol=1&minBps=3"),
+    fetchPublicJson("/api/token-scan?minLiq=8000&limit=8"),
+  ]);
+
+  const signals = Array.isArray(alpha?.signals) ? alpha.signals : [];
+  const windows = Array.isArray(arb?.windows) ? arb.windows : [];
+  const tokens = Array.isArray(tokenScan?.tokens) ? tokenScan.tokens : [];
+  const solPriceUsd = Number(tokenScan?.sol_price_usd || arb?.sol_price_usd || 0);
+
+  if (!health && signals.length === 0 && windows.length === 0 && tokens.length === 0) {
+    return null;
+  }
+
+  const base = normalizePayload(seed || {});
+  const now = Date.now();
+  const findings = signals.slice(0, 5).map((signal: any) => ({
+    type: signal?.type || "SIGNAL",
+    symbol: signal?.symbol || "UNK",
+    mint: signal?.mint || "",
+    score: Number(signal?.score || 0),
+    action: signal?.action || "MONITOR",
+    sources: Array.isArray(signal?.sources) ? signal.sources : [],
+  }));
+  const proposals = windows.slice(0, 3).map((window: any) => ({
+    symbol: window?.symbol || "UNK",
+    mint: window?.mint || "",
+    net_bps: Number(window?.net_bps || 0),
+    net_sol: Number(window?.net_sol || 0),
+    capital_sol: Number(window?.capital_sol || 0),
+  }));
+  const trending = tokens.slice(0, 8).map((token: any) => ({
+    symbol: token?.symbol || "UNK",
+    mint: token?.mint || "",
+    vol1h: Number(token?.volume_usd_24h || 0),
+    chg1h: Number(token?.price_change_24h || 0),
+    chg5m: 0,
+    ratio: Number(token?.score || 0),
+    buys: 0,
+    sells: 0,
+    mcap: 0,
+    source: token?.source || "public",
+    liquidity_usd: Number(token?.liquidity_usd || 0),
+  }));
+
+  return normalizePayload({
+    ...base,
+    ok: true,
+    degraded: true,
+    stale: false,
+    status: "swarm_public_synthesized",
+    message: "Using live public market snapshot while the private swarm publisher is unavailable.",
+    ts: now,
+    agents: [
+      { name: "public-health", status: health?.status === "ok" ? "online" : "degraded" },
+      { name: "public-alpha-signals", status: signals.length > 0 ? "online" : "quiet" },
+      { name: "public-arb-windows", status: arb ? "online" : "degraded" },
+      { name: "public-token-scan", status: tokens.length > 0 ? "online" : "degraded" },
+    ],
+    trending,
+    findings,
+    proposals,
+    allocation: {
+      source: "public-market-snapshot",
+      sol_price_usd: solPriceUsd,
+      profitable_count: Number(arb?.profitable_count || 0),
+      scanned_at: arb?.scanned_at || tokenScan?.scanned_at || null,
+      reason: "Private swarm publisher unavailable; synthesized from live public routes.",
+    },
+    last_optimizer_cycle: {
+      source: "public-market-snapshot",
+      generated_at: new Date(now).toISOString(),
+    },
+  });
+}
+
 export async function GET() {
   try {
     const upstashPayload = await getUpstashPayload();
+    if (upstashPayload && !upstashPayload.stale) {
+      return NextResponse.json(upstashPayload, {
+        status: 200,
+        headers: { "cache-control": "no-store" },
+      });
+    }
+
+    const synthesizedPayload = await buildPublicSwarmSnapshot(upstashPayload);
+    if (synthesizedPayload) {
+      await persistUpstashPayload(synthesizedPayload);
+      return NextResponse.json(synthesizedPayload, {
+        status: 200,
+        headers: { "cache-control": "no-store" },
+      });
+    }
+
     if (upstashPayload) {
       return NextResponse.json(upstashPayload, {
         status: 200,
