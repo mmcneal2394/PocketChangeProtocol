@@ -224,6 +224,12 @@ function deriveMicroScoutRuntimeConfig(profile: any) {
   };
 }
 
+function artifactLagMs(artifactAgeMs: number | null, journalAgeMs: number | null) {
+  if (artifactAgeMs === null) return null;
+  if (journalAgeMs === null) return artifactAgeMs;
+  return Math.max(0, artifactAgeMs - journalAgeMs);
+}
+
 export function detectGuardianAnomalies(input: {
   now: number;
   services: any[];
@@ -274,9 +280,15 @@ export function detectGuardianAnomalies(input: {
 
   const walletSignalsStale =
     input.walletSignalsAgeMs !== null && input.walletSignalsAgeMs > WALLET_SIGNALS_STALE_MS;
-  const profileStale =
-    (input.profileEventsAgeMs !== null && input.profileEventsAgeMs > PROFILE_STALE_MS) ||
-    (input.profileStatsAgeMs !== null && input.profileStatsAgeMs > PROFILE_STALE_MS);
+  const profileEventsLagMs = artifactLagMs(input.profileEventsAgeMs, input.journalAgeMs);
+  const profileStatsLagMs = artifactLagMs(input.profileStatsAgeMs, input.journalAgeMs);
+  const profileEventsStale =
+    profileEventsLagMs !== null && profileEventsLagMs > PROFILE_STALE_MS;
+  const profileStatsStale =
+    profileStatsLagMs !== null &&
+    profileStatsLagMs > PROFILE_STALE_MS &&
+    profileEventsStale;
+  const profileStale = profileEventsStale || profileStatsStale;
   const activeFlowLikely =
     input.openPositions > 0 || input.executableBuySignalCount > 0;
 
@@ -321,6 +333,8 @@ export function detectGuardianAnomalies(input: {
         journalAgeMs: input.journalAgeMs,
         profileEventsAgeMs: input.profileEventsAgeMs,
         profileStatsAgeMs: input.profileStatsAgeMs,
+        profileEventsLagMs,
+        profileStatsLagMs,
       },
     });
   }
@@ -343,6 +357,8 @@ export function detectGuardianAnomalies(input: {
           walletSignalsAgeMs: input.walletSignalsAgeMs,
           profileEventsAgeMs: input.profileEventsAgeMs,
           profileStatsAgeMs: input.profileStatsAgeMs,
+          profileEventsLagMs,
+          profileStatsLagMs,
           journalAgeMs: input.journalAgeMs,
         },
       });

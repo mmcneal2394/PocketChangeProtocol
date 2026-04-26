@@ -109,6 +109,28 @@ test('detectGuardianAnomalies marks stale journals when upstream feeds are onlin
   assert.ok(anomalies.some((item) => item.type === 'journal_stale'));
 });
 
+test('detectGuardianAnomalies does not flag profile drift when profile artifacts age in lockstep with the journal', () => {
+  const anomalies = detectGuardianAnomalies({
+    now: 2_000_000,
+    services: baseServices(),
+    state: { ...baseState(), underfilledSince: 1_000 },
+    journalAgeMs: 27 * 60_000,
+    latestJournalTs: 368_000,
+    walletSignalsAgeMs: 30_000,
+    executableBuySignalCount: 1,
+    profileEventsAgeMs: 27 * 60_000,
+    profileStatsAgeMs: 27 * 60_000,
+    openPositions: 0,
+    bootConfig: null,
+    runtimeBanner: null,
+    gemmaConfig: null,
+  });
+
+  assert.ok(!anomalies.some((item) => item.type === 'profile_stale'));
+  assert.ok(!anomalies.some((item) => item.type === 'quota_degraded'));
+  assert.ok(!anomalies.some((item) => item.type === 'journal_stale'));
+});
+
 test('detectGuardianAnomalies ignores restart flap when pm2 restart counters reset after a clean redeploy', () => {
   const state = {
     ...baseState(),
