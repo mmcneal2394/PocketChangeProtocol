@@ -32,6 +32,9 @@ const ARB_LIVE_MIN_PROFIT_SOL = Math.max(0, Number(process.env.ARB_LIVE_MIN_PROF
 const ARB_LIVE_MIN_BUDGET_SOL = Math.max(0.01, Number(process.env.ARB_LIVE_MIN_BUDGET_SOL || 0.5));
 const REINVESTMENT_RATIO = Math.max(0, Math.min(1, Number(process.env.ARB_PROFIT_REINVESTMENT_RATIO || 0.8)));
 const RUN_ONCE = process.argv.includes('--once');
+const NON_ALLOCATOR_TARGET_MINTS = new Set<string>([
+  'So11111111111111111111111111111111111111112',
+]);
 
 type JsonRecord = Record<string, any>;
 
@@ -55,6 +58,11 @@ function readJsonIfExists(filePath: string, fallback: any = null) {
 function writeJson(filePath: string, payload: any) {
   ensureDir(path.dirname(filePath));
   fs.writeFileSync(filePath, JSON.stringify(payload, null, 2), 'utf8');
+}
+
+function isAllocatorEligibleMint(mint: string | null | undefined): boolean {
+  const normalizedMint = String(mint || '').trim();
+  return normalizedMint.length > 0 && !NON_ALLOCATOR_TARGET_MINTS.has(normalizedMint);
 }
 
 function loadWallet(): Keypair | null {
@@ -169,7 +177,7 @@ function buildArbTargets(walletSignals: any[], trendingSignals: any[]) {
 
   const pushTarget = (mint: string, target: any) => {
     const normalizedMint = String(mint || '').trim();
-    if (!normalizedMint || seen.has(normalizedMint)) return;
+    if (!isAllocatorEligibleMint(normalizedMint) || seen.has(normalizedMint)) return;
     seen.add(normalizedMint);
     targets.push(target);
   };
@@ -233,9 +241,13 @@ async function runCycle() {
   const openPositions = loadOpenPositionsCount();
   const realizedProfit = loadRealizedProfit();
   const freshWalletSignals = sortWalletQuotaSignals(
-    walletSignals.filter((signal: any) => signal?.mint && signal.expired !== true && isWalletSignalFresh(signal)),
+    walletSignals.filter((signal: any) =>
+      isAllocatorEligibleMint(signal?.mint) &&
+      signal.expired !== true &&
+      isWalletSignalFresh(signal),
+    ),
   );
-  const executableWalletSignals = freshWalletSignals.filter((signal: any) => signal.executable !== false);
+  const executableWalletSignals = freshWalletSignals.filter((signal: any) => signal.executable === true);
   const quotaAssistLevel = Number(resolveQuotaAssistLevel(openPositions));
   const arbTargets = buildArbTargets(executableWalletSignals, trendingSignals);
 

@@ -95,6 +95,14 @@ const RELATIVE_CHANGE_THRESHOLD = 0.15;
 const BUY_SIGNAL_WINDOW_MS = 15 * 60_000;
 const SELL_SIGNAL_WINDOW_MS = 15 * 60_000;
 const EVENT_RETENTION_MS = 90 * 60_000;
+const NON_SIGNAL_MINTS = new Set<string>([
+  'So11111111111111111111111111111111111111112',
+]);
+
+function isSignalEligibleMint(mint: string | null | undefined): boolean {
+  const normalizedMint = String(mint || '').trim();
+  return normalizedMint.length > 0 && !NON_SIGNAL_MINTS.has(normalizedMint);
+}
 
 function clamp01(value: number): number {
   if (!Number.isFinite(value)) return 0;
@@ -410,6 +418,7 @@ export function buildWalletSignalArtifacts(args: {
       ]);
 
       for (const mint of Array.from(mintSet)) {
+        if (!isSignalEligibleMint(mint)) continue;
         const prev = Number(previousBalances[mint] || 0);
         const curr = Number(currentBalances[mint] || 0);
         const key = eventKey(snapshot.wallet, mint);
@@ -492,6 +501,7 @@ export function buildWalletSignalArtifacts(args: {
   const recentBuyEvents = nextState.buyEvents.filter((event) => now - event.ts <= BUY_SIGNAL_WINDOW_MS);
   const groupedByMint = new Map<string, WalletEvent[]>();
   for (const event of recentBuyEvents) {
+    if (!isSignalEligibleMint(event.mint)) continue;
     const liveBalance = nextState.balancesByWallet[event.walletAddr]?.[event.mint] || 0;
     if (liveBalance <= DUST_THRESHOLD) continue;
     const current = groupedByMint.get(event.mint) || [];
@@ -515,7 +525,10 @@ export function buildWalletSignalArtifacts(args: {
     return Number(right.walletPnlScore || 0) - Number(left.walletPnlScore || 0);
   });
 
-  const sellSignals = buildSellSignals(nextState.sellEvents, now);
+  const sellSignals = buildSellSignals(
+    nextState.sellEvents.filter((event) => isSignalEligibleMint(event.mint)),
+    now,
+  );
   const sectorCounts: Record<string, number> = {};
   for (const signal of buySignals) {
     if (!signal.sector) continue;
