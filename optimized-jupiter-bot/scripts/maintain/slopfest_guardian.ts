@@ -231,6 +231,7 @@ export function detectGuardianAnomalies(input: {
   journalAgeMs: number | null;
   latestJournalTs: number | null;
   walletSignalsAgeMs: number | null;
+  executableBuySignalCount: number;
   profileEventsAgeMs: number | null;
   profileStatsAgeMs: number | null;
   openPositions: number;
@@ -276,11 +277,14 @@ export function detectGuardianAnomalies(input: {
   const profileStale =
     (input.profileEventsAgeMs !== null && input.profileEventsAgeMs > PROFILE_STALE_MS) ||
     (input.profileStatsAgeMs !== null && input.profileStatsAgeMs > PROFILE_STALE_MS);
+  const activeFlowLikely =
+    input.openPositions > 0 || input.executableBuySignalCount > 0;
 
   if (
     input.journalAgeMs !== null &&
     input.journalAgeMs > JOURNAL_STALE_MS &&
     upstreamOnline &&
+    activeFlowLikely &&
     (walletSignalsStale || profileStale)
   ) {
     anomalies.push({
@@ -305,6 +309,7 @@ export function detectGuardianAnomalies(input: {
   }
 
   const profileLikelyStaleDuringActiveFlow =
+    activeFlowLikely &&
     input.journalAgeMs !== null &&
     input.journalAgeMs <= JOURNAL_STALE_MS &&
     profileStale;
@@ -469,6 +474,7 @@ export async function runGuardianCycle() {
   const walletSignals = readJson<any>(WALLET_SIGNALS_FILE, {});
   const walletSignalsUpdatedAt = Number(walletSignals?.updated_at || 0) || null;
   const walletSignalsAgeMs = walletSignalsUpdatedAt ? Math.max(0, now - walletSignalsUpdatedAt) : fileAgeMs(WALLET_SIGNALS_FILE, now);
+  const executableBuySignalCount = latestExecutableWalletCount(walletSignals);
   const sniperState = readJson<any>(SNIPER_STATE_FILE, {});
   const openPositions = Array.isArray(sniperState?.positions) ? sniperState.positions.length : 0;
   const quotaAssistLevel = resolveQuotaAssistLevel(openPositions);
@@ -500,6 +506,7 @@ export async function runGuardianCycle() {
     journalAgeMs,
     latestJournalTs: latestTradeTs,
     walletSignalsAgeMs,
+    executableBuySignalCount,
     profileEventsAgeMs,
     profileStatsAgeMs,
     openPositions,
@@ -538,7 +545,7 @@ export async function runGuardianCycle() {
       ageMs: walletSignalsAgeMs,
       trackedWalletCount: Number(walletSignals?.tracked_wallet_count || 0),
       buySignalCount: Array.isArray(walletSignals?.buy_signals) ? walletSignals.buy_signals.length : 0,
-      executableBuySignalCount: latestExecutableWalletCount(walletSignals),
+      executableBuySignalCount,
     },
     quota: {
       openPositions,
