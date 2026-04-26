@@ -2172,6 +2172,7 @@ interface PositionStore {
     consecutiveLosses: number;
     pausedUntil: number;
     lastRecoveryProbeAt: number;
+    lastLossAt: number;
   };
 }
 
@@ -2204,6 +2205,7 @@ let store: PositionStore = {
     consecutiveLosses: 0,
     pausedUntil: 0,
     lastRecoveryProbeAt: 0,
+    lastLossAt: 0,
   },
 };
 loadStore();
@@ -2848,6 +2850,8 @@ function loadStore() {
       const journalLossStreak = deriveLossStreakSnapshotFromJournal();
       const persistedConsecutiveLosses = Math.max(0, Number(raw?.stats?.consecutiveLosses || 0));
       const recoveredConsecutiveLosses = Math.max(persistedConsecutiveLosses, journalLossStreak.consecutiveLosses);
+      const persistedLastLossAt = Math.max(0, Number(raw?.stats?.lastLossAt || 0));
+      const recoveredLastLossAt = Math.max(persistedLastLossAt, journalLossStreak.lastLossAt);
       store = {
         positions: Array.isArray(raw?.positions)
           ? raw.positions.map((pos: any) => {
@@ -2868,6 +2872,7 @@ function loadStore() {
           consecutiveLosses: recoveredConsecutiveLosses,
           pausedUntil: Math.max(0, Number(raw?.stats?.pausedUntil || 0)),
           lastRecoveryProbeAt: Math.max(0, Number(raw?.stats?.lastRecoveryProbeAt || 0)),
+          lastLossAt: recoveredLastLossAt,
         },
       };
       if (recoveredConsecutiveLosses > persistedConsecutiveLosses) {
@@ -2906,7 +2911,7 @@ function loadRecentTradeJournalRows(limit = 500): any[] {
   }
 }
 
-function deriveLossStreakSnapshotFromJournal(limit = 80): { consecutiveLosses: number } {
+function deriveLossStreakSnapshotFromJournal(limit = 80): { consecutiveLosses: number; lastLossAt: number } {
   const rows = loadRecentTradeJournalRows(limit)
     .filter((row: any) => String(row?.action || '').toUpperCase() === 'SELL')
     .filter((row: any) => {
@@ -2915,16 +2920,20 @@ function deriveLossStreakSnapshotFromJournal(limit = 80): { consecutiveLosses: n
     });
 
   let consecutiveLosses = 0;
+  let lastLossAt = 0;
   for (let i = rows.length - 1; i >= 0; i -= 1) {
     const pnl = Number(rows[i]?.pnlSol ?? rows[i]?.pnl_sol ?? 0);
     if (pnl < 0) {
       consecutiveLosses += 1;
+      if (lastLossAt <= 0) {
+        lastLossAt = Math.max(0, Number(rows[i]?.timestamp ?? rows[i]?.ts ?? 0));
+      }
       continue;
     }
     break;
   }
 
-  return { consecutiveLosses };
+  return { consecutiveLosses, lastLossAt };
 }
 
 function refreshFamilyPerformanceMemory() {
@@ -3639,6 +3648,10 @@ function getConsecutiveLosses(): number {
   return Math.max(0, Number((store.stats as any)?.consecutiveLosses || 0));
 }
 
+function getLastLossAt(): number {
+  return Math.max(0, Number((store.stats as any)?.lastLossAt || 0));
+}
+
 function resolveLossStreakPauseMs(consecutiveLosses: number): number {
   if (consecutiveLosses >= 8) return 90 * 60 * 1000;
   if (consecutiveLosses >= 6) return 60 * 60 * 1000;
@@ -3647,8 +3660,33 @@ function resolveLossStreakPauseMs(consecutiveLosses: number): number {
   return 0;
 }
 
-function getLossStreakState(now = Date.now()): LossStreakState {
+function maybeDecayLossStreak(now = Date.now()): number {
   const consecutiveLosses = getConsecutiveLosses();
+  if (consecutiveLosses < LOSS_STREAK_PAUSE_THRESHOLD) return consecutiveLosses;
+  const pausedUntil = Math.max(0, Number((store.stats as any)?.pausedUntil || 0));
+  const lastLossAt = getLastLossAt();
+  const recoveryWindowMs = resolveLossStreakPauseMs(consecutiveLosses);
+  const flatBook = (store.positions?.length || 0) === 0;
+  if (!flatBook || pausedUntil > now || lastLossAt <= 0 || recoveryWindowMs <= 0) {
+    return consecutiveLosses;
+  }
+  const recoveryElapsedMs = Math.max(0, now - lastLossAt);
+  if (recoveryElapsedMs < recoveryWindowMs) {
+    return consecutiveLosses;
+  }
+  console.log(
+    `[SNIPER]  LOSS STREAK DECAY: clearing ${consecutiveLosses} consecutive losses ` +
+    `after ${(recoveryElapsedMs / 60000).toFixed(0)}m flat-book recovery.`
+  );
+  (store.stats as any).consecutiveLosses = 0;
+  (store.stats as any).lastLossAt = 0;
+  delete (store.stats as any).pausedUntil;
+  saveStore();
+  return 0;
+}
+
+function getLossStreakState(now = Date.now()): LossStreakState {
+  const consecutiveLosses = maybeDecayLossStreak(now);
   const pauseDisabled = isLossStreakPauseDisabled();
   const pausedUntil = Math.max(0, Number((store.stats as any)?.pausedUntil || 0));
   const pauseActive = !pauseDisabled && pausedUntil > now;
@@ -5875,6 +5913,7 @@ async function checkExits() {
               }
 
               (store.stats as any).consecutiveLosses = ((store.stats as any).consecutiveLosses || 0) + 1;
+              (store.stats as any).lastLossAt = Date.now();
               if ((store.stats as any).consecutiveLosses >= LOSS_STREAK_PAUSE_THRESHOLD) {
                 if (isLossStreakPauseDisabled()) {
                   delete (store.stats as any).pausedUntil;
@@ -5899,6 +5938,7 @@ async function checkExits() {
               }
           } else {
               (store.stats as any).consecutiveLosses = 0;
+              (store.stats as any).lastLossAt = 0;
               delete (store.stats as any).pausedUntil;
               await pubPublisher.del(`strikes:${pos.mint}`);
               if (isTimeExit) {
