@@ -40,6 +40,8 @@ BAYESIAN_FILE = os.path.join(SIGNALS_DIR, 'bayesian_params.json')
 REALIZED_PROFIT_FILE = os.path.join(SIGNALS_DIR, 'realized_profit_paper.json' if PAPER_MODE else 'realized_profit.json')
 SWARM_DIR = os.path.join(SIGNALS_DIR, 'swarm')
 BACKTEST_RESULTS_FILE = os.path.join(SWARM_DIR, 'backtest_results.json')
+STRATEGY_PARAMS_FILE = os.path.join(PROJECT_ROOT, 'strategy_params.json')
+STRATEGY_PARAMS_MIRROR = os.path.join(SIGNALS_DIR, 'strategy_params.json')
 SNIPER_TS = os.path.join(PROJECT_ROOT, 'scripts', 'maintain', 'momentum_sniper.ts')
 INTERVAL_SECONDS = int(os.environ.get('GEMMA4_INTERVAL_SECONDS', '900'))  # Run every 15 minutes
 MIN_TRADE_SAMPLE = 10
@@ -1771,6 +1773,61 @@ def apply_recommendations(recs):
         print(f'  Redis publish error: {e}. Applied strictly to .env (Restart sniper for instant reflection)')
         return True # still true because .env got updated
 
+def should_sync_boot_profile(current_filters, desired_filters):
+    tighter_floor_keys = ('min_5m_change', 'min_liquidity_usd', 'min_volume_5m')
+    shorter_exposure_keys = ('max_hold_minutes', 'hunterModeMultiplier', 'overbought_ceiling')
+    for key in tighter_floor_keys:
+        desired = try_float(desired_filters.get(key))
+        current = try_float(current_filters.get(key))
+        if desired is not None and current is not None and current < desired:
+            return True
+    for key in shorter_exposure_keys:
+        desired = try_float(desired_filters.get(key))
+        current = try_float(current_filters.get(key))
+        if desired is not None and current is not None and current > desired:
+            return True
+    return False
+
+def sync_strategy_boot_profile(recs):
+    filters = (recs or {}).get('recommended_filters') or {}
+    if not filters:
+        return False
+    if not (recs or {}).get('broader_book_weak'):
+        return False
+
+    current = load_json(STRATEGY_PARAMS_FILE, {})
+    if not current:
+        current = load_json(STRATEGY_PARAMS_MIRROR, {})
+    current = dict(current or {})
+
+    sync_keys = (
+        'min_5m_change',
+        'min_liquidity_usd',
+        'min_volume_5m',
+        'max_top10_holder_pct',
+        'tp1_pct',
+        'stop_loss_pct',
+        'max_hold_minutes',
+        'hunterModeMultiplier',
+        'overbought_ceiling',
+    )
+    desired_filters = {key: filters.get(key) for key in sync_keys if key in filters}
+    current_filters = {key: current.get(key) for key in sync_keys}
+    if not should_sync_boot_profile(current_filters, desired_filters):
+        return False
+
+    current.update(desired_filters)
+    current['recommended_filters'] = {
+        **(current.get('recommended_filters') or {}),
+        **desired_filters,
+    }
+    current['source'] = 'gemma4_runtime_sync'
+    current['promotion_reason'] = 'live_recommendation_sync'
+    current['last_updated'] = datetime.now(timezone.utc).isoformat()
+    write_json_atomic(STRATEGY_PARAMS_FILE, current)
+    write_json_atomic(STRATEGY_PARAMS_MIRROR, current)
+    return True
+
 def run_cycle():
     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     print(f'\n{"="*60}')
@@ -1883,6 +1940,8 @@ def run_cycle():
         print(f'  Parameters pushed to live sniper')
     else:
         print(f'  Not applied (low confidence or error)')
+    if sync_strategy_boot_profile(recs):
+        print('  Strategy boot profile synchronized to live safe recommendation')
 
     print(f'  Saved to {RECS}')
 
