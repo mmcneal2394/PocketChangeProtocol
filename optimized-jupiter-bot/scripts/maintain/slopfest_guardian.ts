@@ -25,6 +25,7 @@ const SNIPER_STATE_FILE = path.join(SIGNALS_DIR, IS_PAPER ? 'sniper_positions_pa
 const WALLET_SIGNALS_FILE = path.join(SIGNALS_DIR, 'wallet_signals.json');
 const GEMMA_RECOMMENDATIONS_FILE = path.join(SIGNALS_DIR, 'gemma4_recommendations.json');
 const SWARM_HEALTH_FILE = path.join(SIGNALS_DIR, 'swarm_health.json');
+const LEGACY_GUARDIAN_STATUS_FILE = path.join(SIGNALS_DIR, 'slopfest_guardian_status.json');
 const SWARM_INCIDENTS_FILE = path.join(SIGNALS_DIR, 'swarm_incidents.jsonl');
 const GUARDIAN_STATE_FILE = path.join(SIGNALS_DIR, 'swarm_guardian_state.json');
 const SNIPER_OUT_LOG = path.join(os.homedir(), '.pm2', 'logs', 'pcp-sniper-1-out.log');
@@ -548,6 +549,28 @@ export async function runGuardianCycle() {
 
   if (!fs.existsSync(SIGNALS_DIR)) fs.mkdirSync(SIGNALS_DIR, { recursive: true });
   fs.writeFileSync(SWARM_HEALTH_FILE, JSON.stringify(health, null, 2), 'utf-8');
+  const sniperService = findService(services, 'pcp-sniper-1');
+  const guardianHealthy = anomalies.length === 0;
+  const sniperHealthy = sniperService?.status === 'online';
+  fs.writeFileSync(
+    LEGACY_GUARDIAN_STATUS_FILE,
+    JSON.stringify({
+      updatedAt: new Date(now).toISOString(),
+      activeAnomalies: anomalies.length,
+      guardianHealthy,
+      sniperHealthy,
+      quota: health.quota,
+      journal: {
+        latestTs: latestTradeTs,
+        ageMs: journalAgeMs,
+        recentTrades,
+      },
+      walletSignals: health.walletSignals,
+      anomalies,
+      lastRemediation: remediation,
+    }, null, 2),
+    'utf-8',
+  );
 
   for (const anomaly of anomalies) {
     appendIncident(state, {

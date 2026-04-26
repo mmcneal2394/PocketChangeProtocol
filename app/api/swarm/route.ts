@@ -57,26 +57,37 @@ function createFallbackPayload(status: string, message: string): SwarmPayload {
 
 function normalizePayload(payload: any): SwarmPayload {
   const fallback = createFallbackPayload("swarm_backend_degraded", "Using fallback swarm payload");
+  const explicitPayload = payload && typeof payload === "object" ? payload : {};
+  const shouldSurfaceFallbackError =
+    explicitPayload?.degraded === true ||
+    explicitPayload?.stale === true ||
+    explicitPayload?.ok === false;
   return {
     ...fallback,
-    ...(payload && typeof payload === "object" ? payload : {}),
-    ts: typeof payload?.ts === "number" ? payload.ts : Date.now(),
-    wallet: payload?.wallet ?? fallback.wallet,
-    trackedAssets: Array.isArray(payload?.trackedAssets) ? payload.trackedAssets : fallback.trackedAssets,
-    parameters: payload?.parameters && typeof payload.parameters === "object" ? payload.parameters : fallback.parameters,
-    trades: Array.isArray(payload?.trades) ? payload.trades : fallback.trades,
-    agents: Array.isArray(payload?.agents) ? payload.agents : fallback.agents,
-    portfolio: payload?.portfolio && typeof payload.portfolio === "object" ? payload.portfolio : fallback.portfolio,
-    open_positions: Array.isArray(payload?.open_positions) ? payload.open_positions : fallback.open_positions,
-    blacklist_count: typeof payload?.blacklist_count === "number" ? payload.blacklist_count : fallback.blacklist_count,
-    last_trades: Array.isArray(payload?.last_trades) ? payload.last_trades : fallback.last_trades,
-    trending: Array.isArray(payload?.trending) ? payload.trending : fallback.trending,
-    allocation: payload?.allocation && typeof payload.allocation === "object" ? payload.allocation : fallback.allocation,
-    findings: Array.isArray(payload?.findings) ? payload.findings : fallback.findings,
-    proposals: Array.isArray(payload?.proposals) ? payload.proposals : fallback.proposals,
+    ...explicitPayload,
+    error:
+      typeof explicitPayload?.error === "string"
+        ? explicitPayload.error
+        : shouldSurfaceFallbackError
+          ? fallback.error
+          : null,
+    ts: typeof explicitPayload?.ts === "number" ? explicitPayload.ts : Date.now(),
+    wallet: explicitPayload?.wallet ?? fallback.wallet,
+    trackedAssets: Array.isArray(explicitPayload?.trackedAssets) ? explicitPayload.trackedAssets : fallback.trackedAssets,
+    parameters: explicitPayload?.parameters && typeof explicitPayload.parameters === "object" ? explicitPayload.parameters : fallback.parameters,
+    trades: Array.isArray(explicitPayload?.trades) ? explicitPayload.trades : fallback.trades,
+    agents: Array.isArray(explicitPayload?.agents) ? explicitPayload.agents : fallback.agents,
+    portfolio: explicitPayload?.portfolio && typeof explicitPayload.portfolio === "object" ? explicitPayload.portfolio : fallback.portfolio,
+    open_positions: Array.isArray(explicitPayload?.open_positions) ? explicitPayload.open_positions : fallback.open_positions,
+    blacklist_count: typeof explicitPayload?.blacklist_count === "number" ? explicitPayload.blacklist_count : fallback.blacklist_count,
+    last_trades: Array.isArray(explicitPayload?.last_trades) ? explicitPayload.last_trades : fallback.last_trades,
+    trending: Array.isArray(explicitPayload?.trending) ? explicitPayload.trending : fallback.trending,
+    allocation: explicitPayload?.allocation && typeof explicitPayload.allocation === "object" ? explicitPayload.allocation : fallback.allocation,
+    findings: Array.isArray(explicitPayload?.findings) ? explicitPayload.findings : fallback.findings,
+    proposals: Array.isArray(explicitPayload?.proposals) ? explicitPayload.proposals : fallback.proposals,
     last_optimizer_cycle:
-      payload?.last_optimizer_cycle && typeof payload.last_optimizer_cycle === "object"
-        ? payload.last_optimizer_cycle
+      explicitPayload?.last_optimizer_cycle && typeof explicitPayload.last_optimizer_cycle === "object"
+        ? explicitPayload.last_optimizer_cycle
         : fallback.last_optimizer_cycle,
   };
 }

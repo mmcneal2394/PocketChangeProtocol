@@ -82,15 +82,27 @@ function buildMetricsSnapshot() {
 
   // PM2 agent status
   const pm2 = getPm2Status();
-  const agentNames = [
-    'jupiter-ultra-bot', 'pcp-engine', 'pcp-sniper',
-    'pcp-pumpfun', 'pcp-trending', 'pcp-health',
-    'pcp-strategist', 'pcp-optimizer', 'pcp-social'
+  const agentSpecs = [
+    { name: 'pcp-sniper', pm2Name: 'pcp-sniper-1' },
+    { name: 'pcp-wallet-monitor', pm2Name: 'pcp-wallet-monitor' },
+    { name: 'pcp-wallet-intel', pm2Name: 'pcp-wallet-intel' },
+    { name: 'pcp-gmgn-bridge', pm2Name: 'pcp-gmgn-bridge' },
+    { name: 'pcp-velocity-stream', pm2Name: 'pcp-velocity-stream' },
+    { name: 'pcp-bags-swarm', pm2Name: 'pcp-bags-swarm' },
+    { name: 'pcp-gemma4-refiner', pm2Name: 'pcp-gemma4-refiner' },
+    { name: 'pcp-slopfest-guardian', pm2Name: 'pcp-slopfest-guardian' },
+    { name: 'pcp-capital-allocator', pm2Name: 'pcp-capital-allocator' },
+    { name: 'pcp-profit-accumulator', pm2Name: 'pcp-profit-accumulator' },
+    { name: 'pcp-overview', pm2Name: 'pcp-overview' },
+    { name: 'pcp-metrics', pm2Name: 'pcp-metrics' },
+    { name: 'pcp-social', pm2Name: 'pcp-social' },
+    { name: 'pcp-arb-scout', pm2Name: 'pcp-arb-scout' },
   ];
-  const agents = agentNames.map(name => {
-    const proc = pm2.find(p => p.name === name);
+  const agents = agentSpecs.map(({ name, pm2Name }) => {
+    const proc = pm2.find(p => p.name === pm2Name);
     return {
       name,
+      pm2_name: pm2Name,
       status: proc ? proc.pm2_env.status : 'unknown',
       uptime: proc ? proc.pm2_env.pm_uptime : null,
       restarts: proc ? proc.pm2_env.restart_time : 0,
