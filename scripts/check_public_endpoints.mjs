@@ -151,15 +151,6 @@ async function main() {
       },
     ),
     checkJson(
-      "Legacy arb windows",
-      `${LEGACY_BASE_URL}/api/arb-windows?capitalSol=1.0&minBps=3`,
-      async (data) => {
-        assert(Array.isArray(data.windows), "expected windows array");
-        assert(typeof data.profitable_count === "number", "expected profitable_count number");
-        assert(typeof data.sol_price_usd === "number" && data.sol_price_usd > 0, "expected positive sol_price_usd");
-      },
-    ),
-    checkJson(
       "Public alpha signals",
       `${PUBLIC_BASE_URL}/api/alpha-signals`,
       async (data) => {

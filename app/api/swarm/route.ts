@@ -100,7 +100,7 @@ export async function GET() {
         const upstream = await fetch(swarmApiUrl, {
           cache: "no-store",
           headers: { "Cache-Control": "no-cache" },
-          signal: AbortSignal.timeout(4000),
+          signal: AbortSignal.timeout(1000),
         });
         if (!upstream.ok) continue;
 
