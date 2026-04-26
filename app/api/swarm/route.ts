@@ -1,10 +1,21 @@
 import { NextResponse } from "next/server";
+import { Redis as UpstashRedis } from "@upstash/redis";
 
 export const runtime = "nodejs";
 
 export const dynamic = "force-dynamic";
 
 type SwarmPayload = Record<string, unknown>;
+const UPSTASH_SWARM_KEY = process.env.PCP_SWARM_UPSTASH_KEY?.trim() || "pcp:swarm:latest";
+const UPSTASH_SWARM_MAX_AGE_MS = Number(process.env.PCP_SWARM_UPSTASH_MAX_AGE_MS || "90000");
+
+const upstashClient =
+  process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
+    ? new UpstashRedis({
+        url: process.env.UPSTASH_REDIS_REST_URL,
+        token: process.env.UPSTASH_REDIS_REST_TOKEN,
+      })
+    : null;
 
 function createFallbackPayload(status: string, message: string): SwarmPayload {
   return {
@@ -93,8 +104,39 @@ function getCandidateUrls() {
   ];
 }
 
+async function getUpstashPayload() {
+  if (!upstashClient) return null;
+  try {
+    const raw = await upstashClient.get<string | Record<string, unknown>>(UPSTASH_SWARM_KEY);
+    if (!raw) return null;
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    const payload = normalizePayload(parsed);
+    const ageMs = Date.now() - Number(payload.ts || 0);
+    if (!Number.isFinite(ageMs) || ageMs > UPSTASH_SWARM_MAX_AGE_MS) {
+      return {
+        ...payload,
+        stale: true,
+        degraded: true,
+        status: "swarm_upstash_stale",
+        message: "Swarm snapshot is available but stale.",
+      };
+    }
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
 export async function GET() {
   try {
+    const upstashPayload = await getUpstashPayload();
+    if (upstashPayload) {
+      return NextResponse.json(upstashPayload, {
+        status: 200,
+        headers: { "cache-control": "no-store" },
+      });
+    }
+
     const attempts = getCandidateUrls().map(async (swarmApiUrl) => {
       try {
         const upstream = await fetch(swarmApiUrl, {

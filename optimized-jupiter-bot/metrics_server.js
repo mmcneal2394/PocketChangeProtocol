@@ -7,11 +7,19 @@ const express = require('express');
 const fs      = require('fs');
 const path    = require('path');
 const { execSync } = require('child_process');
+const Redis   = require('ioredis');
 
 const app  = express();
 const PORT = 3333;
 const BASE = path.join(__dirname, 'signals');
 const SWARM= path.join(BASE, 'swarm');
+const UPSTASH_REDIS_URL = (process.env.PCP_SWARM_UPSTASH_REDIS_URL || process.env.UPSTASH_REDIS_URL || '').trim();
+const UPSTASH_SWARM_KEY = (process.env.PCP_SWARM_UPSTASH_KEY || 'pcp:swarm:latest').trim();
+const UPSTASH_SWARM_TTL_SEC = Math.max(30, Number(process.env.PCP_SWARM_UPSTASH_TTL_SEC || 120));
+const UPSTASH_SYNC_INTERVAL_MS = Math.max(10000, Number(process.env.PCP_SWARM_UPSTASH_SYNC_MS || 15000));
+const upstash = UPSTASH_REDIS_URL
+  ? new Redis(UPSTASH_REDIS_URL, { tls: {}, lazyConnect: true, maxRetriesPerRequest: 1, enableReadyCheck: true })
+  : null;
 
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -42,7 +50,7 @@ function getPm2Status() {
   } catch { return []; }
 }
 
-app.get('/metrics', (req, res) => {
+function buildMetricsSnapshot() {
   const journal   = readJournal();
   const positions = readJson(path.join(BASE, 'sniper_positions.json'));
   const trending  = readJson(path.join(BASE, 'trending.json'));
@@ -90,7 +98,7 @@ app.get('/metrics', (req, res) => {
     };
   });
 
-  res.json({
+  return {
     ts: Date.now(),
     agents,
     portfolio: {
@@ -138,11 +146,40 @@ app.get('/metrics', (req, res) => {
     findings: findings.findings || [],
     proposals: proposals.proposals || [],
     last_optimizer_cycle: cycles,
-  });
+  };
+}
+
+async function mirrorSnapshotToUpstash() {
+  if (!upstash) return false;
+  try {
+    if (upstash.status === 'wait') {
+      await upstash.connect();
+    }
+    const snapshot = buildMetricsSnapshot();
+    await upstash.set(UPSTASH_SWARM_KEY, JSON.stringify(snapshot), 'EX', UPSTASH_SWARM_TTL_SEC);
+    return true;
+  } catch (error) {
+    console.error(`[pcp-metrics] Upstash mirror failed: ${error.message}`);
+    return false;
+  }
+}
+
+app.get('/metrics', async (req, res) => {
+  const snapshot = buildMetricsSnapshot();
+  if (upstash) {
+    mirrorSnapshotToUpstash().catch(() => {});
+  }
+  res.json(snapshot);
 });
 
 app.get('/health', (req, res) => res.json({ ok: true, ts: Date.now() }));
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`[pcp-metrics] Listening on port ${PORT}`);
+  if (upstash) {
+    mirrorSnapshotToUpstash().catch(() => {});
+    setInterval(() => {
+      mirrorSnapshotToUpstash().catch(() => {});
+    }, UPSTASH_SYNC_INTERVAL_MS).unref?.();
+  }
 });
