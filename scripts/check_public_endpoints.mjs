@@ -77,6 +77,29 @@ async function checkJson(label, url, validator, options = {}) {
   return data;
 }
 
+async function checkSwarm(label, url) {
+  const response = await fetchResponse(label, url);
+
+  let data;
+  try {
+    data = JSON.parse(response.text);
+  } catch (error) {
+    throw new Error(`expected JSON body: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  if (response.status === 200) {
+    assert(data && typeof data === "object", "expected object payload");
+    pushResult("PASS", label, `200 JSON from ${url}`);
+    return data;
+  }
+
+  if (response.status === 503 && data?.status === "swarm_backend_not_configured") {
+    throw new Error("public swarm route exists but swarm backend env is not configured");
+  }
+
+  throw new Error(`expected HTTP 200, got ${response.status}`);
+}
+
 async function main() {
   console.log(`Checking public site: ${PUBLIC_BASE_URL}`);
   console.log(`Checking legacy backend: ${LEGACY_BASE_URL}`);
@@ -123,6 +146,7 @@ async function main() {
       async (data) => {
         assert(Array.isArray(data.windows), "expected windows array");
         assert(typeof data.profitable_count === "number", "expected profitable_count number");
+        assert(typeof data.sol_price_usd === "number" && data.sol_price_usd > 0, "expected positive sol_price_usd");
       },
     ),
     checkJson(
@@ -131,6 +155,7 @@ async function main() {
       async (data) => {
         assert(Array.isArray(data.windows), "expected windows array");
         assert(typeof data.profitable_count === "number", "expected profitable_count number");
+        assert(typeof data.sol_price_usd === "number" && data.sol_price_usd > 0, "expected positive sol_price_usd");
       },
     ),
     checkJson(
@@ -140,6 +165,7 @@ async function main() {
         assert(Array.isArray(data.signals), "expected signals array");
       },
     ),
+    checkSwarm("Public swarm", `${PUBLIC_BASE_URL}/api/swarm`),
     checkJson(
       "Legacy alpha signals",
       `${LEGACY_BASE_URL}/api/alpha-signals`,
@@ -152,6 +178,7 @@ async function main() {
       `${PUBLIC_BASE_URL}/api/token-scan?minLiq=10000&limit=3`,
       async (data) => {
         assert(Array.isArray(data.tokens), "expected tokens array");
+        assert(typeof data.sol_price_usd === "number" && data.sol_price_usd > 0, "expected positive sol_price_usd");
       },
     ),
     checkJson(
@@ -159,6 +186,7 @@ async function main() {
       `${LEGACY_BASE_URL}/api/token-scan?minLiq=10000&limit=3`,
       async (data) => {
         assert(Array.isArray(data.tokens), "expected tokens array");
+        assert(typeof data.sol_price_usd === "number" && data.sol_price_usd > 0, "expected positive sol_price_usd");
       },
     ),
   ]);

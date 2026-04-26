@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { fetchDexScreenerSolanaSearches, fetchSolPriceUsd } from '../_shared/market';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type',
 };
-
-const BROWSER_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36';
 
 function scoreToken(t: any): number {
   let score = 0;
@@ -22,16 +21,6 @@ function scoreToken(t: any): number {
   if (src === 'boosted') score += 15;
   if (src === 'dexscreener') score += 10;
   return Math.min(score, 100);
-}
-
-async function fetchDexscreener(query: string): Promise<any[]> {
-  const res = await fetch(`https://api.dexscreener.com/latest/dex/search?q=${encodeURIComponent(query)}`, {
-    headers: { 'User-Agent': BROWSER_UA, 'Accept': 'application/json' },
-    signal: AbortSignal.timeout(8000),
-  });
-  if (!res.ok) return [];
-  const data = await res.json();
-  return (data.pairs || []).filter((p: any) => p.chainId === 'solana');
 }
 
 const SEEDED = [
@@ -56,30 +45,27 @@ export async function GET(req: NextRequest) {
 
   // Multi-query DexScreener
   const queries = ['solana', 'meme solana', 'new solana'];
-  const results = await Promise.allSettled(queries.map(fetchDexscreener));
-  for (const r of results) {
-    if (r.status !== 'fulfilled') continue;
-    for (const pair of r.value) {
-      const liq   = Number(pair.liquidity?.usd || 0);
-      const vol24 = Number(pair.volume?.h24 || 0);
-      const ts    = pair.pairCreatedAt || 0;
-      const age_h = ts ? (Date.now() - ts) / 3_600_000 : 24;
-      const mint  = pair.baseToken?.address || '';
-      if (!mint || seen.has(mint)) continue;
-      if (liq < minLiq * 0.5) continue;
-      if (age_h > maxAge) continue;
-      seen.add(mint);
-      tokens.push({
-        mint, age_hours: Math.round(age_h * 10) / 10,
-        symbol:           pair.baseToken?.symbol || 'UNK',
-        name:             pair.baseToken?.name   || '',
-        liquidity_usd:    liq,
-        volume_usd_24h:   vol24,
-        price_usd:        Number(pair.priceUsd || 0),
-        price_change_24h: Number(pair.priceChange?.h24 || 0),
-        source: 'dexscreener',
-      });
-    }
+  const pairs = await fetchDexScreenerSolanaSearches(queries);
+  for (const pair of pairs) {
+    const liq   = Number(pair.liquidity?.usd || 0);
+    const vol24 = Number(pair.volume?.h24 || 0);
+    const ts    = pair.pairCreatedAt || 0;
+    const age_h = ts ? (Date.now() - ts) / 3_600_000 : 24;
+    const mint  = pair.baseToken?.address || '';
+    if (!mint || seen.has(mint)) continue;
+    if (liq < minLiq * 0.5) continue;
+    if (age_h > maxAge) continue;
+    seen.add(mint);
+    tokens.push({
+      mint, age_hours: Math.round(age_h * 10) / 10,
+      symbol:           pair.baseToken?.symbol || 'UNK',
+      name:             pair.baseToken?.name   || '',
+      liquidity_usd:    liq,
+      volume_usd_24h:   vol24,
+      price_usd:        Number(pair.priceUsd || 0),
+      price_change_24h: Number(pair.priceChange?.h24 || 0),
+      source: 'dexscreener',
+    });
   }
 
   // Always add seeded tokens
@@ -94,12 +80,7 @@ export async function GET(req: NextRequest) {
     .slice(0, limit);
 
   // Get SOL price
-  let sol_price_usd = 0;
-  try {
-    const pr = await fetch('https://lite-api.jup.ag/price/v2?ids=So11111111111111111111111111111111111111112', { signal: AbortSignal.timeout(4000) });
-    const pd = await pr.json();
-    sol_price_usd = Number(pd?.data?.['So11111111111111111111111111111111111111112']?.price || 0);
-  } catch {}
+  const sol_price_usd = await fetchSolPriceUsd();
 
   return NextResponse.json({ tokens: scored, scanned_at: new Date().toISOString(), sol_price_usd }, { headers: CORS });
 }

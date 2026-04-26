@@ -1,19 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { BROWSER_UA, fetchDexScreenerSolanaSearches } from '../_shared/market';
 
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' };
 
-const BROWSER_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36';
-
 async function getDexScreenerSpikes() {
   try {
-    const res = await fetch('https://api.dexscreener.com/latest/dex/search?q=solana', {
-      headers: { 'User-Agent': BROWSER_UA, 'Accept': 'application/json' },
-      signal: AbortSignal.timeout(8000),
-    });
-    if (!res.ok) return [];
-    const data = await res.json();
     const signals = [];
-    for (const pair of (data.pairs || []).filter((p: any) => p.chainId === 'solana').slice(0, 60)) {
+    const pairs = await fetchDexScreenerSolanaSearches(['solana', 'meme solana', 'new solana']);
+    for (const pair of pairs.slice(0, 80)) {
       const buysH1  = pair.txns?.h1?.buys  || 0;
       const buysH6  = (pair.txns?.h6?.buys || 0) / 6;
       const volH1   = Number(pair.volume?.h1 || 0);
@@ -38,6 +32,51 @@ async function getDexScreenerSpikes() {
     }
     return signals;
   } catch { return []; }
+}
+
+async function getDexScreenerScannerFallback() {
+  try {
+    const signals = [];
+    const pairs = await fetchDexScreenerSolanaSearches(['solana', 'meme solana', 'new solana']);
+    for (const pair of pairs.slice(0, 80)) {
+      const mint = pair.baseToken?.address || '';
+      const liq = Number(pair.liquidity?.usd || 0);
+      const vol24 = Number(pair.volume?.h24 || 0);
+      const buysH1 = Number(pair.txns?.h1?.buys || 0);
+      const buysM5 = Number(pair.txns?.m5?.buys || 0);
+      const priceChg24 = Number(pair.priceChange?.h24 || 0);
+      const priceChg1 = Number(pair.priceChange?.h1 || 0);
+      if (!mint || liq < 12_000 || vol24 < 40_000) continue;
+
+      const score = Math.min(
+        (liq >= 100_000 ? 20 : liq >= 30_000 ? 14 : 8) +
+        (vol24 >= 500_000 ? 20 : vol24 >= 100_000 ? 14 : 8) +
+        (priceChg24 >= 20 ? 18 : priceChg24 >= 10 ? 10 : priceChg1 >= 3 ? 6 : 0) +
+        (buysH1 >= 50 ? 12 : buysH1 >= 20 ? 8 : buysM5 >= 5 ? 5 : 0),
+        100,
+      );
+
+      if (score < 40) continue;
+
+      signals.push({
+        type: score >= 65 ? 'CONVICTION' : 'MOMENTUM',
+        symbol: pair.baseToken?.symbol || 'UNK',
+        mint,
+        score,
+        sources: ['dexscreener_scan'],
+        action: score >= 65 ? 'SCAN_ARB' : 'MONITOR',
+        evidence: {
+          liquidity_usd: Math.round(liq),
+          volume_h24: Math.round(vol24),
+          buys_h1: buysH1,
+          price_change_h24: priceChg24,
+        },
+      });
+    }
+    return signals;
+  } catch {
+    return [];
+  }
 }
 
 async function getPumpFunGraduations() {
@@ -69,8 +108,12 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const minScore = Number(searchParams.get('minScore') || 40);
 
-  const [spikes, graduations] = await Promise.all([getDexScreenerSpikes(), getPumpFunGraduations()]);
-  const allSignals = [...spikes, ...graduations];
+  const [spikes, graduations, scannerFallback] = await Promise.all([
+    getDexScreenerSpikes(),
+    getPumpFunGraduations(),
+    getDexScreenerScannerFallback(),
+  ]);
+  const allSignals = [...spikes, ...graduations, ...scannerFallback];
 
   // Merge by mint
   const merged = new Map<string, any>();

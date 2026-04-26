@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { fetchSolPriceUsd, WSOL } from '../_shared/market';
 
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' };
-const WSOL = 'So11111111111111111111111111111111111111112';
 const JUP  = 'https://lite-api.jup.ag/swap/v1/quote';
 
 const ROUTES = [
@@ -48,12 +48,7 @@ export async function GET(req: NextRequest) {
     })
   );
 
-  let solPrice = 0;
-  try {
-    const pr = await fetch('https://lite-api.jup.ag/price/v2?ids=So11111111111111111111111111111111111111112', { signal: AbortSignal.timeout(4000) });
-    const pd = await pr.json();
-    solPrice = Number(pd?.data?.['So11111111111111111111111111111111111111112']?.price || 0);
-  } catch {}
+  const solPrice = await fetchSolPriceUsd();
 
   const windows = results
     .filter(r => r.status === 'fulfilled' && r.value && r.value.net_bps >= minBps)
