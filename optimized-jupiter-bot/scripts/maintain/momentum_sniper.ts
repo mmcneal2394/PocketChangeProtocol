@@ -6762,16 +6762,24 @@ async function poll() {
 	          const candidate = row.candidate;
 	          const symbol = candidate.symbol || candidate.mint.slice(0, 8);
 	          const ta = loadSignal(candidate.mint);
+            let alphaVolume1h = Number(candidate.volume1h || 0);
+            let alphaPriceChange1h = Number(candidate.priceChange1h || 0);
             let alphaMomentum5m = Number(candidate.priceChange5m || 0);
             let alphaMomentum1m = Number(candidate.priceChange1m || 0);
             let alphaLiquidityUsd = Number(candidate.liquidityUsd || 0);
+            let alphaPairCreatedAt = candidate.pairCreatedAt || candidate.createdAt || undefined;
             if (alphaMomentum5m <= 0 || alphaMomentum1m <= 0 || alphaLiquidityUsd <= 0) {
               try {
                 const liveAlphaPair = await fetchDexScreenerPair(candidate.mint);
                 if (liveAlphaPair) {
+                  alphaVolume1h = Math.max(alphaVolume1h, Number(liveAlphaPair.volume1h || 0));
+                  alphaPriceChange1h = Number.isFinite(Number(liveAlphaPair.priceChange1h))
+                    ? Number(liveAlphaPair.priceChange1h)
+                    : alphaPriceChange1h;
                   alphaMomentum5m = Math.max(alphaMomentum5m, Number(liveAlphaPair.priceChange5m || 0));
                   alphaMomentum1m = Math.max(alphaMomentum1m, Number(liveAlphaPair.priceChange1m || 0));
                   alphaLiquidityUsd = Math.max(alphaLiquidityUsd, Number(liveAlphaPair.liquidity || 0));
+                  alphaPairCreatedAt = alphaPairCreatedAt || liveAlphaPair.pairCreatedAt || undefined;
                 }
               } catch {}
             }
@@ -6814,17 +6822,17 @@ async function poll() {
           await trySnipe(
             candidate.mint,
             symbol,
-            Number(candidate.volume1h || 0),
-            Number(candidate.priceChange1h || 0),
+            alphaVolume1h,
+            alphaPriceChange1h,
             Number(candidate.buys1h || 0),
             Number(candidate.sells1h || 0),
             Number(candidate.buyRatio || 0.9),
             ta?.signal || 'ALPHA_ASSIST',
             Math.min(0.99, Math.max(Number(ta?.confidence || 0), 0.55 + row.alphaBoost)),
             row.tokenAgeSec,
-            Number(candidate.priceChange5m || 0),
-            Number(candidate.priceChange1m || 0),
-            candidate.pairCreatedAt || candidate.createdAt || undefined,
+            alphaMomentum5m,
+            alphaMomentum1m,
+            alphaPairCreatedAt,
             {
               ...buildMicroOnlyProbeEntryOptions({
                 requestedEntryMode: 'normal',
