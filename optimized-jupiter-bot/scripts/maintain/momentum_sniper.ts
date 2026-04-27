@@ -173,6 +173,12 @@ const {
 } = require('./gmgn_pressure_logic.ts');
 const { appendTradeProfileArtifacts } = require('./trade_profile_logic.ts');
 const { loadExpectedValueModel, scoreCandidateExpectedValue } = require('./ev_ranking_logic.ts');
+const {
+  appendTargetQualityLedgerEvent,
+  evaluateTargetQualityGovernor,
+  loadTargetQualitySummary,
+  resolveGovernedRankScore,
+} = require('./target_quality_ledger_logic.ts');
 
 let latestVelocityData: any = {};
 let pollInFlight = false;
@@ -216,6 +222,18 @@ function getExpectedValueModelSnapshot() {
   return loadExpectedValueModel();
 }
 
+function getTargetQualitySummarySnapshot() {
+  return loadTargetQualitySummary();
+}
+
+function buildTargetQualityInput(input: Record<string, any>, expectedValueDecision?: any) {
+  return {
+    ...input,
+    expectedValueSol: expectedValueDecision?.expectedPnlSol,
+    expectedValueDecision,
+  };
+}
+
 function formatExitSummaryLine(config: { holdMinutes: number; stopLossPct: number; maxTPpct: number }) {
   return `Hold: ${config.holdMinutes}min | SL/TP: ${config.stopLossPct}%/${config.maxTPpct}%`;
 }
@@ -223,22 +241,34 @@ function formatExitSummaryLine(config: { holdMinutes: number; stopLossPct: numbe
 function annotateCandidatesWithExpectedValue<T extends Record<string, any>>(
   candidates: T[],
   buildInput: (candidate: T) => Record<string, any>,
-): Array<T & { expectedValueDecision: any }> {
+): Array<T & { expectedValueDecision: any; targetQualityDecision: any }> {
   const model = getExpectedValueModelSnapshot();
-  return (Array.isArray(candidates) ? candidates : []).map((candidate) => ({
-    ...candidate,
-    expectedValueDecision: scoreCandidateExpectedValue(buildExpectedValueInput(buildInput(candidate)), { model }),
-  }));
+  const targetQualitySummary = getTargetQualitySummarySnapshot();
+  return (Array.isArray(candidates) ? candidates : []).map((candidate) => {
+    const expectedValueInput = buildExpectedValueInput(buildInput(candidate));
+    const expectedValueDecision = scoreCandidateExpectedValue(expectedValueInput, { model });
+    const targetQualityDecision = evaluateTargetQualityGovernor(
+      buildTargetQualityInput(expectedValueInput, expectedValueDecision),
+      { summary: targetQualitySummary },
+    );
+    return {
+      ...candidate,
+      expectedValueDecision,
+      targetQualityDecision,
+    };
+  });
 }
 
 function compareExpectedValueRank<T extends Record<string, any>>(
-  left: T & { expectedValueDecision?: any },
-  right: T & { expectedValueDecision?: any },
+  left: T & { expectedValueDecision?: any; targetQualityDecision?: any },
+  right: T & { expectedValueDecision?: any; targetQualityDecision?: any },
   fallbackCompare?: (left: T, right: T) => number,
 ) {
   const leftEv = left?.expectedValueDecision || {};
   const rightEv = right?.expectedValueDecision || {};
-  const rankDelta = Number(rightEv.rankScore || 0) - Number(leftEv.rankScore || 0);
+  const leftRank = resolveGovernedRankScore(Number(leftEv.rankScore || 0), left?.targetQualityDecision);
+  const rightRank = resolveGovernedRankScore(Number(rightEv.rankScore || 0), right?.targetQualityDecision);
+  const rankDelta = rightRank - leftRank;
   if (Math.abs(rankDelta) > 1e-9) return rankDelta > 0 ? 1 : -1;
 
   const pnlDelta = Number(rightEv.expectedPnlSol || 0) - Number(leftEv.expectedPnlSol || 0);
@@ -526,6 +556,14 @@ interface EntryOptions {
   expectedValueConfidence?: number;
   expectedValueRankScore?: number;
   expectedValueTradeCount?: number;
+  targetQualityLane?: string;
+  targetQualityConfidence?: number;
+  targetQualityRejectRate?: number;
+  targetQualityClosedTrades?: number;
+  targetQualityAvgPnlSol?: number;
+  targetQualityTotalPnlSol?: number;
+  targetQualityMultiplier?: number;
+  targetQualityRankMultiplier?: number;
   replayRecoveryProbe?: boolean;
   replayRecoveryReason?: string;
   replayRecoveryWindowMs?: number;
@@ -2073,6 +2111,14 @@ export function appendTrade(record: {
   alphaBoost?: number;
   alphaKolCount?: number;
   preferredHoldMs?: number;
+  targetQualityLane?: string;
+  targetQualityConfidence?: number;
+  targetQualityRejectRate?: number;
+  targetQualityClosedTrades?: number;
+  targetQualityAvgPnlSol?: number;
+  targetQualityTotalPnlSol?: number;
+  targetQualityMultiplier?: number;
+  targetQualityRankMultiplier?: number;
 }) {
   try {
     const normalizedRecord = normalizeTradeRecord(record);
@@ -2111,6 +2157,7 @@ export function appendTrade(record: {
       recordFamilyTrade(familyPerformanceMemory, normalizedRecord, FAMILY_PERFORMANCE_GATE_CONFIG);
     }
     appendTradeProfileArtifacts(normalizedRecord);
+    appendTargetQualityLedgerEvent(normalizedRecord);
   } catch { /* never crash on journal write */ }
 }
 
@@ -2294,6 +2341,7 @@ export function logMissedTarget(record: any) {
       entryMode: record?.entryMode || 'normal',
     };
     fs.appendFileSync(MISSED_TARGETS_FILE, JSON.stringify(payload) + '\n', 'utf-8');
+    appendTargetQualityLedgerEvent(payload);
 
     const stats = loadMissedTargetStats();
     stats.generatedAt = ts;
@@ -2357,6 +2405,14 @@ interface Position {
   alphaBoost?: number;
   alphaKolCount?: number;
   preferredHoldMs?: number;
+  targetQualityLane?: string;
+  targetQualityConfidence?: number;
+  targetQualityRejectRate?: number;
+  targetQualityClosedTrades?: number;
+  targetQualityAvgPnlSol?: number;
+  targetQualityTotalPnlSol?: number;
+  targetQualityMultiplier?: number;
+  targetQualityRankMultiplier?: number;
   tokenAgeSec?: number;
   momentum1m?: number;
   marketCapUsd?: number;
@@ -6005,7 +6061,7 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
     );
   }
 
-  const expectedValueDecision = scoreCandidateExpectedValue({
+  const expectedValueInput = buildExpectedValueInput({
     mint,
     symbol,
     entryMode,
@@ -6037,7 +6093,8 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
     velocityBuyRatio60s: vel?.buyRatio60s,
     velocityTxPerMin: vel?.velocity,
     velocitySolVolume60s: vel?.solVolume60s,
-  }, {
+  });
+  const expectedValueDecision = scoreCandidateExpectedValue(expectedValueInput, {
     model: getExpectedValueModelSnapshot(),
   });
   const allowQuotaEvBypass = false;
@@ -6077,11 +6134,65 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
     await setMintCooldownExact(pub, mint, 45, 'NEG_EV');
     return;
   }
+  const targetQualityDecision = evaluateTargetQualityGovernor(
+    buildTargetQualityInput(expectedValueInput, expectedValueDecision),
+    { summary: getTargetQualitySummarySnapshot() },
+  );
+  if (targetQualityDecision.shouldSkip) {
+    console.log(
+      `[SNIPER]  TARGET QUALITY GOVERNOR: ${symbol} blocked because ${targetQualityDecision.skipReason} ` +
+      `| lane=${targetQualityDecision.lane} | reject=${(targetQualityDecision.rejectRate * 100).toFixed(1)}% ` +
+      `| closes=${targetQualityDecision.closedTrades} | avg=${targetQualityDecision.avgPnlSol.toFixed(6)} SOL`
+    );
+    logMissedTarget({
+      mint,
+      symbol,
+      stage: `${entryMode}-entry`,
+      reason: 'target_quality_governor_block',
+      entryMode,
+      sourceLane: entryOptions?.sourceLane,
+      entryFamily,
+      amountSol: buySol,
+      expectedValueSol: expectedValueDecision.expectedPnlSol,
+      evConfidence: expectedValueDecision.confidence,
+      evRankScore: expectedValueDecision.rankScore,
+      targetQualityLane: targetQualityDecision.lane,
+      targetQualityConfidence: targetQualityDecision.confidence,
+      targetQualityRejectRate: targetQualityDecision.rejectRate,
+      targetQualityClosedTrades: targetQualityDecision.closedTrades,
+      targetQualityAvgPnlSol: targetQualityDecision.avgPnlSol,
+      targetQualityTotalPnlSol: targetQualityDecision.totalPnlSol,
+      marketCapUsd: liveMarketCapUsd,
+      liquidityUsd: Math.max(liveLiquidityUsd, Number(momData?.liquidityUsd || 0)),
+      volume1hUsd: Math.max(volume1h, Number(liveMcap?.volume1h || 0)),
+      tokenAgeSec,
+      momentum5m,
+      momentum1m,
+      buyRatio,
+      buys1h,
+      sells1h,
+      buys60s: vel?.buys60s,
+      sells60s: vel?.sells60s,
+      buyRatio60s: vel?.buyRatio60s,
+      velocity: vel?.velocity,
+      solVolume60s: vel?.solVolume60s,
+    });
+    await setMintCooldownExact(pub, mint, targetQualityDecision.cooldownSeconds, 'TQ_GOVERNOR');
+    return;
+  }
   if (entryOptions) {
     entryOptions.expectedValueSol = expectedValueDecision.expectedPnlSol;
     entryOptions.expectedValueConfidence = expectedValueDecision.confidence;
     entryOptions.expectedValueRankScore = expectedValueDecision.rankScore;
     entryOptions.expectedValueTradeCount = expectedValueDecision.posteriorTradeCount;
+    entryOptions.targetQualityLane = targetQualityDecision.lane;
+    entryOptions.targetQualityConfidence = targetQualityDecision.confidence;
+    entryOptions.targetQualityRejectRate = targetQualityDecision.rejectRate;
+    entryOptions.targetQualityClosedTrades = targetQualityDecision.closedTrades;
+    entryOptions.targetQualityAvgPnlSol = targetQualityDecision.avgPnlSol;
+    entryOptions.targetQualityTotalPnlSol = targetQualityDecision.totalPnlSol;
+    entryOptions.targetQualityMultiplier = targetQualityDecision.positionMultiplier;
+    entryOptions.targetQualityRankMultiplier = targetQualityDecision.rankMultiplier;
   }
 
   const combinedPositionMultiplier = Math.max(
@@ -6091,7 +6202,8 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
         (entryOptions?.sizeMultiplier ?? 1) *
         familyDecision.sizeMultiplier *
         entryRiskDecision.positionMultiplier *
-        expectedValueDecision.positionMultiplier
+        expectedValueDecision.positionMultiplier *
+        targetQualityDecision.positionMultiplier
       ).toFixed(4),
     ),
   );
@@ -6105,7 +6217,7 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
     console.log(
       `[SNIPER]  POSITION SCALE: ${symbol} ${buySol.toFixed(4)} SOL  ${scaledBuySol.toFixed(4)} SOL ` +
       `(family ${(familyDecision.sizeMultiplier * 100).toFixed(0)}% | risk ${(entryRiskDecision.positionMultiplier * 100).toFixed(0)}% | ` +
-      `ev ${(expectedValueDecision.positionMultiplier * 100).toFixed(0)}%).`
+      `ev ${(expectedValueDecision.positionMultiplier * 100).toFixed(0)}% | tq ${(targetQualityDecision.positionMultiplier * 100).toFixed(0)}%).`
     );
     buySol = scaledBuySol;
   }
@@ -6238,6 +6350,7 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
     `| size=${buySol.toFixed(4)} SOL | familyWin=${(familyDecision.recentWinRate * 100).toFixed(1)}%/${familyDecision.sampleCount} ` +
     `| familyNet=${familyDecision.recentNetSol.toFixed(6)} SOL | risk=${entryRiskDecision.riskScore}(${entryRiskDecision.riskBand}) ` +
     `| EV=${expectedValueDecision.expectedPnlSol.toFixed(6)} SOL @ ${(expectedValueDecision.confidence * 100).toFixed(0)}% ` +
+    `| TQ=${targetQualityDecision.lane}:${(targetQualityDecision.positionMultiplier * 100).toFixed(0)}%/${(targetQualityDecision.confidence * 100).toFixed(0)}% ` +
     `| mult=${combinedPositionMultiplier.toFixed(2)} | routeLive=${liveRouteProbe?.routable ? 'yes' : 'no'} ` +
     `| terrainSamples=${Number(terrainState?.summary?.sampleCount || 0)} | strongFlow=${Number(terrainState?.summary?.strongFlowSamples || 0)} ` +
     `| reqRatio=${reqRatio.toFixed(2)}x | reqBuys=${reqBuys}`
@@ -6349,6 +6462,14 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
 	    evConfidence: entryOptions?.expectedValueConfidence,
 	    evRankScore: entryOptions?.expectedValueRankScore,
 	    evTradeCount: entryOptions?.expectedValueTradeCount,
+	    targetQualityLane: entryOptions?.targetQualityLane,
+	    targetQualityConfidence: entryOptions?.targetQualityConfidence,
+	    targetQualityRejectRate: entryOptions?.targetQualityRejectRate,
+	    targetQualityClosedTrades: entryOptions?.targetQualityClosedTrades,
+	    targetQualityAvgPnlSol: entryOptions?.targetQualityAvgPnlSol,
+	    targetQualityTotalPnlSol: entryOptions?.targetQualityTotalPnlSol,
+	    targetQualityMultiplier: entryOptions?.targetQualityMultiplier,
+	    targetQualityRankMultiplier: entryOptions?.targetQualityRankMultiplier,
 	    buyRatio,
 	    positionMultiplier: combinedPositionMultiplier, riskScore: entryRiskDecision.riskScore, riskBand: entryRiskDecision.riskBand,
     timestamp: openedAt, openedAt, entryPriceSol, entryCostSol: buySol,
@@ -6437,6 +6558,14 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
 	    evConfidence: entryOptions?.expectedValueConfidence,
 	    evRankScore: entryOptions?.expectedValueRankScore,
 	    evTradeCount: entryOptions?.expectedValueTradeCount,
+	    targetQualityLane: entryOptions?.targetQualityLane,
+	    targetQualityConfidence: entryOptions?.targetQualityConfidence,
+	    targetQualityRejectRate: entryOptions?.targetQualityRejectRate,
+	    targetQualityClosedTrades: entryOptions?.targetQualityClosedTrades,
+	    targetQualityAvgPnlSol: entryOptions?.targetQualityAvgPnlSol,
+	    targetQualityTotalPnlSol: entryOptions?.targetQualityTotalPnlSol,
+	    targetQualityMultiplier: entryOptions?.targetQualityMultiplier,
+	    targetQualityRankMultiplier: entryOptions?.targetQualityRankMultiplier,
 	    tokenAgeSec,
     momentum1m,
     marketCapUsd: liveMarketCapUsd,
@@ -6755,6 +6884,14 @@ async function checkExits() {
             alphaBoost: pos.alphaBoost,
             alphaKolCount: pos.alphaKolCount,
             preferredHoldMs: pos.preferredHoldMs,
+            targetQualityLane: pos.targetQualityLane,
+            targetQualityConfidence: pos.targetQualityConfidence,
+            targetQualityRejectRate: pos.targetQualityRejectRate,
+            targetQualityClosedTrades: pos.targetQualityClosedTrades,
+            targetQualityAvgPnlSol: pos.targetQualityAvgPnlSol,
+            targetQualityTotalPnlSol: pos.targetQualityTotalPnlSol,
+            targetQualityMultiplier: pos.targetQualityMultiplier,
+            targetQualityRankMultiplier: pos.targetQualityRankMultiplier,
             tokenAgeSec: pos.tokenAgeSec,
             momentum1m: pos.momentum1m,
             marketCapUsd: pos.marketCapUsd,
