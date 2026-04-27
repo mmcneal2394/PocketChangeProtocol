@@ -4,6 +4,7 @@ function toFiniteNumber(value: any, fallback = 0): number {
 }
 
 export type NormalizedDexScreenerPair = {
+  priceUsd: number;
   liquidity: number;
   marketCap: number;
   fdv: number;
@@ -19,6 +20,7 @@ export type NormalizedDexScreenerPair = {
 
 export function normalizeDexScreenerPair(pair: any): NormalizedDexScreenerPair {
   return {
+    priceUsd: toFiniteNumber(pair?.priceUsd, 0),
     liquidity: toFiniteNumber(pair?.liquidity?.usd, 0),
     marketCap: toFiniteNumber(pair?.marketCap, 0),
     fdv: toFiniteNumber(pair?.fdv ?? pair?.marketCap, 0),

@@ -179,6 +179,14 @@ const {
   loadTargetQualitySummary,
   resolveGovernedRankScore,
 } = require('./target_quality_ledger_logic.ts');
+const {
+  scheduleMarkout,
+  processDueMarkouts,
+} = require('./markout_tracker_logic.ts');
+const {
+  scoreLiquidityQuality,
+  resolveLiquidityGovernedRankScore,
+} = require('./liquidity_quality_logic.ts');
 
 let latestVelocityData: any = {};
 let pollInFlight = false;
@@ -234,6 +242,20 @@ function buildTargetQualityInput(input: Record<string, any>, expectedValueDecisi
   };
 }
 
+function buildLiquidityQualityInput(input: Record<string, any>) {
+  let fallbackMinLiquidityUsd = 25_000;
+  try {
+    fallbackMinLiquidityUsd = Number(loadNormalLaneConfig().minLiquidityUsd || fallbackMinLiquidityUsd);
+  } catch { }
+  return {
+    ...input,
+    minLiquidityUsd: Math.max(
+      1_000,
+      Number(input?.minLiquidityUsd || 0) || fallbackMinLiquidityUsd,
+    ),
+  };
+}
+
 function formatExitSummaryLine(config: { holdMinutes: number; stopLossPct: number; maxTPpct: number }) {
   return `Hold: ${config.holdMinutes}min | SL/TP: ${config.stopLossPct}%/${config.maxTPpct}%`;
 }
@@ -241,7 +263,7 @@ function formatExitSummaryLine(config: { holdMinutes: number; stopLossPct: numbe
 function annotateCandidatesWithExpectedValue<T extends Record<string, any>>(
   candidates: T[],
   buildInput: (candidate: T) => Record<string, any>,
-): Array<T & { expectedValueDecision: any; targetQualityDecision: any }> {
+): Array<T & { expectedValueDecision: any; targetQualityDecision: any; liquidityQualityDecision: any }> {
   const model = getExpectedValueModelSnapshot();
   const targetQualitySummary = getTargetQualitySummarySnapshot();
   return (Array.isArray(candidates) ? candidates : []).map((candidate) => {
@@ -251,23 +273,27 @@ function annotateCandidatesWithExpectedValue<T extends Record<string, any>>(
       buildTargetQualityInput(expectedValueInput, expectedValueDecision),
       { summary: targetQualitySummary },
     );
+    const liquidityQualityDecision = scoreLiquidityQuality(buildLiquidityQualityInput(expectedValueInput));
     return {
       ...candidate,
       expectedValueDecision,
       targetQualityDecision,
+      liquidityQualityDecision,
     };
   });
 }
 
 function compareExpectedValueRank<T extends Record<string, any>>(
-  left: T & { expectedValueDecision?: any; targetQualityDecision?: any },
-  right: T & { expectedValueDecision?: any; targetQualityDecision?: any },
+  left: T & { expectedValueDecision?: any; targetQualityDecision?: any; liquidityQualityDecision?: any },
+  right: T & { expectedValueDecision?: any; targetQualityDecision?: any; liquidityQualityDecision?: any },
   fallbackCompare?: (left: T, right: T) => number,
 ) {
   const leftEv = left?.expectedValueDecision || {};
   const rightEv = right?.expectedValueDecision || {};
-  const leftRank = resolveGovernedRankScore(Number(leftEv.rankScore || 0), left?.targetQualityDecision);
-  const rightRank = resolveGovernedRankScore(Number(rightEv.rankScore || 0), right?.targetQualityDecision);
+  const leftTargetRank = resolveGovernedRankScore(Number(leftEv.rankScore || 0), left?.targetQualityDecision);
+  const rightTargetRank = resolveGovernedRankScore(Number(rightEv.rankScore || 0), right?.targetQualityDecision);
+  const leftRank = resolveLiquidityGovernedRankScore(leftTargetRank, left?.liquidityQualityDecision);
+  const rightRank = resolveLiquidityGovernedRankScore(rightTargetRank, right?.liquidityQualityDecision);
   const rankDelta = rightRank - leftRank;
   if (Math.abs(rankDelta) > 1e-9) return rankDelta > 0 ? 1 : -1;
 
@@ -564,6 +590,11 @@ interface EntryOptions {
   targetQualityTotalPnlSol?: number;
   targetQualityMultiplier?: number;
   targetQualityRankMultiplier?: number;
+  liquidityQualityScore?: number;
+  liquidityQualityGrade?: string;
+  liquidityQualityCode?: string;
+  liquidityQualityMultiplier?: number;
+  liquidityQualityRankMultiplier?: number;
   replayRecoveryProbe?: boolean;
   replayRecoveryReason?: string;
   replayRecoveryWindowMs?: number;
@@ -1545,6 +1576,7 @@ async function checkHolderConcentration(mint: string): Promise<{safe: boolean, t
 }
 
 type DexScreenerPairSnapshot = {
+  priceUsd: number,
   liquidity: number,
   marketCap: number,
   fdv: number,
@@ -1612,6 +1644,7 @@ function mergeQuotaCandidateWithDexPair(candidate: Record<string, any> | null | 
   if (!candidate || !livePair) return candidate || null;
   return {
     ...candidate,
+    priceUsd: Math.max(Number(candidate?.priceUsd || candidate?.price || 0), Number(livePair.priceUsd || 0)),
     liquidityUsd: Math.max(Number(candidate?.liquidityUsd || 0), Number(livePair.liquidity || 0)),
     marketCapUsd: Math.max(
       Number(candidate?.marketCapUsd || 0),
@@ -2119,6 +2152,11 @@ export function appendTrade(record: {
   targetQualityTotalPnlSol?: number;
   targetQualityMultiplier?: number;
   targetQualityRankMultiplier?: number;
+  liquidityQualityScore?: number;
+  liquidityQualityGrade?: string;
+  liquidityQualityCode?: string;
+  liquidityQualityMultiplier?: number;
+  liquidityQualityRankMultiplier?: number;
 }) {
   try {
     const normalizedRecord = normalizeTradeRecord(record);
@@ -2342,6 +2380,7 @@ export function logMissedTarget(record: any) {
     };
     fs.appendFileSync(MISSED_TARGETS_FILE, JSON.stringify(payload) + '\n', 'utf-8');
     appendTargetQualityLedgerEvent(payload);
+    scheduleMarkout(payload);
 
     const stats = loadMissedTargetStats();
     stats.generatedAt = ts;
@@ -2413,6 +2452,11 @@ interface Position {
   targetQualityTotalPnlSol?: number;
   targetQualityMultiplier?: number;
   targetQualityRankMultiplier?: number;
+  liquidityQualityScore?: number;
+  liquidityQualityGrade?: string;
+  liquidityQualityCode?: string;
+  liquidityQualityMultiplier?: number;
+  liquidityQualityRankMultiplier?: number;
   tokenAgeSec?: number;
   momentum1m?: number;
   marketCapUsd?: number;
@@ -5064,6 +5108,25 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
   });
   if (lowLiquidityMicroRejectReason) {
     console.log(`[SNIPER]  LOW LIQ MICRO REJECT: ${symbol} ${lowLiquidityMicroRejectReason}`);
+    logMissedTarget({
+      mint,
+      symbol,
+      stage: `${entryMode}-entry`,
+      reason: 'low_liq_micro_reject',
+      entryMode,
+      sourceLane: entryOptions?.sourceLane,
+      liquidityUsd: earlyGateLiquidityUsd,
+      marketCapUsd: Number(entryOptions?.cachedMarketCapUsd || 0) || undefined,
+      volume1hUsd: volume1h,
+      momentum5m,
+      momentum1m,
+      buys1h,
+      sells1h,
+      buyRatio,
+      tokenAgeSec,
+      lowLiquidityMicroRejectReason,
+      redisCooldownSec: LOW_LIQ_MICRO_REJECT_COOLDOWN_SEC,
+    });
     await setMintCooldownExact(pub, mint, LOW_LIQ_MICRO_REJECT_COOLDOWN_SEC, 'LOW_LIQ_MICRO_REJECT');
     return;
   }
@@ -5761,7 +5824,113 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
     : strongFlowLiquidityOverride
       ? Math.max(5000, applyNormalLaneFilters && normalLaneConfig.enabled ? normalLaneConfig.minLiquidityUsd : 0, entryOptions?.minLiquidityUsd || 0)
       : Math.max(7500, applyNormalLaneFilters && normalLaneConfig.enabled ? normalLaneConfig.minLiquidityUsd : 0, entryOptions?.minLiquidityUsd || 0);
-  if (liveMcap && liveMcap.liquidity < minLiveLiquidityUsd) {
+  const liquidityQualityObservedUsd = Math.max(liveLiquidityUsd, Number(momData?.liquidityUsd || 0), poolLiq);
+  const liquidityQualityHasMarketContext =
+    Boolean(liveMcap) ||
+    liveRouteProbe !== null ||
+    liquidityQualityObservedUsd > 0;
+  const liquidityQualityInput = buildLiquidityQualityInput({
+    mint,
+    symbol,
+    entryMode,
+    entryFamily,
+    sourceLane: entryOptions?.sourceLane,
+    liquidityUsd: liquidityQualityObservedUsd,
+    marketCapUsd: liveMarketCapUsd,
+    fdvUsd: liveFdvUsd,
+    volume1hUsd: Math.max(volume1h, Number(liveMcap?.volume1h || 0)),
+    momentum5m: Number(liveMcap?.priceChange5m ?? momentum5m ?? 0),
+    minLiquidityUsd: minLiveLiquidityUsd || normalLaneConfig.minLiquidityUsd,
+    routeLive: liveRouteProbe?.routable ?? null,
+    routeOutAmount: liveRouteProbe?.outAmount,
+    walletConfirmed: entryOptions?.walletConfirmed,
+    strongRecentFlowConfirmed: entryOptions?.strongRecentFlowConfirmed,
+    allowUnconfirmedMicroProbe: entryOptions?.allowUnconfirmedRouteLiveProbe,
+    routeLiveFastTrack,
+    probeLikeEntry,
+  });
+  const liquidityQualityDecision = liquidityQualityHasMarketContext
+    ? scoreLiquidityQuality(liquidityQualityInput)
+    : {
+        enabled: false,
+        score: 1,
+        grade: 'healthy',
+        shouldHold: false,
+        shouldBlock: false,
+        code: 'liquidity_quality_unobserved',
+        reason: 'liquidity context unavailable; defer to quote execution',
+        cooldownSeconds: 0,
+        positionMultiplier: 1,
+        rankMultiplier: 1,
+        rankPenalty: 0,
+        metrics: {
+          liquidityUsd: 0,
+          marketCapUsd: liveMarketCapUsd,
+          fdvUsd: liveFdvUsd,
+          volume1hUsd: Math.max(volume1h, Number(liveMcap?.volume1h || 0)),
+          minLiquidityUsd: minLiveLiquidityUsd || normalLaneConfig.minLiquidityUsd,
+          routeLive: false,
+        },
+      };
+  const liquidityQualityBypassesThinPool =
+    liveRouteProbe?.routable === true &&
+    !liquidityQualityDecision.shouldHold &&
+    !liquidityQualityDecision.shouldBlock &&
+    (
+      routeLiveFastTrack ||
+      entryOptions?.walletConfirmed === true ||
+      entryOptions?.strongRecentFlowConfirmed === true ||
+      entryOptions?.allowUnconfirmedRouteLiveProbe === true
+    );
+  if (liquidityQualityDecision.shouldHold || liquidityQualityDecision.shouldBlock) {
+    console.log(
+      `[SNIPER]  LIQUIDITY QUALITY ${liquidityQualityDecision.shouldBlock ? 'BLOCK' : 'HOLD'}: ${symbol} ` +
+      `${liquidityQualityDecision.reason} | score=${liquidityQualityDecision.score.toFixed(2)} ` +
+      `| liq=$${Number(liquidityQualityDecision.metrics.liquidityUsd || 0).toFixed(0)} ` +
+      `| min=$${Number(liquidityQualityDecision.metrics.minLiquidityUsd || 0).toFixed(0)} ` +
+      `| route=${liquidityQualityDecision.metrics.routeLive ? 'yes' : 'no'}`
+    );
+    logMissedTarget({
+      mint,
+      symbol,
+      stage: `${entryMode}-entry`,
+      reason: liquidityQualityDecision.code,
+      entryMode,
+      sourceLane: entryOptions?.sourceLane,
+      entryFamily,
+      marketCapUsd: liveMarketCapUsd,
+      fdvUsd: liveFdvUsd,
+      priceUsd: liveMcap?.priceUsd,
+      liquidityUsd: liquidityQualityDecision.metrics.liquidityUsd,
+      volume1hUsd: Math.max(volume1h, Number(liveMcap?.volume1h || 0)),
+      tokenAgeSec,
+      momentum5m: Number(liveMcap?.priceChange5m ?? momentum5m ?? 0),
+      momentum1m,
+      buys1h,
+      sells1h,
+      buyRatio,
+      buys60s: vel?.buys60s,
+      sells60s: vel?.sells60s,
+      buyRatio60s: vel?.buyRatio60s,
+      velocity: vel?.velocity,
+      solVolume60s: vel?.solVolume60s,
+      liquidityQualityScore: liquidityQualityDecision.score,
+      liquidityQualityGrade: liquidityQualityDecision.grade,
+      liquidityQualityRankMultiplier: liquidityQualityDecision.rankMultiplier,
+      liquidityQualityMultiplier: liquidityQualityDecision.positionMultiplier,
+      routeLive: liveRouteProbe?.routable === true,
+      routeOutAmount: liveRouteProbe?.outAmount ? Number(liveRouteProbe.outAmount) : null,
+      redisCooldownSec: liquidityQualityDecision.cooldownSeconds || LOW_LIQ_MICRO_REJECT_COOLDOWN_SEC,
+    });
+    await setMintCooldownExact(
+      pub,
+      mint,
+      liquidityQualityDecision.cooldownSeconds || LOW_LIQ_MICRO_REJECT_COOLDOWN_SEC,
+      liquidityQualityDecision.shouldBlock ? 'LIQ_QUALITY_BLOCK' : 'LIQ_QUALITY_WAIT',
+    );
+    return;
+  }
+  if (liveMcap && liveMcap.liquidity < minLiveLiquidityUsd && !liquidityQualityBypassesThinPool) {
     console.log('[SNIPER] \u{1f6ab} MCAP REJECT: ' + symbol + '  liq $' + liveMcap.liquidity.toFixed(0) + ' < $' + minLiveLiquidityUsd.toFixed(0));
     logMissedTarget({
       mint,
@@ -5769,6 +5938,7 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
       stage: 'normal-entry',
       reason: 'live_liquidity_below_threshold',
       entryMode: entryOptions?.entryMode || 'normal',
+      priceUsd: liveMcap.priceUsd,
       liquidityUsd: liveMcap.liquidity,
       volume1hUsd: volume1h,
       buys1h,
@@ -5780,6 +5950,13 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
     });
     await setMintCooldown(pub, mint, 600, '1');
     return;
+  }
+  if (liquidityQualityBypassesThinPool && liveMcap && liveMcap.liquidity < minLiveLiquidityUsd) {
+    console.log(
+      `[SNIPER]  LIQUIDITY QUALITY PASS: ${symbol} thin pool $${liveMcap.liquidity.toFixed(0)} ` +
+      `< $${minLiveLiquidityUsd.toFixed(0)} accepted by route/flow confirmation ` +
+      `(score=${liquidityQualityDecision.score.toFixed(2)}).`
+    );
   }
 
   const fdvLiquidityGuard = evaluateFdvLiquidityGuard({
@@ -6193,6 +6370,11 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
     entryOptions.targetQualityTotalPnlSol = targetQualityDecision.totalPnlSol;
     entryOptions.targetQualityMultiplier = targetQualityDecision.positionMultiplier;
     entryOptions.targetQualityRankMultiplier = targetQualityDecision.rankMultiplier;
+    entryOptions.liquidityQualityScore = liquidityQualityDecision.score;
+    entryOptions.liquidityQualityGrade = liquidityQualityDecision.grade;
+    entryOptions.liquidityQualityCode = liquidityQualityDecision.code;
+    entryOptions.liquidityQualityMultiplier = liquidityQualityDecision.positionMultiplier;
+    entryOptions.liquidityQualityRankMultiplier = liquidityQualityDecision.rankMultiplier;
   }
 
   const combinedPositionMultiplier = Math.max(
@@ -6203,7 +6385,8 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
         familyDecision.sizeMultiplier *
         entryRiskDecision.positionMultiplier *
         expectedValueDecision.positionMultiplier *
-        targetQualityDecision.positionMultiplier
+        targetQualityDecision.positionMultiplier *
+        liquidityQualityDecision.positionMultiplier
       ).toFixed(4),
     ),
   );
@@ -6217,7 +6400,8 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
     console.log(
       `[SNIPER]  POSITION SCALE: ${symbol} ${buySol.toFixed(4)} SOL  ${scaledBuySol.toFixed(4)} SOL ` +
       `(family ${(familyDecision.sizeMultiplier * 100).toFixed(0)}% | risk ${(entryRiskDecision.positionMultiplier * 100).toFixed(0)}% | ` +
-      `ev ${(expectedValueDecision.positionMultiplier * 100).toFixed(0)}% | tq ${(targetQualityDecision.positionMultiplier * 100).toFixed(0)}%).`
+      `ev ${(expectedValueDecision.positionMultiplier * 100).toFixed(0)}% | tq ${(targetQualityDecision.positionMultiplier * 100).toFixed(0)}% | ` +
+      `liq ${(liquidityQualityDecision.positionMultiplier * 100).toFixed(0)}%).`
     );
     buySol = scaledBuySol;
   }
@@ -6470,6 +6654,11 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
 	    targetQualityTotalPnlSol: entryOptions?.targetQualityTotalPnlSol,
 	    targetQualityMultiplier: entryOptions?.targetQualityMultiplier,
 	    targetQualityRankMultiplier: entryOptions?.targetQualityRankMultiplier,
+	    liquidityQualityScore: entryOptions?.liquidityQualityScore,
+	    liquidityQualityGrade: entryOptions?.liquidityQualityGrade,
+	    liquidityQualityCode: entryOptions?.liquidityQualityCode,
+	    liquidityQualityMultiplier: entryOptions?.liquidityQualityMultiplier,
+	    liquidityQualityRankMultiplier: entryOptions?.liquidityQualityRankMultiplier,
 	    buyRatio,
 	    positionMultiplier: combinedPositionMultiplier, riskScore: entryRiskDecision.riskScore, riskBand: entryRiskDecision.riskBand,
     timestamp: openedAt, openedAt, entryPriceSol, entryCostSol: buySol,
@@ -6566,6 +6755,11 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
 	    targetQualityTotalPnlSol: entryOptions?.targetQualityTotalPnlSol,
 	    targetQualityMultiplier: entryOptions?.targetQualityMultiplier,
 	    targetQualityRankMultiplier: entryOptions?.targetQualityRankMultiplier,
+	    liquidityQualityScore: entryOptions?.liquidityQualityScore,
+	    liquidityQualityGrade: entryOptions?.liquidityQualityGrade,
+	    liquidityQualityCode: entryOptions?.liquidityQualityCode,
+	    liquidityQualityMultiplier: entryOptions?.liquidityQualityMultiplier,
+	    liquidityQualityRankMultiplier: entryOptions?.liquidityQualityRankMultiplier,
 	    tokenAgeSec,
     momentum1m,
     marketCapUsd: liveMarketCapUsd,
@@ -7297,12 +7491,39 @@ async function recoverOrphans() {
   } catch (e: any) { console.error('[SNIPER] Orphan recovery error:', e.message); }
 }
 
+let markoutProcessing = false;
+let lastMarkoutProcessAt = 0;
+
+async function maybeProcessDueMarkouts(now = Date.now()) {
+  if (markoutProcessing || now - lastMarkoutProcessAt < 15_000) return;
+  markoutProcessing = true;
+  lastMarkoutProcessAt = now;
+  try {
+    const result = await processDueMarkouts({
+      now,
+      maxPerRun: 8,
+      fetchPair: fetchDexScreenerPair,
+    });
+    if (result.processed > 0) {
+      console.log(
+        `[SNIPER] MARKOUT UPDATE: processed=${result.processed} ` +
+        `missed=${result.missedWinners} correct=${result.correctRejects} pending=${result.remaining}`
+      );
+    }
+  } catch (e: any) {
+    console.warn(`[SNIPER] MARKOUT UPDATE WARN: ${e?.message || e}`);
+  } finally {
+    markoutProcessing = false;
+  }
+}
+
 async function poll() {
   if (pollInFlight) {
     pollQueued = true;
     return;
   }
   pollInFlight = true;
+  void maybeProcessDueMarkouts();
   const MIN_POSITIONS = 10;
   const TARGET_POSITIONS = 15;
   const openPositions = store.positions.length;
@@ -8829,6 +9050,31 @@ async function poll() {
                   `[SNIPER]  LOW LIQ ROUTE PREFLIGHT HOLD: ${symbol} liq $${livePair.liquidity.toFixed(0)} ` +
                   `< $${loadNormalLaneConfig().minLiquidityUsd.toFixed(0)} without wallet confirmation - recheck in ${cooldownSec}s.`
                 );
+                logMissedTarget({
+                  mint: v.mint,
+                  symbol,
+                  stage: 'velocity_first',
+                  reason: 'low_liq_route_preflight',
+                  entryMode: canUseMicroScout || microOnlyMode ? 'micro-scout' : 'normal',
+                  sourceLane: 'velocity-first-preflight',
+                  priceUsd: livePair.priceUsd,
+                  liquidityUsd: livePair.liquidity,
+                  marketCapUsd: livePair.marketCap || livePair.fdv,
+                  fdvUsd: livePair.fdv,
+                  volume1hUsd: Math.max(vol1h, Number(livePair.volume1h || 0)),
+                  momentum5m: livePair.priceChange5m,
+                  momentum1m: livePair.priceChange1m,
+                  priceChange1h: livePair.priceChange1h ?? pc1h,
+                  buys1h,
+                  sells1h,
+                  buyRatio,
+                  buys60s: v.buys60s,
+                  sells60s: v.sells60s,
+                  buyRatio60s: v.buyRatio60s,
+                  velocity: v.velocity,
+                  solVolume60s: v.solVolume60s,
+                  redisCooldownSec: cooldownSec,
+                });
                 await setMintCooldownExact(RedisBus.getPublisher(), v.mint, cooldownSec, 'LOW_LIQ_ROUTE_PREFLIGHT');
                 continue;
               }
@@ -9065,6 +9311,36 @@ async function poll() {
                 });
                 if (earlyLowLiquidityMicroRejectReason) {
                   console.log(`[SNIPER]  LOW LIQ MICRO REJECT: ${symbol} ${earlyLowLiquidityMicroRejectReason}`);
+                  logMissedTarget({
+                    mint: v.mint,
+                    symbol,
+                    stage: 'velocity_first',
+                    reason: 'low_liq_micro_reject',
+                    entryMode: 'micro-scout',
+                    sourceLane: 'velocity-first',
+                    priceUsd: livePair.priceUsd,
+                    liquidityUsd: Number(livePair.liquidity || 0),
+                    marketCapUsd: livePair.marketCap || livePair.fdv,
+                    fdvUsd: livePair.fdv,
+                    volume1hUsd: Math.max(vol1h, Number(livePair.volume1h || 0)),
+                    momentum5m: livePair.priceChange5m,
+                    momentum1m: livePair.priceChange1m,
+                    priceChange1h: livePair.priceChange1h ?? pc1h,
+                    buys1h,
+                    sells1h,
+                    buyRatio,
+                    buys60s: v.buys60s,
+                    sells60s: v.sells60s,
+                    buyRatio60s: v.buyRatio60s,
+                    velocity: v.velocity,
+                    solVolume60s: v.solVolume60s,
+                    routeLive: true,
+                    routeOutAmount: tradabilityProbe.outAmount ? Number(tradabilityProbe.outAmount) : null,
+                    terrainSampleCount: preflightTerrainState?.summary?.sampleCount,
+                    terrainRouteStrengthPct: preflightTerrainState?.summary?.routeStrengthPct,
+                    lowLiquidityMicroRejectReason: earlyLowLiquidityMicroRejectReason,
+                    redisCooldownSec: LOW_LIQ_MICRO_REJECT_COOLDOWN_SEC,
+                  });
                   const pub = RedisBus.getPublisher();
                   await setMintCooldownExact(pub, v.mint, LOW_LIQ_MICRO_REJECT_COOLDOWN_SEC, 'LOW_LIQ_MICRO_REJECT');
                   continue;
@@ -9266,6 +9542,35 @@ async function poll() {
               });
               if (earlyLowLiquidityMicroRejectReason) {
                 console.log(`[SNIPER]  LOW LIQ MICRO REJECT: ${symbol} ${earlyLowLiquidityMicroRejectReason}`);
+                logMissedTarget({
+                  mint: v.mint,
+                  symbol,
+                  stage: 'velocity_first',
+                  reason: 'low_liq_micro_reject',
+                  entryMode: 'micro-scout',
+                  sourceLane: 'velocity-first',
+                  priceUsd: livePair.priceUsd,
+                  liquidityUsd: Number(livePair.liquidity || 0),
+                  marketCapUsd: livePair.marketCap || livePair.fdv,
+                  fdvUsd: livePair.fdv,
+                  volume1hUsd: Math.max(vol1h, Number(livePair.volume1h || 0)),
+                  momentum5m: livePair.priceChange5m,
+                  momentum1m: livePair.priceChange1m,
+                  priceChange1h: livePair.priceChange1h ?? pc1h,
+                  buys1h,
+                  sells1h,
+                  buyRatio,
+                  buys60s: v.buys60s,
+                  sells60s: v.sells60s,
+                  buyRatio60s: v.buyRatio60s,
+                  velocity: v.velocity,
+                  solVolume60s: v.solVolume60s,
+                  routeLive: routeLivePreflight,
+                  terrainSampleCount: preflightTerrainState?.summary?.sampleCount,
+                  terrainRouteStrengthPct: preflightTerrainState?.summary?.routeStrengthPct,
+                  lowLiquidityMicroRejectReason: earlyLowLiquidityMicroRejectReason,
+                  redisCooldownSec: LOW_LIQ_MICRO_REJECT_COOLDOWN_SEC,
+                });
                 const pub = RedisBus.getPublisher();
                 await setMintCooldownExact(pub, v.mint, LOW_LIQ_MICRO_REJECT_COOLDOWN_SEC, 'LOW_LIQ_MICRO_REJECT');
                 continue;
@@ -9357,6 +9662,35 @@ async function poll() {
                 });
                 if (earlyLowLiquidityMicroRejectReason) {
                   console.log(`[SNIPER]  LOW LIQ MICRO REJECT: ${symbol} ${earlyLowLiquidityMicroRejectReason}`);
+                  logMissedTarget({
+                    mint: v.mint,
+                    symbol,
+                    stage: 'velocity_first',
+                    reason: 'low_liq_micro_reject',
+                    entryMode: 'micro-scout',
+                    sourceLane: 'velocity-first',
+                    priceUsd: livePair.priceUsd,
+                    liquidityUsd: Number(livePair.liquidity || 0),
+                    marketCapUsd: livePair.marketCap || livePair.fdv,
+                    fdvUsd: livePair.fdv,
+                    volume1hUsd: Math.max(vol1h, Number(livePair.volume1h || 0)),
+                    momentum5m: livePair.priceChange5m,
+                    momentum1m: livePair.priceChange1m,
+                    priceChange1h: livePair.priceChange1h ?? pc1h,
+                    buys1h,
+                    sells1h,
+                    buyRatio,
+                    buys60s: v.buys60s,
+                    sells60s: v.sells60s,
+                    buyRatio60s: v.buyRatio60s,
+                    velocity: v.velocity,
+                    solVolume60s: v.solVolume60s,
+                    routeLive: routeLivePreflight,
+                    terrainSampleCount: preflightTerrainState?.summary?.sampleCount,
+                    terrainRouteStrengthPct: preflightTerrainState?.summary?.routeStrengthPct,
+                    lowLiquidityMicroRejectReason: earlyLowLiquidityMicroRejectReason,
+                    redisCooldownSec: LOW_LIQ_MICRO_REJECT_COOLDOWN_SEC,
+                  });
                   const pub = RedisBus.getPublisher();
                   await setMintCooldownExact(pub, v.mint, LOW_LIQ_MICRO_REJECT_COOLDOWN_SEC, 'LOW_LIQ_MICRO_REJECT');
                   continue;
@@ -9368,6 +9702,32 @@ async function poll() {
               );
             } else {
             console.log(`[SNIPER]  LOW LIQ SKIP: ${symbol}  liq $${livePair.liquidity.toFixed(0)} < $5K`);
+            logMissedTarget({
+              mint: v.mint,
+              symbol,
+              stage: 'velocity_first',
+              reason: 'low_liq_no_route',
+              entryMode: microOnlyMode ? 'micro-scout' : 'normal',
+              sourceLane: 'velocity-first-preflight',
+              priceUsd: livePair.priceUsd,
+              liquidityUsd: Number(livePair.liquidity || 0),
+              marketCapUsd: livePair.marketCap || livePair.fdv,
+              fdvUsd: livePair.fdv,
+              volume1hUsd: Math.max(vol1h, Number(livePair.volume1h || 0)),
+              momentum5m: livePair.priceChange5m,
+              momentum1m: livePair.priceChange1m,
+              priceChange1h: livePair.priceChange1h ?? pc1h,
+              buys1h,
+              sells1h,
+              buyRatio,
+              buys60s: v.buys60s,
+              sells60s: v.sells60s,
+              buyRatio60s: v.buyRatio60s,
+              velocity: v.velocity,
+              solVolume60s: v.solVolume60s,
+              routeLive: false,
+              redisCooldownSec: 300,
+            });
             const pub = RedisBus.getPublisher();
               await setMintCooldown(pub, v.mint, 300, '1');
             continue;
@@ -9693,6 +10053,35 @@ async function poll() {
           });
           if (earlyLowLiquidityMicroRejectReason) {
             console.log(`[SNIPER]  LOW LIQ MICRO REJECT: ${symbol} ${earlyLowLiquidityMicroRejectReason}`);
+            logMissedTarget({
+              mint: v.mint,
+              symbol,
+              stage: 'velocity_first',
+              reason: 'low_liq_micro_reject',
+              entryMode: normalEntryOptions.entryMode,
+              sourceLane: normalEntryOptions.sourceLane,
+              priceUsd: livePair?.priceUsd,
+              liquidityUsd: Number(livePair?.liquidity || 0),
+              marketCapUsd: livePair?.marketCap || livePair?.fdv,
+              fdvUsd: livePair?.fdv,
+              volume1hUsd: Math.max(vol1h, Number(livePair?.volume1h || 0)),
+              momentum5m: livePair?.priceChange5m ?? mom5m,
+              momentum1m: livePair?.priceChange1m ?? mom1m,
+              priceChange1h: livePair?.priceChange1h ?? pc1h,
+              buys1h,
+              sells1h,
+              buyRatio,
+              buys60s: v.buys60s,
+              sells60s: v.sells60s,
+              buyRatio60s: v.buyRatio60s,
+              velocity: v.velocity,
+              solVolume60s: v.solVolume60s,
+              routeLive: routeLivePreflight,
+              terrainSampleCount: preflightTerrainState?.summary?.sampleCount,
+              terrainRouteStrengthPct: preflightTerrainState?.summary?.routeStrengthPct,
+              lowLiquidityMicroRejectReason: earlyLowLiquidityMicroRejectReason,
+              redisCooldownSec: LOW_LIQ_MICRO_REJECT_COOLDOWN_SEC,
+            });
             const pub = RedisBus.getPublisher();
             await setMintCooldownExact(pub, v.mint, LOW_LIQ_MICRO_REJECT_COOLDOWN_SEC, 'LOW_LIQ_MICRO_REJECT');
             continue;
