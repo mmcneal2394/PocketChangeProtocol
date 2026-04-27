@@ -1436,7 +1436,7 @@ async function checkHolderConcentration(mint: string): Promise<{safe: boolean, t
   }
 }
 
-async function fetchDexScreenerPair(mint: string): Promise<{
+type DexScreenerPairSnapshot = {
   liquidity: number,
   marketCap: number,
   fdv: number,
@@ -1448,16 +1448,142 @@ async function fetchDexScreenerPair(mint: string): Promise<{
   volume6h: number,
   boosted: boolean,
   pairCreatedAt?: number
-} | null> {
-  try {
-    const res = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${mint}`, { signal: AbortSignal.timeout(3000) });
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (!data.pairs || data.pairs.length === 0) return null;
-    // Pick the highest-liquidity pair
-    const pair = data.pairs.sort((a: any, b: any) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0))[0];
-    return normalizeDexScreenerPair(pair);
-  } catch { return null; }
+};
+
+const dexPairCache = new Map<string, { value: DexScreenerPairSnapshot | null; ts: number }>();
+const dexPairInflight = new Map<string, Promise<DexScreenerPairSnapshot | null>>();
+const DEX_PAIR_CACHE_TTL_MS = 20_000;
+
+async function fetchDexScreenerPair(mint: string): Promise<DexScreenerPairSnapshot | null> {
+  const normalizedMint = String(mint || '').trim();
+  if (!normalizedMint) return null;
+
+  const now = Date.now();
+  const cached = dexPairCache.get(normalizedMint);
+  if (cached && (now - cached.ts) <= DEX_PAIR_CACHE_TTL_MS) {
+    return cached.value;
+  }
+
+  const inflight = dexPairInflight.get(normalizedMint);
+  if (inflight) return inflight;
+
+  const request = (async () => {
+    try {
+      const res = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${normalizedMint}`, { signal: AbortSignal.timeout(3000) });
+      if (!res.ok) {
+        dexPairCache.set(normalizedMint, { value: null, ts: Date.now() });
+        return null;
+      }
+      const data = await res.json();
+      if (!data.pairs || data.pairs.length === 0) {
+        dexPairCache.set(normalizedMint, { value: null, ts: Date.now() });
+        return null;
+      }
+      // Pick the highest-liquidity pair.
+      const pair = data.pairs.sort((a: any, b: any) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0))[0];
+      const normalizedPair = normalizeDexScreenerPair(pair);
+      dexPairCache.set(normalizedMint, { value: normalizedPair, ts: Date.now() });
+      return normalizedPair;
+    } catch {
+      dexPairCache.set(normalizedMint, { value: null, ts: Date.now() });
+      return null;
+    } finally {
+      dexPairInflight.delete(normalizedMint);
+    }
+  })();
+
+  dexPairInflight.set(normalizedMint, request);
+  return request;
+}
+
+function mergeQuotaCandidateWithDexPair(candidate: Record<string, any> | null | undefined, livePair: DexScreenerPairSnapshot | null) {
+  if (!candidate || !livePair) return candidate || null;
+  return {
+    ...candidate,
+    liquidityUsd: Math.max(Number(candidate?.liquidityUsd || 0), Number(livePair.liquidity || 0)),
+    marketCapUsd: Math.max(
+      Number(candidate?.marketCapUsd || 0),
+      Number(candidate?.marketCap || 0),
+      Number(livePair.marketCap || 0),
+      Number(livePair.fdv || 0),
+    ),
+    fdvUsd: Math.max(
+      Number(candidate?.fdvUsd || 0),
+      Number(candidate?.fdv || 0),
+      Number(livePair.fdv || 0),
+      Number(livePair.marketCap || 0),
+    ),
+    priceChange1m: Number.isFinite(Number(livePair.priceChange1m))
+      ? Number(livePair.priceChange1m)
+      : Number(candidate?.priceChange1m || 0),
+    priceChange5m: Number.isFinite(Number(livePair.priceChange5m))
+      ? Number(livePair.priceChange5m)
+      : Number(candidate?.priceChange5m || 0),
+    priceChange1h: Number.isFinite(Number(livePair.priceChange1h))
+      ? Number(livePair.priceChange1h)
+      : Number(candidate?.priceChange1h || 0),
+    volume5m: Math.max(Number(candidate?.volume5m || 0), Number(livePair.volume5m || 0)),
+    volume1h: Math.max(Number(candidate?.volume1h || 0), Number(livePair.volume1h || 0)),
+    volume6h: Math.max(Number(candidate?.volume6h || 0), Number(livePair.volume6h || 0)),
+    pairCreatedAt: candidate?.pairCreatedAt || candidate?.createdAt || livePair.pairCreatedAt || undefined,
+  };
+}
+
+function shouldHydrateAlphaQuotaCandidate(candidate: Record<string, any> | null | undefined) {
+  if (!candidate) return false;
+  return (
+    isQuotaCandidateMetadataBlind(candidate) ||
+    !hasQuotaCandidateMarketSupport(candidate) ||
+    Number(candidate?.priceChange5m || 0) <= 0 ||
+    Number(candidate?.liquidityUsd || 0) <= 0 ||
+    Number(candidate?.volume1h || 0) <= 0
+  );
+}
+
+function evaluateAlphaQuotaCandidateAdmission(args: {
+  candidate?: Record<string, any> | null;
+  alphaKolCount?: number;
+  signalCount?: number;
+  quotaQuietRegime?: boolean;
+  walletSignal?: Record<string, any> | null;
+  replayBacked?: boolean;
+}) {
+  const candidate = args.candidate || {};
+  const allow = shouldAllowAlphaQuotaCandidate(args);
+  if (allow) {
+    return { allow: true as const, rejectReason: null };
+  }
+  if (isQuotaCandidateMetadataBlind(candidate)) {
+    return { allow: false as const, rejectReason: 'metadata_blind' as const };
+  }
+  if (!hasQuotaCandidateMarketSupport(candidate)) {
+    return { allow: false as const, rejectReason: 'missing_market_support' as const };
+  }
+  return { allow: false as const, rejectReason: 'weak_confirmation' as const };
+}
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  fn: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const cappedConcurrency = Math.max(1, Math.floor(concurrency || 1));
+  const results: R[] = new Array(items.length);
+  let cursor = 0;
+
+  const worker = async () => {
+    while (true) {
+      const index = cursor;
+      cursor += 1;
+      if (index >= items.length) return;
+      results[index] = await fn(items[index], index);
+    }
+  };
+
+  await Promise.all(
+    Array.from({ length: Math.min(cappedConcurrency, Math.max(1, items.length)) }, () => worker()),
+  );
+  return results;
 }
 
 const jupiterTradabilityCache = new Map<
@@ -3766,14 +3892,23 @@ const LOSS_STREAK_DEFENSIVE_THRESHOLD = 2;
 const LOSS_STREAK_PAUSE_THRESHOLD = 3;
 const LOSS_STREAK_DEFENSIVE_RECOVERY_MS = 10 * 60 * 1000;
 const IDLE_ALPHA_CONTINUITY_MIN_IDLE_MS = 90 * 60 * 1000;
+const IDLE_ALPHA_CONTINUITY_EXTREME_IDLE_MS = 6 * 60 * 60 * 1000;
 const IDLE_ALPHA_CONTINUITY_COOLDOWN_MS = 60 * 60 * 1000;
 const IDLE_ALPHA_CONTINUITY_MIN_MOMENTUM5M_PCT = 4;
 const IDLE_ALPHA_CONTINUITY_MIN_BUY_RATIO = 0.72;
 const IDLE_ALPHA_CONTINUITY_MIN_BUYS1H = 8;
 const IDLE_ALPHA_CONTINUITY_MIN_VOLUME1H_USD = 10_000;
 const IDLE_ALPHA_CONTINUITY_MIN_SIGNAL_COUNT = 2;
+const IDLE_ALPHA_CONTINUITY_EXTREME_IDLE_MIN_SIGNAL_COUNT = 1;
+const IDLE_ALPHA_CONTINUITY_EXTREME_IDLE_MIN_MOMENTUM5M_PCT = 7;
+const IDLE_ALPHA_CONTINUITY_EXTREME_IDLE_MIN_BUY_RATIO = 0.78;
+const IDLE_ALPHA_CONTINUITY_EXTREME_IDLE_MIN_BUYS1H = 10;
+const IDLE_ALPHA_CONTINUITY_EXTREME_IDLE_MIN_VOLUME1H_USD = 12_000;
+const IDLE_ALPHA_CONTINUITY_EXTREME_IDLE_MIN_PRICECHANGE1H_PCT = 0;
+const IDLE_ALPHA_CONTINUITY_EXTREME_IDLE_MIN_LIQUIDITY_USD = 12_000;
 const IDLE_ALPHA_CONTINUITY_ABSOLUTE_MIN_LIQUIDITY_USD = 10_000;
 const IDLE_ALPHA_CONTINUITY_LIQUIDITY_FLOOR_RATIO = 0.5;
+const LOW_LIQ_MICRO_REJECT_COOLDOWN_SEC = 180;
 
 type LossStreakState = {
   consecutiveLosses: number;
@@ -3901,7 +4036,9 @@ function evaluateIdleAlphaContinuityProbe(input: {
     IDLE_ALPHA_CONTINUITY_ABSOLUTE_MIN_LIQUIDITY_USD,
     Math.round(Math.max(0, Number(input.normalLaneMinLiquidityUsd || 0)) * IDLE_ALPHA_CONTINUITY_LIQUIDITY_FLOOR_RATIO),
   );
-  const strongTape =
+  const extremeIdle = idleMs >= IDLE_ALPHA_CONTINUITY_EXTREME_IDLE_MS;
+  const oneSignalMinLiquidityUsd = Math.max(minLiquidityUsd, IDLE_ALPHA_CONTINUITY_EXTREME_IDLE_MIN_LIQUIDITY_USD);
+  const multiSignalStrongTape =
     Number(input.momentum5m || 0) >= IDLE_ALPHA_CONTINUITY_MIN_MOMENTUM5M_PCT &&
     Number(input.buyRatio || 0) >= IDLE_ALPHA_CONTINUITY_MIN_BUY_RATIO &&
     Number(input.buys1h || 0) >= IDLE_ALPHA_CONTINUITY_MIN_BUYS1H &&
@@ -3910,6 +4047,18 @@ function evaluateIdleAlphaContinuityProbe(input: {
     (Number(input.alphaKolCount || 0) > 0 || Number(input.signalCount || 0) >= IDLE_ALPHA_CONTINUITY_MIN_SIGNAL_COUNT) &&
     Number(input.expectedValueSol || 0) > 0 &&
     Number(input.priceChange1h || 0) >= -5;
+  const singleSignalExtremeIdleTape =
+    extremeIdle &&
+    Number(input.alphaKolCount || 0) <= 0 &&
+    Number(input.signalCount || 0) >= IDLE_ALPHA_CONTINUITY_EXTREME_IDLE_MIN_SIGNAL_COUNT &&
+    Number(input.momentum5m || 0) >= IDLE_ALPHA_CONTINUITY_EXTREME_IDLE_MIN_MOMENTUM5M_PCT &&
+    Number(input.buyRatio || 0) >= IDLE_ALPHA_CONTINUITY_EXTREME_IDLE_MIN_BUY_RATIO &&
+    Number(input.buys1h || 0) >= IDLE_ALPHA_CONTINUITY_EXTREME_IDLE_MIN_BUYS1H &&
+    Number(input.volume1hUsd || 0) >= IDLE_ALPHA_CONTINUITY_EXTREME_IDLE_MIN_VOLUME1H_USD &&
+    Number(input.liquidityUsd || 0) >= oneSignalMinLiquidityUsd &&
+    Number(input.expectedValueSol || 0) > 0 &&
+    Number(input.priceChange1h || 0) >= IDLE_ALPHA_CONTINUITY_EXTREME_IDLE_MIN_PRICECHANGE1H_PCT;
+  const strongTape = multiSignalStrongTape || singleSignalExtremeIdleTape;
 
   if ((input.openPositionCount || 0) > 0) {
     return { allow: false, reason: 'open_position_present', minLiquidityUsd, remainingMs, windowMs: IDLE_ALPHA_CONTINUITY_COOLDOWN_MS };
@@ -3928,9 +4077,11 @@ function evaluateIdleAlphaContinuityProbe(input: {
   }
   return {
     allow: true,
-    reason:
-      `flat book for ${(idleMs / 60000).toFixed(0)}m with no executable wallet or arb flow; ` +
-      `strong 5m alpha tape qualifies for a bounded continuity probe`,
+    reason: singleSignalExtremeIdleTape
+      ? `flat book for ${(idleMs / 60000).toFixed(0)}m with no executable wallet or arb flow; ` +
+        `extreme-idle one-signal alpha tape qualifies for a bounded continuity probe`
+      : `flat book for ${(idleMs / 60000).toFixed(0)}m with no executable wallet or arb flow; ` +
+        `strong 5m alpha tape qualifies for a bounded continuity probe`,
     minLiquidityUsd,
     remainingMs,
     windowMs: IDLE_ALPHA_CONTINUITY_COOLDOWN_MS,
@@ -3955,6 +4106,7 @@ function getIdleAlphaContinuityRegime(input?: {
     active,
     idleMs,
     idleMinutes: Math.round(idleMs / 60000),
+    extremeIdle: idleMs >= IDLE_ALPHA_CONTINUITY_EXTREME_IDLE_MS,
   };
 }
 
@@ -4454,7 +4606,7 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
   });
   if (lowLiquidityMicroRejectReason) {
     console.log(`[SNIPER]  LOW LIQ MICRO REJECT: ${symbol} ${lowLiquidityMicroRejectReason}`);
-    await setMintCooldownExact(pub, mint, 60, 'LOW_LIQ_MICRO_REJECT');
+    await setMintCooldownExact(pub, mint, LOW_LIQ_MICRO_REJECT_COOLDOWN_SEC, 'LOW_LIQ_MICRO_REJECT');
     return;
   }
   if (poolLiq > 0 && poolLiq < 5000) {
@@ -6848,49 +7000,72 @@ async function poll() {
               executableWalletBuyCount,
               openPositionCount: store.positions.length,
             });
-		        const alphaBaseCandidates = Array.from(quotaTrendingMap.values())
-	          .filter((candidate: any) =>
-	            candidate?.mint &&
-	            !store.blacklist.includes(candidate.mint) &&
-            !store.positions.find((p: any) => p.mint === candidate.mint)
-          )
-          .map((candidate: any) => {
-            const alphaDecision = computeAlphaBoost({
-              tokenAddress: candidate.mint,
-              now: Date.now(),
-              catalystSignalsFile: path.join(SIGNALS_DIR, 'catalyst_alerts.json'),
-              walletSignalsFile: WALLET_SIG_FILE,
-            });
-            const pairCreatedAt = candidate.pairCreatedAt || candidate.createdAt || undefined;
-            const tokenAgeSec = pairCreatedAt ? Math.max(0, Math.floor((Date.now() - Number(pairCreatedAt)) / 1000)) : undefined;
-            return {
-              candidate,
-              alphaBoost: Number(alphaDecision.totalBoost || 0),
-              alphaKolCount: Number(alphaDecision.uniqueKols || 0),
-              signalCount: Number(alphaDecision.signalCount || 0),
-              tokenAgeSec,
-              walletSignal: freshWalletSignalMap.get(String(candidate?.mint || '').trim()) || null,
-            };
-          })
-          .filter((row: any) => row.alphaBoost > 0 || row.alphaKolCount > 0);
+		        const alphaBaseCandidates = (await mapWithConcurrency(
+            Array.from(quotaTrendingMap.values())
+              .filter((candidate: any) =>
+                candidate?.mint &&
+                !store.blacklist.includes(candidate.mint) &&
+                !store.positions.find((p: any) => p.mint === candidate.mint)
+              ),
+            6,
+            async (candidate: any) => {
+              const alphaDecision = computeAlphaBoost({
+                tokenAddress: candidate.mint,
+                now: Date.now(),
+                catalystSignalsFile: path.join(SIGNALS_DIR, 'catalyst_alerts.json'),
+                walletSignalsFile: WALLET_SIG_FILE,
+              });
+              const alphaBoost = Number(alphaDecision.totalBoost || 0);
+              const alphaKolCount = Number(alphaDecision.uniqueKols || 0);
+              const signalCount = Number(alphaDecision.signalCount || 0);
+              if (!(alphaBoost > 0 || alphaKolCount > 0)) {
+                return null;
+              }
+
+              let hydratedCandidate = candidate;
+              let metadataHydrated = false;
+              if (shouldHydrateAlphaQuotaCandidate(candidate)) {
+                const liveAlphaPair = await fetchDexScreenerPair(candidate.mint);
+                if (liveAlphaPair) {
+                  hydratedCandidate = mergeQuotaCandidateWithDexPair(candidate, liveAlphaPair);
+                  metadataHydrated = true;
+                }
+              }
+
+              const pairCreatedAt = hydratedCandidate.pairCreatedAt || hydratedCandidate.createdAt || undefined;
+              const tokenAgeSec = pairCreatedAt ? Math.max(0, Math.floor((Date.now() - Number(pairCreatedAt)) / 1000)) : undefined;
+              const walletSignal = freshWalletSignalMap.get(String(hydratedCandidate?.mint || '').trim()) || null;
+              const admissionDecision = evaluateAlphaQuotaCandidateAdmission({
+                candidate: hydratedCandidate,
+                alphaKolCount,
+                signalCount,
+                quotaQuietRegime: quietQuotaRegime,
+                walletSignal,
+                replayBacked: replayBackedProfile.active &&
+                  Number(hydratedCandidate?.priceChange5m || 0) >= replayAlphaMomentumFloor &&
+                  (
+                    alphaKolCount > 0 ||
+                    signalCount >= 2 ||
+                    Number(hydratedCandidate?.volume1h || 0) >= Math.max(1000, Number(replayBackedProfile.minVolume5m || 0))
+                  ),
+              });
+
+              return {
+                candidate: hydratedCandidate,
+                alphaBoost,
+                alphaKolCount,
+                signalCount,
+                tokenAgeSec,
+                walletSignal,
+                metadataHydrated,
+                rejectReason: admissionDecision.rejectReason,
+                allowAlphaQuota: admissionDecision.allow,
+              };
+            },
+          )).filter(Boolean);
 	        const alphaBaseShortlist = alphaBaseCandidates
-          .filter((row: any) =>
-            shouldAllowAlphaQuotaCandidate({
-              candidate: row.candidate,
-              alphaKolCount: row.alphaKolCount,
-              signalCount: row.signalCount,
-              quotaQuietRegime: quietQuotaRegime,
-              walletSignal: row.walletSignal,
-              replayBacked: replayBackedProfile.active &&
-                Number(row.candidate?.priceChange5m || 0) >= replayAlphaMomentumFloor &&
-                (
-                  row.alphaKolCount > 0 ||
-                  row.signalCount >= 2 ||
-                  Number(row.candidate?.volume1h || 0) >= Math.max(1000, Number(replayBackedProfile.minVolume5m || 0))
-                ),
-            })
-          )
-	          .sort((left: any, right: any) =>
+          .filter((row: any) => row.allowAlphaQuota === true)
+          .sort((left: any, right: any) =>
 	            (right.alphaBoost - left.alphaBoost) ||
 	            (right.alphaKolCount - left.alphaKolCount) ||
 	              (Number(right.candidate?.buys1h || 0) - Number(left.candidate?.buys1h || 0)) ||
@@ -6900,7 +7075,14 @@ async function poll() {
           const alphaContinuityShortlist =
             alphaBaseShortlist.length === 0 && idleAlphaContinuityRegime.active
               ? alphaBaseCandidates
-                  .filter((row: any) => row.alphaKolCount > 0 || row.signalCount >= IDLE_ALPHA_CONTINUITY_MIN_SIGNAL_COUNT)
+                  .filter((row: any) =>
+                    row.alphaKolCount > 0 ||
+                    row.signalCount >= (
+                      idleAlphaContinuityRegime.extremeIdle
+                        ? IDLE_ALPHA_CONTINUITY_EXTREME_IDLE_MIN_SIGNAL_COUNT
+                        : IDLE_ALPHA_CONTINUITY_MIN_SIGNAL_COUNT
+                    )
+                  )
                   .sort((left: any, right: any) =>
                     (right.alphaBoost - left.alphaBoost) ||
                     (right.alphaKolCount - left.alphaKolCount) ||
@@ -6910,21 +7092,37 @@ async function poll() {
                   )
                   .slice(0, Math.max(2, Math.min(5, resolveAlphaQuotaCandidateLimit(globalQuotaAssistLevel))))
               : [];
-          if (alphaContinuityShortlist.length > 0) {
+	          if (alphaContinuityShortlist.length > 0) {
             console.log(
               `[SNIPER]  ALPHA IDLE SHORTLIST: reviving ${alphaContinuityShortlist.length} signal-backed candidate(s) ` +
-              `after ${idleAlphaContinuityRegime.idleMinutes}m flat book.`
+              `after ${idleAlphaContinuityRegime.idleMinutes}m flat book ` +
+              `(minSignals=${idleAlphaContinuityRegime.extremeIdle ? IDLE_ALPHA_CONTINUITY_EXTREME_IDLE_MIN_SIGNAL_COUNT : IDLE_ALPHA_CONTINUITY_MIN_SIGNAL_COUNT}).`
+            );
+          }
+          const alphaHydratedCount = alphaBaseCandidates.filter((row: any) => row?.metadataHydrated === true).length;
+          if (alphaHydratedCount > 0) {
+            console.log(
+              `[SNIPER]  ALPHA METADATA BACKFILL: hydrated ${alphaHydratedCount}/${alphaBaseCandidates.length} ` +
+              `candidate(s) from live Dex before quota gating.`
             );
           }
           const alphaCandidateShortlist =
             alphaBaseShortlist.length > 0
               ? alphaBaseShortlist
               : alphaContinuityShortlist;
-	        const alphaGuardFilteredCount = Math.max(0, alphaBaseCandidates.length - alphaCandidateShortlist.length);
+          const alphaGuardFilteredRows = alphaBaseCandidates.filter((row: any) => row?.allowAlphaQuota !== true);
+	        const alphaGuardFilteredCount = Math.max(0, alphaGuardFilteredRows.length);
 	        if (alphaGuardFilteredCount > 0) {
+            const alphaRejectCounts = alphaGuardFilteredRows.reduce((acc: Record<string, number>, row: any) => {
+              const key = String(row?.rejectReason || 'other');
+              acc[key] = (acc[key] || 0) + 1;
+              return acc;
+            }, {});
 	          console.log(
 	            `[SNIPER]  ALPHA QUALITY HOLD: filtered ${alphaGuardFilteredCount} quota candidate(s) ` +
-	            `for weak confirmation or missing market metadata.`
+	            `(metadata_blind:${alphaRejectCounts.metadata_blind || 0} ` +
+              `missing_market_support:${alphaRejectCounts.missing_market_support || 0} ` +
+              `weak_confirmation:${alphaRejectCounts.weak_confirmation || 0}).`
 	          );
 	        }
 	        const alphaBaseRank = new Map(
@@ -8160,7 +8358,7 @@ async function poll() {
                 if (earlyLowLiquidityMicroRejectReason) {
                   console.log(`[SNIPER]  LOW LIQ MICRO REJECT: ${symbol} ${earlyLowLiquidityMicroRejectReason}`);
                   const pub = RedisBus.getPublisher();
-                  await setMintCooldownExact(pub, v.mint, 60, 'LOW_LIQ_MICRO_REJECT');
+                  await setMintCooldownExact(pub, v.mint, LOW_LIQ_MICRO_REJECT_COOLDOWN_SEC, 'LOW_LIQ_MICRO_REJECT');
                   continue;
                 }
                 await trySnipe(
@@ -8350,7 +8548,7 @@ async function poll() {
               if (earlyLowLiquidityMicroRejectReason) {
                 console.log(`[SNIPER]  LOW LIQ MICRO REJECT: ${symbol} ${earlyLowLiquidityMicroRejectReason}`);
                 const pub = RedisBus.getPublisher();
-                await setMintCooldownExact(pub, v.mint, 60, 'LOW_LIQ_MICRO_REJECT');
+                await setMintCooldownExact(pub, v.mint, LOW_LIQ_MICRO_REJECT_COOLDOWN_SEC, 'LOW_LIQ_MICRO_REJECT');
                 continue;
               }
               await trySnipe(
@@ -8429,7 +8627,7 @@ async function poll() {
                 if (earlyLowLiquidityMicroRejectReason) {
                   console.log(`[SNIPER]  LOW LIQ MICRO REJECT: ${symbol} ${earlyLowLiquidityMicroRejectReason}`);
                   const pub = RedisBus.getPublisher();
-                  await setMintCooldownExact(pub, v.mint, 60, 'LOW_LIQ_MICRO_REJECT');
+                  await setMintCooldownExact(pub, v.mint, LOW_LIQ_MICRO_REJECT_COOLDOWN_SEC, 'LOW_LIQ_MICRO_REJECT');
                   continue;
                 }
               }
@@ -8753,7 +8951,7 @@ async function poll() {
           if (earlyLowLiquidityMicroRejectReason) {
             console.log(`[SNIPER]  LOW LIQ MICRO REJECT: ${symbol} ${earlyLowLiquidityMicroRejectReason}`);
             const pub = RedisBus.getPublisher();
-            await setMintCooldownExact(pub, v.mint, 60, 'LOW_LIQ_MICRO_REJECT');
+            await setMintCooldownExact(pub, v.mint, LOW_LIQ_MICRO_REJECT_COOLDOWN_SEC, 'LOW_LIQ_MICRO_REJECT');
             continue;
           }
         }
