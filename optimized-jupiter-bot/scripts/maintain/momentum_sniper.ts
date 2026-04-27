@@ -8653,27 +8653,27 @@ async function poll() {
         let routeLiveRecoveryEntryOptions: Partial<EntryOptions> | null = null;
         let preflightTerrainState = null as ReturnType<typeof recordTerrainObservation> | null;
         let livePair = null as Awaited<ReturnType<typeof fetchDexScreenerPair>> | null;
+        const tradabilityProbeLamports = Math.max(1_000_000, Math.floor(microScoutConfig.fixedBuySol * 1e9));
+        const microScoutPacing = resolveActiveMicroScoutPacing(store.positions.length, MAX_POSITIONS, microScoutConfig);
+        const microScoutDecision = evaluateNoDexMicroScoutProbe({
+          buys60s: v.buys60s,
+          sells60s: v.sells60s,
+          buyRatio60s: v.buyRatio60s,
+          velocity: v.velocity,
+          solVolume60s: v.solVolume60s,
+        }, microScoutPacing.probeConfig);
+        const microScoutContinuationGate = evaluateMicroScoutContinuationGate(microScoutConfig, continuation);
+        const canUseMicroScout =
+          microScoutConfig.enabled &&
+          microScoutEntriesThisPoll < microScoutPacing.maxCandidatesPerPoll &&
+          microScoutDecision.shouldScout &&
+          microScoutContinuationGate.ready;
+        const microScoutPacingTag = microScoutPacing.underfilledBookActive ? ' underfilled-book' : '';
 
         // If no cached trending data, do a LIVE DexScreener lookup
         if (!trending) {
           let routeLivePreflight = false;
           livePair = await fetchDexScreenerPair(v.mint);
-          const tradabilityProbeLamports = Math.max(1_000_000, Math.floor(microScoutConfig.fixedBuySol * 1e9));
-          const microScoutPacing = resolveActiveMicroScoutPacing(store.positions.length, MAX_POSITIONS, microScoutConfig);
-          const microScoutDecision = evaluateNoDexMicroScoutProbe({
-            buys60s: v.buys60s,
-            sells60s: v.sells60s,
-            buyRatio60s: v.buyRatio60s,
-            velocity: v.velocity,
-            solVolume60s: v.solVolume60s,
-          }, microScoutPacing.probeConfig);
-          const microScoutContinuationGate = evaluateMicroScoutContinuationGate(microScoutConfig, continuation);
-          const canUseMicroScout =
-            microScoutConfig.enabled &&
-            microScoutEntriesThisPoll < microScoutPacing.maxCandidatesPerPoll &&
-            microScoutDecision.shouldScout &&
-            microScoutContinuationGate.ready;
-          const microScoutPacingTag = microScoutPacing.underfilledBookActive ? ' underfilled-book' : '';
 	          if (livePair && !isExecutableLivePair(livePair)) {
               const routeLivePreflightWalletSignal = freshWalletSignalMap.get(String(v.mint || '').trim()) || null;
               const allowUnconfirmedRouteProbe =
