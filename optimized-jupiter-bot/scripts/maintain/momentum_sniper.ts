@@ -409,6 +409,10 @@ const STRATEGY_FILE    = path.join(SIGNALS_DIR, 'chart_strategy.json');
 const JOURNAL_FILE     = path.join(SIGNALS_DIR, process.env.PAPER_MODE === 'true' ? 'trade_journal_paper.jsonl' : 'trade_journal.jsonl');
 const ALLOCATION_FILE  = path.join(SIGNALS_DIR, 'allocation.json');  // HarmonyAgent capital weight
 const CAPITAL_ALLOCATOR_STATE_FILE = path.join(SIGNALS_DIR, 'capital_allocator_state.json');
+const REALIZED_PROFIT_FILE = path.join(
+  SIGNALS_DIR,
+  process.env.PAPER_MODE === 'true' ? 'realized_profit_paper.json' : 'realized_profit.json',
+);
 const VELOCITY_FILE    = path.join(SIGNALS_DIR, 'velocity.json');     // pcp-velocity real-time swap feed
 const VELOCITY_HYDRATION_STATS_FILE = path.join(SIGNALS_DIR, 'velocity_hydration_stats.json');
 const TERRAIN_MEMORY_FILE = path.join(SIGNALS_DIR, 'terrain_memory.json');
@@ -513,6 +517,9 @@ interface EntryOptions {
   replayRecoveryProbe?: boolean;
   replayRecoveryReason?: string;
   replayRecoveryWindowMs?: number;
+  idleContinuityProbe?: boolean;
+  idleContinuityReason?: string;
+  idleContinuityWindowMs?: number;
 }
 
 interface QuoteRequestOptions {
@@ -2174,6 +2181,7 @@ interface PositionStore {
     consecutiveLosses: number;
     pausedUntil: number;
     lastRecoveryProbeAt: number;
+    lastIdleAlphaProbeAt: number;
     lastLossAt: number;
     lossStreakJournalSuppressedThrough: number;
   };
@@ -2208,6 +2216,7 @@ let store: PositionStore = {
     consecutiveLosses: 0,
     pausedUntil: 0,
     lastRecoveryProbeAt: 0,
+    lastIdleAlphaProbeAt: 0,
     lastLossAt: 0,
     lossStreakJournalSuppressedThrough: 0,
   },
@@ -2242,6 +2251,45 @@ function getCurrentRealizedPnlSol(): number {
   for (const candidate of candidates) {
     const numeric = Number(candidate);
     if (Number.isFinite(numeric)) return numeric;
+  }
+  return 0;
+}
+
+function getAllocatorExecutionSnapshot(): {
+  executableWalletSignals: number;
+  arbTargetCount: number;
+  executionModeRecommendation: string;
+} {
+  const allocatorState =
+    readJsonFile<any>(CAPITAL_ALLOCATOR_STATE_FILE) ||
+    readJsonFile<any>(ALLOCATION_FILE) ||
+    {};
+  return {
+    executableWalletSignals: Math.max(
+      0,
+      Number(allocatorState?.executable_wallet_signals || allocatorState?.executableWalletSignals || 0),
+    ),
+    arbTargetCount: Array.isArray(allocatorState?.arb_targets)
+      ? allocatorState.arb_targets.length
+      : Math.max(0, Number(allocatorState?.arbTargetCount || 0)),
+    executionModeRecommendation: String(allocatorState?.executionModeRecommendation || ''),
+  };
+}
+
+function getLastClosedSellTs(limit = 5000): number {
+  const realizedProfitState = readJsonFile<any>(REALIZED_PROFIT_FILE) || {};
+  for (const candidate of [realizedProfitState?.lastSellTs, realizedProfitState?.last_sell_ts]) {
+    const numeric = Number(candidate);
+    if (Number.isFinite(numeric) && numeric > 0) return numeric;
+  }
+
+  const rows = loadRecentTradeJournalRows(limit);
+  for (let i = rows.length - 1; i >= 0; i -= 1) {
+    const row = rows[i];
+    if (String(row?.action || '').toUpperCase() !== 'SELL') continue;
+    if (!shouldPersistTradeRecord(row, process.env.PAPER_MODE === 'true')) continue;
+    const ts = Number(row?.timestamp ?? row?.ts ?? 0);
+    if (Number.isFinite(ts) && ts > 0) return ts;
   }
   return 0;
 }
@@ -2952,6 +3000,7 @@ function loadStore() {
           consecutiveLosses: recoveredConsecutiveLosses,
           pausedUntil: Math.max(0, Number(raw?.stats?.pausedUntil || 0)),
           lastRecoveryProbeAt: Math.max(0, Number(raw?.stats?.lastRecoveryProbeAt || 0)),
+          lastIdleAlphaProbeAt: Math.max(0, Number(raw?.stats?.lastIdleAlphaProbeAt || 0)),
           lastLossAt: recoveredLastLossAt,
           lossStreakJournalSuppressedThrough: journalSuppressedThrough,
         },
@@ -3716,6 +3765,15 @@ async function calcBuySize(entryOptions?: EntryOptions): Promise<number> {
 const LOSS_STREAK_DEFENSIVE_THRESHOLD = 2;
 const LOSS_STREAK_PAUSE_THRESHOLD = 3;
 const LOSS_STREAK_DEFENSIVE_RECOVERY_MS = 10 * 60 * 1000;
+const IDLE_ALPHA_CONTINUITY_MIN_IDLE_MS = 90 * 60 * 1000;
+const IDLE_ALPHA_CONTINUITY_COOLDOWN_MS = 60 * 60 * 1000;
+const IDLE_ALPHA_CONTINUITY_MIN_MOMENTUM5M_PCT = 4;
+const IDLE_ALPHA_CONTINUITY_MIN_BUY_RATIO = 0.72;
+const IDLE_ALPHA_CONTINUITY_MIN_BUYS1H = 8;
+const IDLE_ALPHA_CONTINUITY_MIN_VOLUME1H_USD = 10_000;
+const IDLE_ALPHA_CONTINUITY_MIN_SIGNAL_COUNT = 2;
+const IDLE_ALPHA_CONTINUITY_ABSOLUTE_MIN_LIQUIDITY_USD = 10_000;
+const IDLE_ALPHA_CONTINUITY_LIQUIDITY_FLOOR_RATIO = 0.5;
 
 type LossStreakState = {
   consecutiveLosses: number;
@@ -3810,6 +3868,94 @@ function isLossStreakPaused(): boolean {
 
 function getLastRecoveryProbeAt(): number {
   return Math.max(0, Number((store.stats as any)?.lastRecoveryProbeAt || 0));
+}
+
+function getLastIdleAlphaProbeAt(): number {
+  return Math.max(0, Number((store.stats as any)?.lastIdleAlphaProbeAt || 0));
+}
+
+function evaluateIdleAlphaContinuityProbe(input: {
+  symbol: string;
+  momentum5m?: number;
+  momentum1m?: number;
+  priceChange1h?: number;
+  volume1hUsd?: number;
+  liquidityUsd?: number;
+  buyRatio?: number;
+  buys1h?: number;
+  signalCount?: number;
+  alphaKolCount?: number;
+  expectedValueSol?: number;
+  normalLaneMinLiquidityUsd?: number;
+  executableWalletBuyCount?: number;
+  quietQuotaRegime?: boolean;
+  openPositionCount?: number;
+}) {
+  const lastSellTs = getLastClosedSellTs();
+  const nowMs = Date.now();
+  const idleMs = lastSellTs > 0 ? Math.max(0, nowMs - lastSellTs) : 0;
+  const lastProbeAt = getLastIdleAlphaProbeAt();
+  const remainingMs = Math.max(0, IDLE_ALPHA_CONTINUITY_COOLDOWN_MS - (nowMs - lastProbeAt));
+  const allocatorExecution = getAllocatorExecutionSnapshot();
+  const minLiquidityUsd = Math.max(
+    IDLE_ALPHA_CONTINUITY_ABSOLUTE_MIN_LIQUIDITY_USD,
+    Math.round(Math.max(0, Number(input.normalLaneMinLiquidityUsd || 0)) * IDLE_ALPHA_CONTINUITY_LIQUIDITY_FLOOR_RATIO),
+  );
+  const strongTape =
+    Number(input.momentum5m || 0) >= IDLE_ALPHA_CONTINUITY_MIN_MOMENTUM5M_PCT &&
+    Number(input.buyRatio || 0) >= IDLE_ALPHA_CONTINUITY_MIN_BUY_RATIO &&
+    Number(input.buys1h || 0) >= IDLE_ALPHA_CONTINUITY_MIN_BUYS1H &&
+    Number(input.volume1hUsd || 0) >= IDLE_ALPHA_CONTINUITY_MIN_VOLUME1H_USD &&
+    Number(input.liquidityUsd || 0) >= minLiquidityUsd &&
+    (Number(input.alphaKolCount || 0) > 0 || Number(input.signalCount || 0) >= IDLE_ALPHA_CONTINUITY_MIN_SIGNAL_COUNT) &&
+    Number(input.expectedValueSol || 0) > 0 &&
+    Number(input.priceChange1h || 0) >= -5;
+
+  if ((input.openPositionCount || 0) > 0) {
+    return { allow: false, reason: 'open_position_present', minLiquidityUsd, remainingMs, windowMs: IDLE_ALPHA_CONTINUITY_COOLDOWN_MS };
+  }
+  if (lastSellTs <= 0 || idleMs < IDLE_ALPHA_CONTINUITY_MIN_IDLE_MS) {
+    return { allow: false, reason: 'idle_window_not_met', minLiquidityUsd, remainingMs, windowMs: IDLE_ALPHA_CONTINUITY_COOLDOWN_MS };
+  }
+  if (remainingMs > 0) {
+    return { allow: false, reason: 'continuity_cooldown_active', minLiquidityUsd, remainingMs, windowMs: IDLE_ALPHA_CONTINUITY_COOLDOWN_MS };
+  }
+  if (allocatorExecution.executableWalletSignals > 0 || allocatorExecution.arbTargetCount > 0) {
+    return { allow: false, reason: 'actionable_upstream_flow_present', minLiquidityUsd, remainingMs, windowMs: IDLE_ALPHA_CONTINUITY_COOLDOWN_MS };
+  }
+  if (!strongTape) {
+    return { allow: false, reason: 'alpha_tape_not_strong_enough', minLiquidityUsd, remainingMs, windowMs: IDLE_ALPHA_CONTINUITY_COOLDOWN_MS };
+  }
+  return {
+    allow: true,
+    reason:
+      `flat book for ${(idleMs / 60000).toFixed(0)}m with no executable wallet or arb flow; ` +
+      `strong 5m alpha tape qualifies for a bounded continuity probe`,
+    minLiquidityUsd,
+    remainingMs,
+    windowMs: IDLE_ALPHA_CONTINUITY_COOLDOWN_MS,
+  };
+}
+
+function getIdleAlphaContinuityRegime(input?: {
+  quietQuotaRegime?: boolean;
+  executableWalletBuyCount?: number;
+  openPositionCount?: number;
+}) {
+  const lastSellTs = getLastClosedSellTs();
+  const idleMs = lastSellTs > 0 ? Math.max(0, Date.now() - lastSellTs) : 0;
+  const allocatorExecution = getAllocatorExecutionSnapshot();
+  const active =
+    (input?.openPositionCount || 0) <= 0 &&
+    lastSellTs > 0 &&
+    idleMs >= IDLE_ALPHA_CONTINUITY_MIN_IDLE_MS &&
+    allocatorExecution.executableWalletSignals <= 0 &&
+    allocatorExecution.arbTargetCount <= 0;
+  return {
+    active,
+    idleMs,
+    idleMinutes: Math.round(idleMs / 60000),
+  };
 }
 
 async function getMintCooldownState(mint: string): Promise<{ active: boolean; value: string | null; ttlSeconds: number | null }> {
@@ -3921,7 +4067,12 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
   const normalLaneConfig = loadNormalLaneConfig();
   if (entryOptions?.sourceLane === 'alpha') {
     const alphaMinLiquidityUsd = Math.max(0, Number(normalLaneConfig.minLiquidityUsd || 0));
-    entryOptions.minLiquidityUsd = Math.max(alphaMinLiquidityUsd, Number(entryOptions?.minLiquidityUsd || 0));
+    const alphaIdleContinuityProbe =
+      entryOptions?.idleContinuityProbe === true &&
+      entryOptions?.continuationApproved === true;
+    entryOptions.minLiquidityUsd = alphaIdleContinuityProbe
+      ? Math.max(0, Number(entryOptions?.minLiquidityUsd || 0))
+      : Math.max(alphaMinLiquidityUsd, Number(entryOptions?.minLiquidityUsd || 0));
     const alphaSignalCount = Math.max(0, Number(entryOptions?.signalCount || 0));
     const alphaStrongFiveMinuteContinuation =
       Number(momentum5m || 0) >= 8 &&
@@ -3932,6 +4083,7 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
         alphaSignalCount >= 2
       );
     const alphaContinuationConfirmed =
+      alphaIdleContinuityProbe ||
       ((momentum5m ?? 0) > 0 && (momentum1m ?? 0) > 0) ||
       alphaStrongFiveMinuteContinuation;
     if (!alphaContinuationConfirmed) {
@@ -3992,6 +4144,31 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
       return;
   } else if (isInCooldown) {
       console.log(`[SNIPER] ⚠️ QUOTA ASSIST BYPASS: ignoring post-trade cooldown for ${symbol} | lane=${entryOptions?.sourceLane || entryFamily}`);
+  }
+  if (
+    entryOptions?.sourceLane === 'alpha' &&
+    entryOptions?.idleContinuityProbe === true &&
+    entryOptions?.continuationApproved === true
+  ) {
+    const idleContinuityWindowMs = Math.max(0, Number(entryOptions?.idleContinuityWindowMs || 0));
+    const nowMs = Date.now();
+    const lastIdleAlphaProbeAt = getLastIdleAlphaProbeAt();
+    const remainingMs = Math.max(0, idleContinuityWindowMs - (nowMs - lastIdleAlphaProbeAt));
+    if (remainingMs > 0) {
+      const cooldownSec = Math.max(30, Math.ceil(remainingMs / 1000));
+      console.log(
+        `[SNIPER]  ALPHA IDLE PROBE HOLD: ${symbol} continuity lane is still cooling down ` +
+        `for ${Math.ceil(remainingMs / 60000)}m.`
+      );
+      await setMintCooldownExact(pub, mint, cooldownSec, 'ALPHA_IDLE_PROBE_COOLDOWN');
+      return;
+    }
+    (store.stats as any).lastIdleAlphaProbeAt = nowMs;
+    saveStore();
+    console.log(
+      `[SNIPER]  ALPHA IDLE PROBE PASS: ${symbol} ${entryOptions?.idleContinuityReason || 'long flat-book continuity lane active'} ` +
+      `| cooldown ${Math.max(1, Math.round(idleContinuityWindowMs / 60000))}m.`
+    );
   }
   const existingPositionLock = await pub.get(REDIS_KEYS.position(mint));
   if (existingPositionLock) {
@@ -6666,6 +6843,11 @@ async function poll() {
 
     if (globalQuotaAssistLevel > 0 && store.positions.length < MAX_POSITIONS && quotaTrendingMap.size > 0) {
       try {
+		        const idleAlphaContinuityRegime = getIdleAlphaContinuityRegime({
+              quietQuotaRegime,
+              executableWalletBuyCount,
+              openPositionCount: store.positions.length,
+            });
 		        const alphaBaseCandidates = Array.from(quotaTrendingMap.values())
 	          .filter((candidate: any) =>
 	            candidate?.mint &&
@@ -6711,11 +6893,34 @@ async function poll() {
 	          .sort((left: any, right: any) =>
 	            (right.alphaBoost - left.alphaBoost) ||
 	            (right.alphaKolCount - left.alphaKolCount) ||
-	            (Number(right.candidate?.buys1h || 0) - Number(left.candidate?.buys1h || 0)) ||
-	            (Number(right.candidate?.priceChange5m || 0) - Number(left.candidate?.priceChange5m || 0))
+	              (Number(right.candidate?.buys1h || 0) - Number(left.candidate?.buys1h || 0)) ||
+	              (Number(right.candidate?.priceChange5m || 0) - Number(left.candidate?.priceChange5m || 0))
 	          )
 	          .slice(0, resolveAlphaQuotaCandidateLimit(globalQuotaAssistLevel));
-	        const alphaGuardFilteredCount = Math.max(0, alphaBaseCandidates.length - alphaBaseShortlist.length);
+          const alphaContinuityShortlist =
+            alphaBaseShortlist.length === 0 && idleAlphaContinuityRegime.active
+              ? alphaBaseCandidates
+                  .filter((row: any) => row.alphaKolCount > 0 || row.signalCount >= IDLE_ALPHA_CONTINUITY_MIN_SIGNAL_COUNT)
+                  .sort((left: any, right: any) =>
+                    (right.alphaBoost - left.alphaBoost) ||
+                    (right.alphaKolCount - left.alphaKolCount) ||
+                    (Number(right.signalCount || 0) - Number(left.signalCount || 0)) ||
+                    (Number(right.candidate?.buys1h || 0) - Number(left.candidate?.buys1h || 0)) ||
+                    (Number(right.candidate?.priceChange5m || 0) - Number(left.candidate?.priceChange5m || 0))
+                  )
+                  .slice(0, Math.max(2, Math.min(5, resolveAlphaQuotaCandidateLimit(globalQuotaAssistLevel))))
+              : [];
+          if (alphaContinuityShortlist.length > 0) {
+            console.log(
+              `[SNIPER]  ALPHA IDLE SHORTLIST: reviving ${alphaContinuityShortlist.length} signal-backed candidate(s) ` +
+              `after ${idleAlphaContinuityRegime.idleMinutes}m flat book.`
+            );
+          }
+          const alphaCandidateShortlist =
+            alphaBaseShortlist.length > 0
+              ? alphaBaseShortlist
+              : alphaContinuityShortlist;
+	        const alphaGuardFilteredCount = Math.max(0, alphaBaseCandidates.length - alphaCandidateShortlist.length);
 	        if (alphaGuardFilteredCount > 0) {
 	          console.log(
 	            `[SNIPER]  ALPHA QUALITY HOLD: filtered ${alphaGuardFilteredCount} quota candidate(s) ` +
@@ -6723,11 +6928,11 @@ async function poll() {
 	          );
 	        }
 	        const alphaBaseRank = new Map(
-	          alphaBaseShortlist.map((row: any, index: number) => [String(row?.candidate?.mint || ''), index]),
+	          alphaCandidateShortlist.map((row: any, index: number) => [String(row?.candidate?.mint || ''), index]),
 	        );
           const alphaMinLiquidityUsd = Math.max(0, Number(loadNormalLaneConfig().minLiquidityUsd || 0));
 	        const alphaShortlist = annotateCandidatesWithExpectedValue(
-	          alphaBaseShortlist,
+	          alphaCandidateShortlist,
 	          (row: any) => ({
 	            entryMode: microOnlyMode ? 'micro-scout' : 'normal',
 	            sourceLane: 'alpha',
@@ -6786,6 +6991,7 @@ async function poll() {
             const alphaBuyRatio = Number(candidate.buyRatio || 0);
             const alphaBuys1h = Number(candidate.buys1h || 0);
             const alphaSignalCount = Math.max(0, Number(row.signalCount || 0));
+            const rowEv = row.expectedValueDecision || {};
             const alphaStrongFiveMinuteContinuation =
               alphaMomentum5m >= 8 &&
               alphaBuyRatio >= 0.7 &&
@@ -6794,7 +7000,27 @@ async function poll() {
             const alphaContinuationConfirmed =
               (alphaMomentum5m > 0 && alphaMomentum1m > 0) ||
               alphaStrongFiveMinuteContinuation;
-            if (!alphaContinuationConfirmed) {
+            const idleAlphaContinuityProbeDecision = evaluateIdleAlphaContinuityProbe({
+              symbol,
+              momentum5m: alphaMomentum5m,
+              momentum1m: alphaMomentum1m,
+              priceChange1h: alphaPriceChange1h,
+              volume1hUsd: alphaVolume1h,
+              liquidityUsd: alphaLiquidityUsd,
+              buyRatio: alphaBuyRatio,
+              buys1h: alphaBuys1h,
+              signalCount: alphaSignalCount,
+              alphaKolCount: row.alphaKolCount,
+              expectedValueSol: Number(rowEv.expectedPnlSol || 0),
+              normalLaneMinLiquidityUsd: alphaMinLiquidityUsd,
+              executableWalletBuyCount,
+              quietQuotaRegime,
+              openPositionCount: store.positions.length,
+            });
+            const alphaContinuationApproved =
+              alphaContinuationConfirmed ||
+              idleAlphaContinuityProbeDecision.allow;
+            if (!alphaContinuationApproved) {
               console.log(
                 `[SNIPER]  ALPHA MOMENTUM HOLD: ${symbol} needs positive 1m and 5m continuation ` +
                 `or a strong 5m alpha tape ` +
@@ -6804,16 +7030,24 @@ async function poll() {
               await setMintCooldown(pollPub, candidate.mint, 30, 'ALPHA_CONTINUATION');
               continue;
             }
-            if (alphaLiquidityUsd > 0 && alphaLiquidityUsd < alphaMinLiquidityUsd) {
+            const effectiveAlphaMinLiquidityUsd = idleAlphaContinuityProbeDecision.allow
+              ? idleAlphaContinuityProbeDecision.minLiquidityUsd
+              : alphaMinLiquidityUsd;
+            if (alphaLiquidityUsd > 0 && alphaLiquidityUsd < effectiveAlphaMinLiquidityUsd) {
               console.log(
                 `[SNIPER]  ALPHA LIQUIDITY HOLD: ${symbol} liquidity $${alphaLiquidityUsd.toFixed(0)} ` +
-                `< $${alphaMinLiquidityUsd.toFixed(0)} floor.`
+                `< $${effectiveAlphaMinLiquidityUsd.toFixed(0)} floor.`
               );
               const pollPub = RedisBus.getPublisher();
               await setMintCooldown(pollPub, candidate.mint, 45, 'ALPHA_LIQUIDITY');
               continue;
             }
-	          const rowEv = row.expectedValueDecision || {};
+            if (idleAlphaContinuityProbeDecision.allow) {
+              console.log(
+                `[SNIPER]  ALPHA IDLE PROBE READY: ${symbol} ${idleAlphaContinuityProbeDecision.reason} ` +
+                `| liq floor $${effectiveAlphaMinLiquidityUsd.toFixed(0)} | 5m=${alphaMomentum5m.toFixed(1)}%`
+              );
+            }
 	          console.log(
 	            `[SNIPER]  ALPHA QUOTA ASSIST: ${symbol} | boost=${row.alphaBoost >= 0 ? '+' : ''}${(row.alphaBoost * 100).toFixed(1)}% ` +
 	            `| kols=${row.alphaKolCount} | signals=${row.signalCount} | quota=${globalQuotaAssistLevel} ` +
@@ -6834,22 +7068,31 @@ async function poll() {
             alphaMomentum1m,
             alphaPairCreatedAt,
             {
-              ...buildMicroOnlyProbeEntryOptions({
-                requestedEntryMode: 'normal',
-                microOnlyMode,
-                microScoutConfig,
-              }),
+              ...(idleAlphaContinuityProbeDecision.allow
+                ? buildMicroScoutEntryOptions({
+                    requestedEntryMode: 'micro-scout',
+                    microScoutConfig,
+                  })
+                : buildMicroOnlyProbeEntryOptions({
+                    requestedEntryMode: 'normal',
+                    microOnlyMode,
+                    microScoutConfig,
+                  })),
               sourceLane: 'alpha',
               entryFamily: 'alpha',
               quotaAssist: true,
               quotaAssistLevel: globalQuotaAssistLevel,
               qualifierThresholdScale: 1,
-              minLiquidityUsd: alphaMinLiquidityUsd,
+              minLiquidityUsd: effectiveAlphaMinLiquidityUsd,
               alphaBoost: row.alphaBoost,
               alphaKolCount: row.alphaKolCount,
               signalCount: row.signalCount,
               kolConfirmed: row.alphaKolCount > 0,
               walletConfirmed: isWalletConfirmedSignal(row.walletSignal),
+              continuationApproved: idleAlphaContinuityProbeDecision.allow,
+              idleContinuityProbe: idleAlphaContinuityProbeDecision.allow,
+              idleContinuityReason: idleAlphaContinuityProbeDecision.reason,
+              idleContinuityWindowMs: idleAlphaContinuityProbeDecision.windowMs,
             },
           );
         }
