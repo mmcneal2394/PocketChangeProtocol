@@ -9,6 +9,7 @@ const {
   loadMarkoutPending,
   processDueMarkouts,
   buildMarkoutSummaryFromRows,
+  evaluateMarkoutProbeAssist,
 } = require('./markout_tracker_logic.ts');
 
 function tempPaths() {
@@ -161,4 +162,39 @@ test('buildMarkoutSummaryFromRows aggregates missed-winner rate by lane and reas
   assert.equal(summary.byLane.alpha.missedWinners, 1);
   assert.equal(summary.byReason.expected_value_negative.correctRejects, 1);
   assert.equal(summary.byLane.alpha.missedWinnerRate, 0.5);
+});
+
+test('evaluateMarkoutProbeAssist allows quote probes only after enough missed-winner evidence', () => {
+  const rows = [];
+  for (let i = 0; i < 8; i += 1) {
+    rows.push({
+      sourceLane: 'velocity-first-preflight',
+      stage: 'velocity_first',
+      reason: 'low_liq_route_preflight',
+      status: 'missed_winner',
+      missedWinner: true,
+      returnPct: 32,
+      ts: i + 1,
+    });
+  }
+  for (let i = 0; i < 14; i += 1) {
+    rows.push({
+      sourceLane: 'velocity-first-preflight',
+      stage: 'velocity_first',
+      reason: 'low_liq_route_preflight',
+      status: 'correct_reject',
+      correctReject: true,
+      returnPct: -2,
+      ts: 100 + i,
+    });
+  }
+  const summary = buildMarkoutSummaryFromRows(rows);
+  const decision = evaluateMarkoutProbeAssist({
+    sourceLane: 'velocity-first-preflight',
+    reason: 'low_liq_route_preflight',
+  }, { summary });
+
+  assert.equal(decision.allowProbe, true);
+  assert.equal(decision.code, 'markout_probe_assist_allow');
+  assert.equal(decision.samples, 22);
 });

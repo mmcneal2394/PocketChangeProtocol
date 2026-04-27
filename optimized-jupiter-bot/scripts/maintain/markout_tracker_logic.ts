@@ -100,6 +100,34 @@ export interface MarkoutSummary {
   byReason: Record<string, MarkoutSummaryBucket>;
 }
 
+export interface MarkoutProbeAssistDecision {
+  enabled: boolean;
+  allowProbe: boolean;
+  reason: string;
+  code: string;
+  samples: number;
+  missedWinnerRate: number;
+  correctRejectRate: number;
+  avgReturnPct: number;
+  maxReturnPct: number;
+}
+
+export interface MarkoutProbeAssistConfig {
+  enabled?: boolean;
+  minSamples?: number;
+  minMissedWinnerRate?: number;
+  minAvgReturnPct?: number;
+  maxCorrectRejectRate?: number;
+}
+
+const DEFAULT_PROBE_ASSIST_CONFIG: Required<MarkoutProbeAssistConfig> = {
+  enabled: process.env.MARKOUT_PROBE_ASSIST_ENABLED !== 'false',
+  minSamples: 20,
+  minMissedWinnerRate: 0.28,
+  minAvgReturnPct: 8,
+  maxCorrectRejectRate: 0.74,
+};
+
 function toFiniteNumber(value: any, fallback = 0): number {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : fallback;
@@ -453,6 +481,86 @@ function writeSummaryFromResults(resultsFilePath: string, summaryFilePath: strin
   return summary;
 }
 
+export function loadMarkoutSummary(options?: { summaryFilePath?: string; resultsFilePath?: string }): MarkoutSummary {
+  const summaryFilePath = options?.summaryFilePath || MARKOUT_SUMMARY_FILE;
+  try {
+    if (fs.existsSync(summaryFilePath)) {
+      const parsed = JSON.parse(fs.readFileSync(summaryFilePath, 'utf-8'));
+      if (parsed && typeof parsed === 'object' && parsed.totals) return parsed;
+    }
+  } catch {
+    // Fall back to rebuilding from results.
+  }
+  const resultsFilePath = options?.resultsFilePath || MARKOUT_RESULTS_FILE;
+  return buildMarkoutSummaryFromRows(readTailJsonl(resultsFilePath, DEFAULT_MAX_RESULTS_FOR_SUMMARY));
+}
+
+function normalizeProbeAssistConfig(config?: MarkoutProbeAssistConfig): Required<MarkoutProbeAssistConfig> {
+  return {
+    ...DEFAULT_PROBE_ASSIST_CONFIG,
+    ...(config || {}),
+  };
+}
+
+function emptyProbeAssistDecision(enabled: boolean, code: string, reason: string): MarkoutProbeAssistDecision {
+  return {
+    enabled,
+    allowProbe: false,
+    reason,
+    code,
+    samples: 0,
+    missedWinnerRate: 0,
+    correctRejectRate: 0,
+    avgReturnPct: 0,
+    maxReturnPct: 0,
+  };
+}
+
+export function evaluateMarkoutProbeAssist(
+  input: { sourceLane?: string; reason?: string; stage?: string } = {},
+  options?: { summary?: MarkoutSummary | null; config?: MarkoutProbeAssistConfig },
+): MarkoutProbeAssistDecision {
+  const config = normalizeProbeAssistConfig(options?.config);
+  if (!config.enabled) return emptyProbeAssistDecision(false, 'markout_probe_assist_disabled', 'markout probe assist disabled');
+  const summary = options?.summary || loadMarkoutSummary();
+  const candidates = [
+    input.reason ? summary.byReason?.[normalizeString(input.reason)] : null,
+    input.sourceLane ? summary.byLane?.[normalizeString(input.sourceLane)] : null,
+    input.stage ? summary.byStage?.[normalizeString(input.stage)] : null,
+  ].filter(Boolean) as MarkoutSummaryBucket[];
+  const bucket = candidates
+    .sort((a, b) => Number(b.samples || 0) - Number(a.samples || 0))[0];
+
+  if (!bucket) return emptyProbeAssistDecision(true, 'markout_probe_assist_no_evidence', 'no markout evidence yet');
+
+  const decision: MarkoutProbeAssistDecision = {
+    enabled: true,
+    allowProbe: false,
+    reason: 'markout evidence has not cleared probe-assist thresholds',
+    code: 'markout_probe_assist_insufficient',
+    samples: Math.max(0, Math.round(toFiniteNumber(bucket.samples, 0))),
+    missedWinnerRate: Number(toFiniteNumber(bucket.missedWinnerRate, 0).toFixed(6)),
+    correctRejectRate: Number(toFiniteNumber(bucket.correctRejectRate, 0).toFixed(6)),
+    avgReturnPct: Number(toFiniteNumber(bucket.avgReturnPct, 0).toFixed(6)),
+    maxReturnPct: Number(toFiniteNumber(bucket.maxReturnPct, 0).toFixed(6)),
+  };
+
+  if (
+    decision.samples >= config.minSamples &&
+    decision.missedWinnerRate >= config.minMissedWinnerRate &&
+    decision.avgReturnPct >= config.minAvgReturnPct &&
+    decision.correctRejectRate <= config.maxCorrectRejectRate
+  ) {
+    decision.allowProbe = true;
+    decision.code = 'markout_probe_assist_allow';
+    decision.reason =
+      `markouts show ${(decision.missedWinnerRate * 100).toFixed(1)}% missed winners ` +
+      `over ${decision.samples} samples`;
+  }
+
+  return decision;
+}
+
 export async function processDueMarkouts(options: {
   now?: number;
   fetchPair: (mint: string) => Promise<JsonRow | null> | JsonRow | null;
@@ -508,6 +616,8 @@ export async function processDueMarkouts(options: {
 module.exports = {
   scheduleMarkout,
   loadMarkoutPending,
+  loadMarkoutSummary,
+  evaluateMarkoutProbeAssist,
   processDueMarkouts,
   buildMarkoutSummaryFromRows,
 };

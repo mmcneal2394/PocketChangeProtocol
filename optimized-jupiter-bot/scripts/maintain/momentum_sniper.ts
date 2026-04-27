@@ -182,6 +182,8 @@ const {
 const {
   scheduleMarkout,
   processDueMarkouts,
+  loadMarkoutSummary,
+  evaluateMarkoutProbeAssist,
 } = require('./markout_tracker_logic.ts');
 const {
   scoreLiquidityQuality,
@@ -232,6 +234,10 @@ function getExpectedValueModelSnapshot() {
 
 function getTargetQualitySummarySnapshot() {
   return loadTargetQualitySummary();
+}
+
+function getMarkoutSummarySnapshot() {
+  return loadMarkoutSummary();
 }
 
 function buildTargetQualityInput(input: Record<string, any>, expectedValueDecision?: any) {
@@ -9034,12 +9040,34 @@ async function poll() {
           livePair = await fetchDexScreenerPair(v.mint);
 	          if (livePair && !isExecutableLivePair(livePair)) {
               const routeLivePreflightWalletSignal = freshWalletSignalMap.get(String(v.mint || '').trim()) || null;
-              const allowUnconfirmedRouteProbe =
+              const markoutProbeAssist = evaluateMarkoutProbeAssist(
+                {
+                  sourceLane: 'velocity-first-preflight',
+                  stage: 'velocity_first',
+                  reason: 'low_liq_route_preflight',
+                },
+                { summary: getMarkoutSummarySnapshot() },
+              );
+              const baseAllowUnconfirmedRouteProbe =
                 microScoutConfig.enabled &&
                 microScoutDecision.shouldScout &&
                 microScoutEntriesThisPoll < microScoutPacing.maxCandidatesPerPoll &&
                 !lossStreakRestricted &&
                 Number(microScoutConfig.fixedBuySol || 0) <= 0.001;
+              const markoutAssistedRouteProbe =
+                markoutProbeAssist.allowProbe &&
+                microScoutConfig.enabled &&
+                microScoutEntriesThisPoll < microScoutPacing.maxCandidatesPerPoll &&
+                !lossStreakRestricted &&
+                Number(microScoutConfig.fixedBuySol || 0) <= 0.001 &&
+                Number(v.buys60s || 0) >= 3 &&
+                Number(v.solVolume60s || 0) >= 0.5;
+              const allowUnconfirmedRouteProbe = baseAllowUnconfirmedRouteProbe || markoutAssistedRouteProbe;
+              if (markoutAssistedRouteProbe && !baseAllowUnconfirmedRouteProbe) {
+                console.log(
+                  `[SNIPER]  MARKOUT PROBE ASSIST: ${symbol} allowing quote probe because ${markoutProbeAssist.reason}.`
+                );
+              }
               if (
                 livePair.liquidity < loadNormalLaneConfig().minLiquidityUsd &&
                 !isWalletConfirmedSignal(routeLivePreflightWalletSignal) &&
