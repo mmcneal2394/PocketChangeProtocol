@@ -18,6 +18,7 @@ type AlphaSignal = {
 const SIGNALS_DIR = path.join(process.cwd(), 'signals');
 const CATALYST_ALERTS_FILE = path.join(SIGNALS_DIR, 'catalyst_alerts.json');
 const WALLET_SIGNALS_FILE = path.join(SIGNALS_DIR, 'wallet_signals.json');
+const jsonCache = new Map<string, { mtimeMs: number; value: any }>();
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -25,9 +26,14 @@ function clamp(value: number, min: number, max: number): number {
 
 function loadJsonSafe(filePath: string, fallback: any): any {
   try {
-    if (!fs.existsSync(filePath)) return fallback;
-    return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    const stat = fs.statSync(filePath);
+    const cached = jsonCache.get(filePath);
+    if (cached && cached.mtimeMs === stat.mtimeMs) return cached.value;
+    const parsed = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    jsonCache.set(filePath, { mtimeMs: stat.mtimeMs, value: parsed });
+    return parsed;
   } catch {
+    jsonCache.delete(filePath);
     return fallback;
   }
 }

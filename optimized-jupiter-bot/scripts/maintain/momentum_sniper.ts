@@ -1748,13 +1748,7 @@ async function runLastStandScan(context: LastStandContext): Promise<boolean> {
     return false;
   }
 
-  let trendingMap: Map<string, any> = new Map();
-  if (fs.existsSync(TRENDING_FILE)) {
-    try {
-      const tRaw = JSON.parse(fs.readFileSync(TRENDING_FILE, 'utf-8'));
-      trendingMap = buildTrendingMap(tRaw);
-    } catch {}
-  }
+  const trendingMap = getTrendingMapSnapshot();
 
   const candidates: Array<{
     mint: string;
@@ -2353,14 +2347,63 @@ let familyPerformanceMemory = buildFamilyPerformanceMemory([]);
 const TOKEN_PROGRAM_ID_STR = TOKEN_PROGRAM_ID.toBase58();
 const TOKEN_2022_PROGRAM_ID_STR = TOKEN_2022_PROGRAM_ID.toBase58();
 const tokenProgramIdCache = new Map<string, string>();
+const jsonFileCache = new Map<string, { mtimeMs: number; value: any }>();
+let trendingMapCache: { mtimeMs: number; value: Map<string, any> } | null = null;
+let trendingDiscoveryMetaCache: { mtimeMs: number; value: Map<string, any> } | null = null;
+
+function getJsonFileSnapshot<T = any>(file: string): { mtimeMs: number; value: T } | null {
+  try {
+    const stat = fs.statSync(file);
+    const cached = jsonFileCache.get(file);
+    if (cached && cached.mtimeMs === stat.mtimeMs) return cached as { mtimeMs: number; value: T };
+    const parsed = JSON.parse(fs.readFileSync(file, 'utf-8')) as T;
+    const snapshot = { mtimeMs: stat.mtimeMs, value: parsed };
+    jsonFileCache.set(file, snapshot);
+    return snapshot;
+  } catch {
+    jsonFileCache.delete(file);
+    return null;
+  }
+}
 
 function readJsonFile<T = any>(file: string): T | null {
+  return getJsonFileSnapshot<T>(file)?.value ?? null;
+}
+
+function readJsonArrayFile<T = any>(file: string): T[] {
+  const value = readJsonFile<any>(file);
+  return Array.isArray(value) ? value : [];
+}
+
+function getTrendingFileMtimeMs(): number | null {
   try {
-    if (!fs.existsSync(file)) return null;
-    return JSON.parse(fs.readFileSync(file, 'utf-8')) as T;
+    return Number(fs.statSync(TRENDING_FILE).mtimeMs || 0);
   } catch {
     return null;
   }
+}
+
+function loadTrendingRowsFromDisk(): any[] {
+  try {
+    const raw = JSON.parse(fs.readFileSync(TRENDING_FILE, 'utf-8'));
+    return Array.isArray(raw) ? raw : Array.isArray(raw?.mints) ? raw.mints : [];
+  } catch {
+    return [];
+  }
+}
+
+function getTrendingMapSnapshot(): Map<string, any> {
+  const mtimeMs = getTrendingFileMtimeMs();
+  if (!mtimeMs) {
+    trendingMapCache = null;
+    return new Map();
+  }
+  if (trendingMapCache && trendingMapCache.mtimeMs === mtimeMs) {
+    return trendingMapCache.value;
+  }
+  const map = buildTrendingMap(loadTrendingRowsFromDisk());
+  trendingMapCache = { mtimeMs, value: map };
+  return map;
 }
 
 function getCurrentRealizedPnlSol(): number {
@@ -2764,6 +2807,29 @@ function loadBagsEnrichmentMeta(mint: string): DiscoveryRiskMeta | null {
   return mergeDiscoveryRiskMeta(freeMeta, jupiterMeta);
 }
 
+function getTrendingDiscoveryMeta(mint: string): DiscoveryRiskMeta | null {
+  const mtimeMs = getTrendingFileMtimeMs();
+  if (!mtimeMs) {
+    trendingDiscoveryMetaCache = null;
+    return null;
+  }
+  if (!trendingDiscoveryMetaCache || trendingDiscoveryMetaCache.mtimeMs !== mtimeMs) {
+    const metaByMint = new Map<string, DiscoveryRiskMeta>();
+    for (const row of loadTrendingRowsFromDisk()) {
+      const rowMint = String(row?.baseToken?.address || row?.mint || '').trim();
+      if (!rowMint) continue;
+      const meta = mergeDiscoveryRiskMeta(
+        extractGmgnImageDupMeta(row?._gmgn, 'trending-gmgn'),
+        extractGmgnImageDupMeta(row?._bags, 'trending-bags'),
+        extractGmgnImageDupMeta(row, 'trending-row'),
+      );
+      if (meta) metaByMint.set(rowMint, meta);
+    }
+    trendingDiscoveryMetaCache = { mtimeMs, value: metaByMint };
+  }
+  return (trendingDiscoveryMetaCache.value.get(mint) as DiscoveryRiskMeta | undefined) || null;
+}
+
 function loadGmgnImageDupMeta(mint: string, allowCliFallback = false) {
   const cached = gmgnImageDupCache.get(mint);
   if (cached && (Date.now() - cached.fetchedAt) < (10 * 60_000)) return cached;
@@ -2774,19 +2840,11 @@ function loadGmgnImageDupMeta(mint: string, allowCliFallback = false) {
   }
   const bagsMeta = loadBagsEnrichmentMeta(mint);
 
-  const trendingRows = readJsonFile<any[]>(TRENDING_FILE);
-  if (Array.isArray(trendingRows)) {
-    const row = trendingRows.find((item: any) => (item?.baseToken?.address || item?.mint) === mint);
-    const meta = mergeDiscoveryRiskMeta(
-      extractGmgnImageDupMeta(row?._gmgn, 'trending-gmgn'),
-      extractGmgnImageDupMeta(row?._bags, 'trending-bags'),
-      extractGmgnImageDupMeta(row, 'trending-row'),
-      bagsMeta,
-    );
-    if (meta) {
-      gmgnImageDupCache.set(mint, meta);
-      return meta;
-    }
+  const trendingMeta = getTrendingDiscoveryMeta(mint);
+  const mergedTrendingMeta = mergeDiscoveryRiskMeta(trendingMeta, bagsMeta);
+  if (mergedTrendingMeta) {
+    gmgnImageDupCache.set(mint, mergedTrendingMeta);
+    return mergedTrendingMeta;
   }
 
   const gmgnTrending = readJsonFile<any>(GMGN_TRENDING_FILE);
@@ -6804,13 +6862,7 @@ async function poll() {
         `${executableWalletBuyCount} executable wallet buys and ${gmgnFollowCount} GMGN follow leads.`
       );
     }
-    let quotaTrendingMap: Map<string, any> = new Map();
-    if (fs.existsSync(TRENDING_FILE)) {
-      try {
-        const tRaw = JSON.parse(fs.readFileSync(TRENDING_FILE, 'utf-8'));
-        quotaTrendingMap = buildTrendingMap(tRaw);
-      } catch {}
-    }
+    const quotaTrendingMap = getTrendingMapSnapshot();
 
 	    if (store.positions.length < MAX_POSITIONS && Array.isArray(walletSignalSnapshot?.buy_signals)) {
 	      try {
@@ -7304,9 +7356,9 @@ async function poll() {
     // --- PATH 0b: VELOCITY ARBITRAGE (Quota-Filler bypass lane) ---
     // Instantly catch any token with >5% price spike and > volume, bypassing mature checks
 	    try {
-	        if (fs.existsSync(TRENDING_FILE) && store.positions.length < MAX_POSITIONS) {
-	            const tRaw = JSON.parse(fs.readFileSync(TRENDING_FILE, 'utf-8'));
-	            const velocityCandidates = tRaw.filter((t: any) =>
+	        const trendingValues = Array.from(getTrendingMapSnapshot().values());
+	        if (trendingValues.length > 0 && store.positions.length < MAX_POSITIONS) {
+	            const velocityCandidates = trendingValues.filter((t: any) =>
 	                (t.priceChange5m || 0) >= 5.0 &&
 	                (t.volume1h || 0) >= 10000 &&
 	                !store.blacklist.includes(t.mint) &&
@@ -7531,13 +7583,7 @@ async function poll() {
 	      );
 
       // Load trending for cross-reference (1h direction confirmation)
-      let trendingMap: Map<string, any> = new Map();
-	      if (fs.existsSync(TRENDING_FILE)) {
-	        try {
-	          const tRaw = JSON.parse(fs.readFileSync(TRENDING_FILE, 'utf-8'));
-	          trendingMap = buildTrendingMap(tRaw);
-	        } catch {}
-	      }
+      const trendingMap = getTrendingMapSnapshot();
 
 	      eligibleAccelerating = annotateCandidatesWithExpectedValue(
 	        eligibleAccelerating as any,
@@ -8983,14 +9029,7 @@ async function poll() {
         1,
         Math.min(matureFallbackConfig.maxCandidatesPerPoll, microScoutConfig.maxCandidatesPerPoll),
       );
-      let matureTrendingMap: Map<string, any> = new Map();
-
-      if (fs.existsSync(TRENDING_FILE)) {
-        try {
-          const tRaw = JSON.parse(fs.readFileSync(TRENDING_FILE, 'utf-8'));
-          matureTrendingMap = buildTrendingMap(tRaw);
-        } catch {}
-      }
+      const matureTrendingMap = getTrendingMapSnapshot();
 
       if (matureTrendingMap.size === 0) {
         return;
