@@ -31,6 +31,7 @@ const TRENDING_FILE = path.join(SIGNALS_DIR, 'trending.json');
 const FOLLOW_MONITOR_WINDOW_MS = 5 * 60_000;
 const FOLLOW_MONITOR_MIN_INFLOW_USD = 250;
 const FOLLOW_MONITOR_MIN_TRADES = 2;
+const TRENDING_BRIDGE_MAX_ROWS = Math.max(500, Number(process.env.GMGN_BRIDGE_TRENDING_MAX_ROWS || 5000));
 const GMGN_CLI_BIN = process.platform === 'win32' ? 'gmgn-cli.cmd' : '/usr/bin/gmgn-cli';
 const GMGN_CLI_TIMEOUT_MS = 120_000;
 const GLOBAL_NPM_BIN = process.platform === 'win32'
@@ -110,6 +111,59 @@ function asArray<T = any>(value: any): T[] {
 function parseNumber(value: any): number {
   const n = typeof value === 'number' ? value : parseFloat(String(value ?? '0'));
   return Number.isFinite(n) ? n : 0;
+}
+
+function toEpochMs(value: any): number {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) return 0;
+  return numeric < 10_000_000_000 ? numeric * 1000 : numeric;
+}
+
+function rowMint(row: any): string {
+  return String(row?.baseToken?.address || row?.mint || '').trim();
+}
+
+function rowFreshnessMs(row: any): number {
+  return Math.max(
+    toEpochMs(row?.observedAt),
+    toEpochMs(row?.fetchedAt),
+    toEpochMs(row?._gmgn?.fetchedAt),
+    toEpochMs(row?._gmgn?.observedAt),
+    toEpochMs(row?._gmgn?.followMonitor?.lastTradeAt),
+    toEpochMs(row?.pairCreatedAt),
+    toEpochMs(row?.createdAt),
+  );
+}
+
+function rowDiscoveryScore(row: any): number {
+  const liquidityUsd = parseNumber(row?.liquidity?.usd ?? row?.liquidityUsd);
+  const volume1h = parseNumber(row?.volume?.h1 ?? row?.volume1h);
+  const volume5m = parseNumber(row?.volume?.m5 ?? row?.volume5m);
+  const freshness = rowFreshnessMs(row);
+  return (
+    Math.min(500_000, volume1h) +
+    Math.min(250_000, volume5m * 2) +
+    Math.min(250_000, liquidityUsd * 3) +
+    (freshness > 0 ? Math.min(100_000, Math.max(0, Date.now() - freshness) / -1000 + 100_000) : 0)
+  );
+}
+
+function compactTrendingRows(rows: any[]): any[] {
+  const byMint = new Map<string, any>();
+  for (const row of rows) {
+    const mint = rowMint(row);
+    if (!mint) continue;
+    const existing = byMint.get(mint);
+    if (!existing || rowFreshnessMs(row) >= rowFreshnessMs(existing)) {
+      byMint.set(mint, row);
+    }
+  }
+  return Array.from(byMint.values())
+    .sort((a, b) =>
+      (rowFreshnessMs(b) - rowFreshnessMs(a)) ||
+      (rowDiscoveryScore(b) - rowDiscoveryScore(a))
+    )
+    .slice(0, TRENDING_BRIDGE_MAX_ROWS);
 }
 
 // ── Feed 1: Trending Tokens ────────────────────────────────────────────────
@@ -255,14 +309,19 @@ function injectIntoSniperTrending(gmgnTokens: TrendingToken[]) {
     }
   } catch { existing = []; }
 
-  const existingMints = new Set(existing.map((t: any) => t.baseToken?.address || t.mint));
+  const indexByMint = new Map<string, any>();
+  for (const row of existing) {
+    const mint = rowMint(row);
+    if (mint) indexByMint.set(mint, row);
+  }
   let added = 0;
+  let updated = 0;
 
   for (const t of gmgnTokens) {
-    if (!t.mint || existingMints.has(t.mint)) continue;
+    if (!t.mint) continue;
     if (t.liquidity < 5000 || t.volume5m < 1000) continue;
 
-    existing.push({
+    const nextRow = {
       chainId: 'solana',
       dexId: 'gmgn-bridge',
       url: `https://gmgn.ai/sol/token/${t.mint}`,
@@ -274,15 +333,30 @@ function injectIntoSniperTrending(gmgnTokens: TrendingToken[]) {
       liquidity: { usd: t.liquidity },
       fdv: t.marketCap,
       txns: { h1: { buys: t.buys, sells: t.sells } },
-      _gmgn: { smartMoney: t.smartMoney, holders: t.holders, source: 'gmgn-bridge' },
-    });
-    existingMints.add(t.mint);
-    added++;
+      observedAt: t.fetchedAt,
+      fetchedAt: t.fetchedAt,
+      _gmgn: { smartMoney: t.smartMoney, holders: t.holders, source: 'gmgn-bridge', fetchedAt: t.fetchedAt },
+    };
+
+    const existingRow = indexByMint.get(t.mint);
+    if (existingRow) {
+      Object.assign(existingRow, {
+        ...existingRow,
+        ...nextRow,
+        _gmgn: { ...(existingRow._gmgn || {}), ...nextRow._gmgn },
+      });
+      updated++;
+    } else {
+      existing.push(nextRow);
+      indexByMint.set(t.mint, nextRow);
+      added++;
+    }
   }
 
-  if (added > 0) {
-    safeWrite(TRENDING_FILE, existing);
-    console.log(`[GMGN-BRIDGE] Injected ${added} GMGN tokens into sniper trending (${existing.length} total)`);
+  if (added > 0 || updated > 0) {
+    const compacted = compactTrendingRows(existing);
+    safeWrite(TRENDING_FILE, compacted);
+    console.log(`[GMGN-BRIDGE] Upserted ${added} new / ${updated} refreshed GMGN tokens into sniper trending (${compacted.length} total)`);
   }
 }
 
@@ -432,7 +506,9 @@ function injectFollowMonitorIntoTrending(tokens: FollowMonitorToken[]) {
   let touched = 0;
   for (const token of tokens) {
     const existingRow = indexByMint.get(token.mint);
+    const observedAt = token.lastTradeAt * 1000;
     if (existingRow) {
+      existingRow.observedAt = Math.max(toEpochMs(existingRow.observedAt), observedAt);
       existingRow._gmgn = {
         ...(existingRow._gmgn || {}),
         source: existingRow._gmgn?.source || 'gmgn-bridge',
@@ -460,6 +536,7 @@ function injectFollowMonitorIntoTrending(tokens: FollowMonitorToken[]) {
       liquidity: { usd: 0 },
       fdv: 0,
       txns: { h1: { buys: token.tradeCount5m, sells: 0 } },
+      observedAt,
       _gmgn: {
         source: 'gmgn-follow-monitor',
         followMonitor: {
@@ -475,8 +552,9 @@ function injectFollowMonitorIntoTrending(tokens: FollowMonitorToken[]) {
   }
 
   if (touched > 0) {
-    safeWrite(TRENDING_FILE, existing);
-    console.log(`[GMGN-BRIDGE] Annotated ${touched} trending rows with follow-monitor inflow`);
+    const compacted = compactTrendingRows(existing);
+    safeWrite(TRENDING_FILE, compacted);
+    console.log(`[GMGN-BRIDGE] Annotated ${touched} trending rows with follow-monitor inflow (${compacted.length} total)`);
   }
 }
 

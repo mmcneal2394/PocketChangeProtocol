@@ -169,6 +169,49 @@ test('allows early weak-route probe when price response is already real and stil
   assert.equal(result.allowEntry, true);
 });
 
+test('allows route-live continuation probe when current momentum is intact near peak', () => {
+  const config = normalizeMicroScoutQualityConfig({});
+  const result = evaluateMicroScoutQualityGate({
+    entryMode: 'micro-scout',
+    probeLike: true,
+    routeLive: true,
+    momentum5mPct: 18.7,
+    routeStrengthPct: null,
+    sampleCount: 2,
+    priceDelta5mPct: -0.9,
+    priceOffPeak5mPct: 0.9,
+  }, config);
+  assert.equal(result.allowEntry, true);
+});
+
+test('holds instead of blocking when route quality probe is rate-limited', () => {
+  const config = normalizeMicroScoutQualityConfig({});
+  const result = evaluateMicroScoutQualityGate({
+    entryMode: 'micro-scout',
+    probeLike: true,
+    routeProbeRateLimited: true,
+    momentum5mPct: 18.7,
+    routeStrengthPct: null,
+    sampleCount: 5,
+  }, config);
+  assert.equal(result.shouldHold, true);
+  assert.equal(result.code, 'micro_scout_quality_wait');
+});
+
+test('does not classify tiny near-peak drift as late-entry rollover', () => {
+  const config = normalizeMicroScoutQualityConfig({});
+  const result = evaluateMicroScoutQualityGate({
+    entryMode: 'micro-scout',
+    probeLike: true,
+    momentum5mPct: 15.9,
+    routeStrengthPct: null,
+    sampleCount: 4,
+    priceDelta5mPct: -0.04,
+    priceOffPeak5mPct: 0.04,
+  }, config);
+  assert.notEqual(result.code, 'micro_scout_quality_late_entry');
+});
+
 test('still blocks weak-route probe when price response is rolling off despite enough samples', () => {
   const config = normalizeMicroScoutQualityConfig({});
   const result = evaluateMicroScoutQualityGate({

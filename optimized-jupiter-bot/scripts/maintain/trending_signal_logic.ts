@@ -7,6 +7,7 @@ export interface NormalizedTrendingToken {
   source?: string;
   volume1h: number;
   volume5m: number;
+  priceChange1m: number;
   priceChange1h: number;
   priceChange5m: number;
   liquidityUsd: number;
@@ -16,6 +17,7 @@ export interface NormalizedTrendingToken {
   sells1h: number;
   buyRatio: number;
   pairCreatedAt?: number;
+  observedAt?: number;
   smartMoney: number;
   holders: number;
   bagsSignal: boolean;
@@ -29,6 +31,12 @@ function toFiniteNumber(value: unknown, fallback = 0): number {
 function toOptionalTimestamp(value: unknown): number | undefined {
   const numeric = Number(value);
   return Number.isFinite(numeric) && numeric > 0 ? numeric : undefined;
+}
+
+function toOptionalEpochMs(value: unknown): number | undefined {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) return undefined;
+  return numeric < 10_000_000_000 ? numeric * 1000 : numeric;
 }
 
 export function extractTrendingEntries(raw: unknown): any[] {
@@ -58,6 +66,7 @@ export function normalizeTrendingEntry(raw: any): NormalizedTrendingToken | null
 
   const volume1h = toFiniteNumber(raw.volume1h ?? raw.volume?.h1);
   const volume5m = toFiniteNumber(raw.volume5m ?? raw.volume?.m5);
+  const priceChange1m = toFiniteNumber(raw.priceChange1m ?? raw.priceChange?.m1);
   const priceChange1h = toFiniteNumber(raw.priceChange1h ?? raw.priceChange?.h1);
   const priceChange5m = toFiniteNumber(raw.priceChange5m ?? raw.priceChange?.m5);
   const liquidityUsd = toFiniteNumber(raw.liquidityUsd ?? raw.liquidity?.usd);
@@ -69,6 +78,15 @@ export function normalizeTrendingEntry(raw: any): NormalizedTrendingToken | null
     buys1h > 0 ? buys1h / Math.max(1, sells1h) : 0;
   const buyRatio = Math.max(toFiniteNumber(raw.buyRatio, inferredBuyRatio), inferredBuyRatio);
   const pairCreatedAt = toOptionalTimestamp(raw.pairCreatedAt ?? raw.createdAt ?? raw.created_at);
+  const observedAt = toOptionalEpochMs(
+    raw.observedAt ??
+    raw.fetchedAt ??
+    raw.detectedAt ??
+    raw._gmgn?.fetchedAt ??
+    raw._gmgn?.observedAt ??
+    raw._gmgn?.followMonitor?.lastTradeAt ??
+    raw._bags?.detectedAt
+  );
   const smartMoney = toFiniteNumber(raw.smartMoney ?? raw._gmgn?.smartMoney);
   const holders = Math.max(0, Math.round(toFiniteNumber(raw.holders ?? raw._gmgn?.holders)));
   const bagsSignal =
@@ -85,6 +103,7 @@ export function normalizeTrendingEntry(raw: any): NormalizedTrendingToken | null
     source,
     volume1h,
     volume5m,
+    priceChange1m,
     priceChange1h,
     priceChange5m,
     liquidityUsd,
@@ -94,6 +113,7 @@ export function normalizeTrendingEntry(raw: any): NormalizedTrendingToken | null
     sells1h,
     buyRatio,
     pairCreatedAt,
+    observedAt,
     smartMoney,
     holders,
     bagsSignal,

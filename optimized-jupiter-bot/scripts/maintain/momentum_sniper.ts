@@ -32,6 +32,7 @@
 import { spawnSync } from 'child_process';
 import fs   from 'fs';
 import path from 'path';
+import { StringDecoder } from 'string_decoder';
 import { randomUUID } from 'crypto';
 import bs58 from 'bs58';
 import { Connection, Keypair, VersionedTransaction, PublicKey } from '@solana/web3.js';
@@ -178,6 +179,7 @@ let pollInFlight = false;
 let pollQueued = false;
 const snipeInFlight = new Set<string>();
 let lastVelocityTriggeredPollAt = 0;
+let lastVelocitySpikeLogAt = 0;
 export let globalQuotaPressure = 0.0;
 export let globalQuotaAssistLevel = 0;
 
@@ -402,6 +404,14 @@ try {
 
 
 const POLL_MS          = Math.max(5_000, parseInt(process.env.SNIPER_POLL_MS || '30000', 10) || 30_000); // Allow faster live-test polling without permanently hard-coding a tighter loop.
+const UNDERFILLED_POLL_MIN_MS = Math.max(
+  2_000,
+  Math.min(POLL_MS, parseInt(process.env.SNIPER_UNDERFILLED_POLL_MIN_MS || '10000', 10) || 10_000),
+);
+const VELOCITY_SPIKE_LOG_INTERVAL_MS = Math.max(
+  5_000,
+  parseInt(process.env.SNIPER_VELOCITY_SPIKE_LOG_INTERVAL_MS || '30000', 10) || 30_000,
+);
 const SIGNALS_DIR      = path.join(process.cwd(), 'signals');
 const TRENDING_FILE    = path.join(SIGNALS_DIR, 'trending.json');
 const SNIPER_LOG       = path.join(SIGNALS_DIR, process.env.PAPER_MODE === 'true' ? 'sniper_positions_paper.json' : 'sniper_positions.json');
@@ -469,6 +479,7 @@ interface EntryOptions {
   continuationApproved?: boolean;
   routeLiveFastTrack?: boolean;
   allowRoutableLowLiquidity?: boolean;
+  allowUnconfirmedRouteLiveProbe?: boolean;
   qualifierThresholdScale?: number;
   buyRatioThresholdScale?: number;
   buyCountThresholdScale?: number;
@@ -479,6 +490,7 @@ interface EntryOptions {
   portfolioFraction?: number;
   minDeploySol?: number;
   maxDeploySol?: number;
+  cachedLiquidityUsd?: number;
   bypassAgeFloor?: boolean;
   minTokenAgeSec?: number;
   maxTokenAgeSec?: number;
@@ -755,6 +767,38 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
+function pruneOldestMapEntries<K, V>(map: Map<K, V>, maxEntries: number): void {
+  const limit = Math.max(1, Math.floor(maxEntries || 1));
+  while (map.size > limit) {
+    const oldestKey = map.keys().next().value;
+    if (oldestKey === undefined) break;
+    map.delete(oldestKey);
+  }
+}
+
+function setBoundedMapEntry<K, V>(map: Map<K, V>, key: K, value: V, maxEntries: number): void {
+  if (map.has(key)) map.delete(key);
+  map.set(key, value);
+  pruneOldestMapEntries(map, maxEntries);
+}
+
+function pruneTimedMapEntries<K, V>(
+  map: Map<K, V>,
+  maxAgeMs: number,
+  maxEntries: number,
+  readTimestamp: (value: V) => number,
+  now = Date.now(),
+): void {
+  const ttlMs = Math.max(1, Number(maxAgeMs || 1));
+  for (const [key, value] of map.entries()) {
+    const ts = Number(readTimestamp(value) || 0);
+    if (!ts || now - ts > ttlMs) {
+      map.delete(key);
+    }
+  }
+  pruneOldestMapEntries(map, maxEntries);
+}
+
 const BASE_TRANSACTION_FEE_LAMPORTS = 5_000;
 const DEFAULT_PRIORITY_FEE_LAMPORTS = Math.round(clampNumber(process.env.SNIPER_PRIORITY_FEE_LAMPORTS, 50_000, 0, 1_000_000));
 const BUY_PRIORITY_FEE_LAMPORTS = Math.round(clampNumber(process.env.SNIPER_BUY_PRIORITY_FEE_LAMPORTS, DEFAULT_PRIORITY_FEE_LAMPORTS, 0, 1_000_000));
@@ -768,8 +812,34 @@ const MAX_BALANCE_FETCH_FAILURES = Math.round(clampNumber(process.env.SNIPER_MAX
 const MAX_BALANCE_EVICT_FAILURES = Math.round(
   clampNumber(process.env.SNIPER_MAX_BALANCE_EVICT_FAILURES, Math.max(MAX_BALANCE_FETCH_FAILURES * 3, 6), MAX_BALANCE_FETCH_FAILURES, 50)
 );
+const VELOCITY_ARBITRAGE_MAX_OPEN = Math.round(clampNumber(process.env.SNIPER_VELOCITY_ARB_MAX_OPEN, 3, 1, 8));
+const VELOCITY_ARBITRAGE_MAX_PER_POLL = Math.round(clampNumber(process.env.SNIPER_VELOCITY_ARB_MAX_PER_POLL, 1, 1, 3));
+const VELOCITY_ARBITRAGE_MIN_LIQUIDITY_USD = clampNumber(process.env.SNIPER_VELOCITY_ARB_MIN_LIQUIDITY_USD, 8_000, 1_000, 50_000);
+const VELOCITY_ARBITRAGE_MIN_VOLUME_1H_USD = clampNumber(process.env.SNIPER_VELOCITY_ARB_MIN_VOLUME_1H_USD, 50_000, 5_000, 500_000);
+const VELOCITY_ARBITRAGE_MAX_TOKEN_AGE_SEC = Math.round(clampNumber(process.env.SNIPER_VELOCITY_ARB_MAX_TOKEN_AGE_SEC, 6 * 60 * 60, 10 * 60, 24 * 60 * 60));
+const VELOCITY_ARBITRAGE_SCAN_LIMIT = Math.round(clampNumber(process.env.SNIPER_VELOCITY_ARB_SCAN_LIMIT, 25, 5, 100));
+const VELOCITY_ARBITRAGE_MAX_HOLD_MINUTES = clampNumber(process.env.SNIPER_VELOCITY_ARB_MAX_HOLD_MINUTES, 4, 1, 12);
+const VELOCITY_ARBITRAGE_STOP_LOSS_PCT = clampNumber(process.env.SNIPER_VELOCITY_ARB_STOP_LOSS_PCT, 0.04, 0.01, 0.12);
+const LOSS_STREAK_MIN_MATERIAL_PNL_SOL = clampNumber(process.env.SNIPER_LOSS_STREAK_MIN_MATERIAL_PNL_SOL, 0.001, 0, 0.02);
+const LOSS_STREAK_MIN_MATERIAL_PNL_PCT = clampNumber(process.env.SNIPER_LOSS_STREAK_MIN_MATERIAL_PNL_PCT, 3, 0, 100);
 const BALANCE_LOOKUP_GRACE_MS = Math.round(clampNumber(process.env.SNIPER_BALANCE_LOOKUP_GRACE_MS, 180_000, 30_000, 3_600_000));
 const MARK_PERSIST_INTERVAL_MS = Math.round(clampNumber(process.env.SNIPER_MARK_PERSIST_INTERVAL_MS, 15_000, 5_000, 300_000));
+const TRENDING_MAX_ROWS = Math.round(clampNumber(process.env.SNIPER_TRENDING_MAX_ROWS, 2_500, 250, 10_000));
+const TRENDING_CACHE_MIN_RELOAD_MS = Math.round(clampNumber(process.env.SNIPER_TRENDING_CACHE_MIN_RELOAD_MS, 15_000, 5_000, 120_000));
+const OBSERVED_TREND_MAX_AGE_SEC = Math.round(clampNumber(process.env.SNIPER_OBSERVED_TREND_MAX_AGE_SEC, 10 * 60, 60, 60 * 60));
+const OBSERVED_TREND_MIN_BUYS_1H = Math.round(clampNumber(process.env.SNIPER_OBSERVED_TREND_MIN_BUYS_1H, 80, 10, 2000));
+const OBSERVED_TREND_MIN_BUY_RATIO = clampNumber(process.env.SNIPER_OBSERVED_TREND_MIN_BUY_RATIO, 1.15, 1.01, 10);
+const VELOCITY_ASSESSMENT_MAX_PER_POLL = Math.round(clampNumber(process.env.SNIPER_VELOCITY_ASSESSMENT_MAX_PER_POLL, 8, 2, 30));
+const DEX_PAIR_CACHE_MAX_ENTRIES = Math.round(clampNumber(process.env.SNIPER_DEX_PAIR_CACHE_MAX_ENTRIES, 1_500, 100, 10_000));
+const HOLDER_CACHE_MAX_ENTRIES = Math.round(clampNumber(process.env.SNIPER_HOLDER_CACHE_MAX_ENTRIES, 750, 100, 5_000));
+const JUPITER_TRADABILITY_CACHE_MAX_ENTRIES = Math.round(clampNumber(process.env.SNIPER_JUPITER_TRADABILITY_CACHE_MAX_ENTRIES, 1_000, 100, 5_000));
+const TOKEN_PROGRAM_CACHE_MAX_ENTRIES = Math.round(clampNumber(process.env.SNIPER_TOKEN_PROGRAM_CACHE_MAX_ENTRIES, 1_000, 100, 10_000));
+const JSON_FILE_CACHE_MAX_ENTRIES = Math.round(clampNumber(process.env.SNIPER_JSON_FILE_CACHE_MAX_ENTRIES, 32, 8, 256));
+const GMGN_IMAGE_DUP_CACHE_MAX_ENTRIES = Math.round(clampNumber(process.env.SNIPER_GMGN_IMAGE_DUP_CACHE_MAX_ENTRIES, 1_500, 100, 10_000));
+const GMGN_TOKEN_INFO_MAX_ENTRIES = Math.round(clampNumber(process.env.SNIPER_GMGN_TOKEN_INFO_MAX_ENTRIES, 2_500, 250, 25_000));
+const HOT_CACHE_PRUNE_INTERVAL_MS = Math.round(clampNumber(process.env.SNIPER_HOT_CACHE_PRUNE_INTERVAL_MS, 60_000, 10_000, 600_000));
+const MISSED_TARGET_LOG_MAX_BYTES = Math.round(clampNumber(process.env.SNIPER_MISSED_TARGET_LOG_MAX_BYTES, 50 * 1024 * 1024, 5 * 1024 * 1024, 500 * 1024 * 1024));
+const MISSED_TARGET_LOG_RETAIN_BYTES = Math.round(clampNumber(process.env.SNIPER_MISSED_TARGET_LOG_RETAIN_BYTES, 10 * 1024 * 1024, 1 * 1024 * 1024, 100 * 1024 * 1024));
 const MICRO_ROUND_TRIP_FEE_FLOOR_LAMPORTS =
   (BASE_TRANSACTION_FEE_LAMPORTS * 2) +
   BUY_PRIORITY_FEE_LAMPORTS +
@@ -1428,7 +1498,7 @@ async function checkHolderConcentration(mint: string): Promise<{safe: boolean, t
     };
 
     // Update cache
-    holderCache.set(mint, { ...result, ts: Date.now() });
+    setBoundedMapEntry(holderCache, mint, { ...result, ts: Date.now() }, HOLDER_CACHE_MAX_ENTRIES);
 
     return result;
   } catch (e) {
@@ -1454,6 +1524,10 @@ const dexPairCache = new Map<string, { value: DexScreenerPairSnapshot | null; ts
 const dexPairInflight = new Map<string, Promise<DexScreenerPairSnapshot | null>>();
 const DEX_PAIR_CACHE_TTL_MS = 20_000;
 
+function rememberDexPairCache(mint: string, value: DexScreenerPairSnapshot | null): void {
+  setBoundedMapEntry(dexPairCache, mint, { value, ts: Date.now() }, DEX_PAIR_CACHE_MAX_ENTRIES);
+}
+
 async function fetchDexScreenerPair(mint: string): Promise<DexScreenerPairSnapshot | null> {
   const normalizedMint = String(mint || '').trim();
   if (!normalizedMint) return null;
@@ -1471,21 +1545,21 @@ async function fetchDexScreenerPair(mint: string): Promise<DexScreenerPairSnapsh
     try {
       const res = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${normalizedMint}`, { signal: AbortSignal.timeout(3000) });
       if (!res.ok) {
-        dexPairCache.set(normalizedMint, { value: null, ts: Date.now() });
+        rememberDexPairCache(normalizedMint, null);
         return null;
       }
       const data = await res.json();
       if (!data.pairs || data.pairs.length === 0) {
-        dexPairCache.set(normalizedMint, { value: null, ts: Date.now() });
+        rememberDexPairCache(normalizedMint, null);
         return null;
       }
       // Pick the highest-liquidity pair.
       const pair = data.pairs.sort((a: any, b: any) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0))[0];
       const normalizedPair = normalizeDexScreenerPair(pair);
-      dexPairCache.set(normalizedMint, { value: normalizedPair, ts: Date.now() });
+      rememberDexPairCache(normalizedMint, normalizedPair);
       return normalizedPair;
     } catch {
-      dexPairCache.set(normalizedMint, { value: null, ts: Date.now() });
+      rememberDexPairCache(normalizedMint, null);
       return null;
     } finally {
       dexPairInflight.delete(normalizedMint);
@@ -1596,6 +1670,13 @@ const JUPITER_RATE_LIMIT_MAX_BACKOFF_MS = 20_000;
 let jupiterQuoteRateLimitUntilMs = 0;
 let jupiterQuoteRateLimitStrikeCount = 0;
 
+function rememberJupiterTradability(
+  mint: string,
+  value: { routable: boolean; outAmount: string | null; ts: number; ttlMs: number; rateLimited?: boolean; retryAfterMs?: number },
+): void {
+  setBoundedMapEntry(jupiterTradabilityCache, mint, value, JUPITER_TRADABILITY_CACHE_MAX_ENTRIES);
+}
+
 function getActiveJupiterQuoteRateLimitMs(now = Date.now()): number {
   return getJupiterRateLimitRemainingMs(jupiterQuoteRateLimitUntilMs, now);
 }
@@ -1640,7 +1721,7 @@ async function probeJupiterTradability(
   if (firstQuote?.errorCode === 'RATE_LIMITED') {
     const retryAfterMs = Math.max(JUPITER_RATE_LIMIT_MIN_BACKOFF_MS, Number(firstQuote.retryAfterMs) || getActiveJupiterQuoteRateLimitMs(now));
     const rateLimitedResult = { routable: false, outAmount: null, rateLimited: true, retryAfterMs };
-    jupiterTradabilityCache.set(mint, { ...rateLimitedResult, ts: now, ttlMs: retryAfterMs });
+    rememberJupiterTradability(mint, { ...rateLimitedResult, ts: now, ttlMs: retryAfterMs });
     return rateLimitedResult;
   }
 
@@ -1648,7 +1729,7 @@ async function probeJupiterTradability(
   if (quote?.errorCode === 'RATE_LIMITED') {
     const retryAfterMs = Math.max(JUPITER_RATE_LIMIT_MIN_BACKOFF_MS, Number(quote.retryAfterMs) || getActiveJupiterQuoteRateLimitMs(now));
     const rateLimitedResult = { routable: false, outAmount: null, rateLimited: true, retryAfterMs };
-    jupiterTradabilityCache.set(mint, { ...rateLimitedResult, ts: now, ttlMs: retryAfterMs });
+    rememberJupiterTradability(mint, { ...rateLimitedResult, ts: now, ttlMs: retryAfterMs });
     return rateLimitedResult;
   }
   const result = {
@@ -1657,7 +1738,7 @@ async function probeJupiterTradability(
     rateLimited: false,
     retryAfterMs: 0,
   };
-  jupiterTradabilityCache.set(mint, { ...result, ts: now, ttlMs: JUPITER_TRADABILITY_TTL_MS });
+  rememberJupiterTradability(mint, { ...result, ts: now, ttlMs: JUPITER_TRADABILITY_TTL_MS });
   return result;
 }
 
@@ -2088,6 +2169,35 @@ function computeLifecyclePnlForClosedTrade(parentBuyId: string, currentRealizedS
 
 const MISSED_TARGETS_FILE = path.join(SIGNALS_DIR, 'missed_targets.jsonl');
 const MISSED_TARGET_STATS_FILE = path.join(SIGNALS_DIR, 'missed_target_stats.json');
+let lastMissedTargetLogTrimAt = 0;
+
+function maybeRotateMissedTargetsLog(now = Date.now()): void {
+  if (now - lastMissedTargetLogTrimAt < 60_000) return;
+  lastMissedTargetLogTrimAt = now;
+  try {
+    if (!fs.existsSync(MISSED_TARGETS_FILE)) return;
+    const stat = fs.statSync(MISSED_TARGETS_FILE);
+    if (stat.size <= MISSED_TARGET_LOG_MAX_BYTES) return;
+    const retainBytes = Math.min(stat.size, MISSED_TARGET_LOG_RETAIN_BYTES);
+    const fd = fs.openSync(MISSED_TARGETS_FILE, 'r');
+    try {
+      const buffer = Buffer.alloc(retainBytes);
+      fs.readSync(fd, buffer, 0, retainBytes, stat.size - retainBytes);
+      let tail = buffer.toString('utf-8');
+      const firstNewline = tail.indexOf('\n');
+      if (firstNewline >= 0) tail = tail.slice(firstNewline + 1);
+      fs.writeFileSync(MISSED_TARGETS_FILE, tail, 'utf-8');
+      console.log(
+        `[SNIPER]  MISSED TARGET LOG ROTATE: trimmed ${Math.round(stat.size / 1024 / 1024)}MB ` +
+        `to ${Math.round(Buffer.byteLength(tail) / 1024 / 1024)}MB.`
+      );
+    } finally {
+      fs.closeSync(fd);
+    }
+  } catch {
+    // Rotation is best-effort telemetry hygiene only.
+  }
+}
 
 function loadMissedTargetStats(): any {
   try {
@@ -2173,6 +2283,7 @@ export function logMissedTarget(record: any) {
   try {
     if (!fs.existsSync(SIGNALS_DIR)) fs.mkdirSync(SIGNALS_DIR, { recursive: true });
     const ts = Date.now();
+    maybeRotateMissedTargetsLog(ts);
     const payload = {
       ts,
       fallbackTimestamp: ts,
@@ -2348,8 +2459,8 @@ const TOKEN_PROGRAM_ID_STR = TOKEN_PROGRAM_ID.toBase58();
 const TOKEN_2022_PROGRAM_ID_STR = TOKEN_2022_PROGRAM_ID.toBase58();
 const tokenProgramIdCache = new Map<string, string>();
 const jsonFileCache = new Map<string, { mtimeMs: number; value: any }>();
-let trendingMapCache: { mtimeMs: number; value: Map<string, any> } | null = null;
-let trendingDiscoveryMetaCache: { mtimeMs: number; value: Map<string, any> } | null = null;
+let trendingMapCache: { mtimeMs: number; loadedAt: number; rowCount: number; value: Map<string, any> } | null = null;
+let trendingDiscoveryMetaCache: { mtimeMs: number; loadedAt: number; rowCount: number; value: Map<string, any> } | null = null;
 
 function getJsonFileSnapshot<T = any>(file: string): { mtimeMs: number; value: T } | null {
   try {
@@ -2358,7 +2469,7 @@ function getJsonFileSnapshot<T = any>(file: string): { mtimeMs: number; value: T
     if (cached && cached.mtimeMs === stat.mtimeMs) return cached as { mtimeMs: number; value: T };
     const parsed = JSON.parse(fs.readFileSync(file, 'utf-8')) as T;
     const snapshot = { mtimeMs: stat.mtimeMs, value: parsed };
-    jsonFileCache.set(file, snapshot);
+    setBoundedMapEntry(jsonFileCache, file, snapshot, JSON_FILE_CACHE_MAX_ENTRIES);
     return snapshot;
   } catch {
     jsonFileCache.delete(file);
@@ -2385,10 +2496,180 @@ function getTrendingFileMtimeMs(): number | null {
 
 function loadTrendingRowsFromDisk(): any[] {
   try {
+    const streamedRows = loadTrendingRowsStreamingTopN(TRENDING_FILE);
+    if (streamedRows) return streamedRows;
     const raw = JSON.parse(fs.readFileSync(TRENDING_FILE, 'utf-8'));
-    return Array.isArray(raw) ? raw : Array.isArray(raw?.mints) ? raw.mints : [];
+    const rows = Array.isArray(raw) ? raw : Array.isArray(raw?.mints) ? raw.mints : [];
+    return selectTrendingRowsForSniper(rows);
   } catch {
     return [];
+  }
+}
+
+function getTrendingRowMint(row: any): string {
+  return String(row?.baseToken?.address || row?.mint || '').trim();
+}
+
+function toEpochMs(value: any): number | undefined {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) return undefined;
+  return numeric < 10_000_000_000 ? numeric * 1000 : numeric;
+}
+
+function getTrendingObservedAtMs(row: any): number | undefined {
+  return toEpochMs(
+    row?.observedAt ??
+    row?.fetchedAt ??
+    row?.detectedAt ??
+    row?._gmgn?.fetchedAt ??
+    row?._gmgn?.observedAt ??
+    row?._gmgn?.followMonitor?.lastTradeAt ??
+    row?._bags?.detectedAt
+  );
+}
+
+function isTrustedObservedTrendSource(row: any): boolean {
+  const source = String(row?.source || row?._gmgn?.source || row?._bags?.source || '').toLowerCase();
+  const dexId = String(row?.dexId || row?.dex_id || '').toLowerCase();
+  return (
+    source === 'gmgn-bridge' ||
+    source === 'gmgn-follow-monitor' ||
+    source === 'bags-swarm' ||
+    source === 'ws_bagsfm' ||
+    dexId === 'gmgn-bridge' ||
+    dexId === 'gmgn-follow-monitor' ||
+    dexId === 'bags-fm'
+  );
+}
+
+function scoreTrendingRowForSniper(row: any, velocityMints: Set<string>, now = Date.now()): number {
+  const mint = getTrendingRowMint(row);
+  const pairCreatedAt = Number(row?.pairCreatedAt || row?.createdAt || 0);
+  const observedAt = getTrendingObservedAtMs(row);
+  const ageBasis = pairCreatedAt > 0 ? pairCreatedAt : observedAt || 0;
+  const ageSec = ageBasis > 0 ? Math.max(0, (now - ageBasis) / 1000) : Number.POSITIVE_INFINITY;
+  const recencyScore = Number.isFinite(ageSec) ? Math.max(0, 86_400 - ageSec) / 86_400 : 0;
+  const liquidityUsd = Math.max(0, Number(row?.liquidityUsd || row?.liquidity?.usd || 0));
+  const volume1hUsd = Math.max(0, Number(row?.volume1h || row?.volume?.h1 || 0));
+  const volume5mUsd = Math.max(0, Number(row?.volume5m || row?.volume?.m5 || 0));
+  const momentum5m = Math.max(0, Number(row?.priceChange5m || row?.priceChange?.m5 || 0));
+  const buyFlow = Math.max(0, Number(row?.buys1h || 0) - Number(row?.sells1h || 0));
+  return (
+    (velocityMints.has(mint) ? 1_000_000_000 : 0) +
+    (recencyScore * 250_000) +
+    Math.min(250_000, liquidityUsd / 2) +
+    Math.min(250_000, volume1hUsd / 2) +
+    Math.min(100_000, volume5mUsd * 5) +
+    (momentum5m * 2_000) +
+    (buyFlow * 50)
+  );
+}
+
+function selectTrendingRowsForSniper(rows: any[]): any[] {
+  if (!Array.isArray(rows) || rows.length <= TRENDING_MAX_ROWS) return Array.isArray(rows) ? rows : [];
+  const velocitySnapshot = getFreshVelocitySnapshot();
+  const velocityMints = new Set(Object.keys(velocitySnapshot?.mints || {}));
+  const now = Date.now();
+  return rows
+    .map((row, index) => ({ row, index, score: scoreTrendingRowForSniper(row, velocityMints, now) }))
+    .sort((left, right) => (right.score - left.score) || (left.index - right.index))
+    .slice(0, TRENDING_MAX_ROWS)
+    .map((entry) => entry.row);
+}
+
+function pushTrendingTopRow(
+  topRows: Array<{ row: any; index: number; score: number }>,
+  row: any,
+  index: number,
+  velocityMints: Set<string>,
+  now: number,
+): void {
+  topRows.push({ row, index, score: scoreTrendingRowForSniper(row, velocityMints, now) });
+  if (topRows.length > TRENDING_MAX_ROWS * 2) {
+    topRows.sort((left, right) => (right.score - left.score) || (left.index - right.index));
+    topRows.length = TRENDING_MAX_ROWS;
+  }
+}
+
+function loadTrendingRowsStreamingTopN(file: string): any[] | null {
+  let fd: number | null = null;
+  try {
+    fd = fs.openSync(file, 'r');
+    const velocitySnapshot = getFreshVelocitySnapshot();
+    const velocityMints = new Set(Object.keys(velocitySnapshot?.mints || {}));
+    const now = Date.now();
+    const topRows: Array<{ row: any; index: number; score: number }> = [];
+    const decoder = new StringDecoder('utf8');
+    const buffer = Buffer.allocUnsafe(64 * 1024);
+    let currentObject = '';
+    let objectDepth = 0;
+    let inString = false;
+    let escaped = false;
+    let activeObject = false;
+    let rowIndex = 0;
+
+    const feed = (text: string) => {
+      for (let i = 0; i < text.length; i += 1) {
+        const ch = text[i];
+        if (!activeObject) {
+          if (ch === '{') {
+            activeObject = true;
+            objectDepth = 1;
+            inString = false;
+            escaped = false;
+            currentObject = '{';
+          }
+          continue;
+        }
+
+        currentObject += ch;
+        if (escaped) {
+          escaped = false;
+          continue;
+        }
+        if (inString && ch === '\\') {
+          escaped = true;
+          continue;
+        }
+        if (ch === '"') {
+          inString = !inString;
+          continue;
+        }
+        if (inString) continue;
+        if (ch === '{' || ch === '[') {
+          objectDepth += 1;
+        } else if (ch === '}' || ch === ']') {
+          objectDepth -= 1;
+          if (objectDepth === 0) {
+            try {
+              const row = JSON.parse(currentObject);
+              pushTrendingTopRow(topRows, row, rowIndex, velocityMints, now);
+            } catch {
+              // Ignore malformed rows; the next object boundary can still recover.
+            }
+            rowIndex += 1;
+            currentObject = '';
+            activeObject = false;
+          }
+        }
+      }
+    };
+
+    while (true) {
+      const bytesRead = fs.readSync(fd, buffer, 0, buffer.length, null);
+      if (bytesRead <= 0) break;
+      feed(decoder.write(buffer.subarray(0, bytesRead)));
+    }
+    feed(decoder.end());
+
+    topRows.sort((left, right) => (right.score - left.score) || (left.index - right.index));
+    return topRows.slice(0, TRENDING_MAX_ROWS).map((entry) => entry.row);
+  } catch {
+    return null;
+  } finally {
+    if (fd !== null) {
+      try { fs.closeSync(fd); } catch {}
+    }
   }
 }
 
@@ -2398,11 +2679,16 @@ function getTrendingMapSnapshot(): Map<string, any> {
     trendingMapCache = null;
     return new Map();
   }
-  if (trendingMapCache && trendingMapCache.mtimeMs === mtimeMs) {
+  const now = Date.now();
+  if (
+    trendingMapCache &&
+    (trendingMapCache.mtimeMs === mtimeMs || now - trendingMapCache.loadedAt < TRENDING_CACHE_MIN_RELOAD_MS)
+  ) {
     return trendingMapCache.value;
   }
-  const map = buildTrendingMap(loadTrendingRowsFromDisk());
-  trendingMapCache = { mtimeMs, value: map };
+  const rows = loadTrendingRowsFromDisk();
+  const map = buildTrendingMap(rows);
+  trendingMapCache = { mtimeMs, loadedAt: now, rowCount: rows.length, value: map };
   return map;
 }
 
@@ -2494,6 +2780,7 @@ function getLowLiquidityMicroRejectReason(input: {
   walletConfirmed?: boolean;
   routeLiveFastTrack?: boolean;
   strongRecentFlowConfirmed?: boolean;
+  allowUnconfirmedMicroProbe?: boolean;
 }) {
   const lowLiquidityFloor = Math.max(0, Number(input?.minLiquidityUsd || 0));
   const liquidityUsd = Number(input?.liquidityUsd || 0);
@@ -2509,9 +2796,11 @@ function getLowLiquidityMicroRejectReason(input: {
     return null;
   }
   const riskyProbeConfirmed =
-    input?.walletConfirmed === true &&
     input?.routeLiveFastTrack === true &&
-    input?.strongRecentFlowConfirmed === true;
+    (
+      (input?.walletConfirmed === true && input?.strongRecentFlowConfirmed === true) ||
+      input?.allowUnconfirmedMicroProbe === true
+    );
   if (riskyProbeConfirmed) return null;
   return `liq $${liquidityUsd.toFixed(0)} < $${lowLiquidityFloor.toFixed(0)} without wallet-confirmed fast-track flow.`;
 }
@@ -2544,6 +2833,10 @@ type DiscoveryRiskMeta = {
   fetchedAt: number;
 };
 const gmgnImageDupCache = new Map<string, DiscoveryRiskMeta>();
+
+function rememberGmgnImageDupCache(mint: string, meta: DiscoveryRiskMeta): void {
+  setBoundedMapEntry(gmgnImageDupCache, mint, meta, GMGN_IMAGE_DUP_CACHE_MAX_ENTRIES);
+}
 type GmgnTokenInfoCacheEntry = {
   meta: DiscoveryRiskMeta;
   expiresAt: number;
@@ -2622,9 +2915,15 @@ function loadGmgnTokenInfoCache() {
 
 function persistGmgnTokenInfoCache() {
   const snapshot = loadGmgnTokenInfoCache();
+  const now = Date.now();
+  const prunedEntries = Object.entries(snapshot.entries || {})
+    .filter(([, entry]: [string, any]) => Number(entry?.expiresAt || 0) > now)
+    .sort((left: [string, any], right: [string, any]) => Number(right[1]?.expiresAt || 0) - Number(left[1]?.expiresAt || 0))
+    .slice(0, GMGN_TOKEN_INFO_MAX_ENTRIES);
+  snapshot.entries = Object.fromEntries(prunedEntries) as Record<string, GmgnTokenInfoCacheEntry>;
   const payload: GmgnTokenInfoCacheDocument = {
     version: 1,
-    updatedAt: Date.now(),
+    updatedAt: now,
     banUntilMs: Math.max(gmgnBanUntilMs, snapshot.banUntilMs || 0),
     entries: snapshot.entries || {},
   };
@@ -2813,9 +3112,17 @@ function getTrendingDiscoveryMeta(mint: string): DiscoveryRiskMeta | null {
     trendingDiscoveryMetaCache = null;
     return null;
   }
-  if (!trendingDiscoveryMetaCache || trendingDiscoveryMetaCache.mtimeMs !== mtimeMs) {
+  const now = Date.now();
+  if (
+    !trendingDiscoveryMetaCache ||
+    (
+      trendingDiscoveryMetaCache.mtimeMs !== mtimeMs &&
+      now - trendingDiscoveryMetaCache.loadedAt >= TRENDING_CACHE_MIN_RELOAD_MS
+    )
+  ) {
+    const rows = loadTrendingRowsFromDisk();
     const metaByMint = new Map<string, DiscoveryRiskMeta>();
-    for (const row of loadTrendingRowsFromDisk()) {
+    for (const row of rows) {
       const rowMint = String(row?.baseToken?.address || row?.mint || '').trim();
       if (!rowMint) continue;
       const meta = mergeDiscoveryRiskMeta(
@@ -2825,7 +3132,7 @@ function getTrendingDiscoveryMeta(mint: string): DiscoveryRiskMeta | null {
       );
       if (meta) metaByMint.set(rowMint, meta);
     }
-    trendingDiscoveryMetaCache = { mtimeMs, value: metaByMint };
+    trendingDiscoveryMetaCache = { mtimeMs, loadedAt: now, rowCount: rows.length, value: metaByMint };
   }
   return (trendingDiscoveryMetaCache.value.get(mint) as DiscoveryRiskMeta | undefined) || null;
 }
@@ -2835,7 +3142,7 @@ function loadGmgnImageDupMeta(mint: string, allowCliFallback = false) {
   if (cached && (Date.now() - cached.fetchedAt) < (10 * 60_000)) return cached;
   const persistedMeta = getCachedGmgnTokenInfoMeta(mint);
   if (persistedMeta) {
-    gmgnImageDupCache.set(mint, persistedMeta);
+    rememberGmgnImageDupCache(mint, persistedMeta);
     return persistedMeta;
   }
   const bagsMeta = loadBagsEnrichmentMeta(mint);
@@ -2843,7 +3150,7 @@ function loadGmgnImageDupMeta(mint: string, allowCliFallback = false) {
   const trendingMeta = getTrendingDiscoveryMeta(mint);
   const mergedTrendingMeta = mergeDiscoveryRiskMeta(trendingMeta, bagsMeta);
   if (mergedTrendingMeta) {
-    gmgnImageDupCache.set(mint, mergedTrendingMeta);
+    rememberGmgnImageDupCache(mint, mergedTrendingMeta);
     return mergedTrendingMeta;
   }
 
@@ -2855,12 +3162,12 @@ function loadGmgnImageDupMeta(mint: string, allowCliFallback = false) {
     bagsMeta,
   );
   if (gmgnTokenMeta) {
-    gmgnImageDupCache.set(mint, gmgnTokenMeta);
+    rememberGmgnImageDupCache(mint, gmgnTokenMeta);
     return gmgnTokenMeta;
   }
 
   if (bagsMeta) {
-    gmgnImageDupCache.set(mint, bagsMeta);
+    rememberGmgnImageDupCache(mint, bagsMeta);
     return bagsMeta;
   }
 
@@ -2872,7 +3179,7 @@ function loadGmgnImageDupMeta(mint: string, allowCliFallback = false) {
     bagsMeta,
   );
   if (infoMeta) {
-    gmgnImageDupCache.set(mint, infoMeta);
+    rememberGmgnImageDupCache(mint, infoMeta);
     rememberGmgnTokenInfoMeta(mint, infoMeta);
     return infoMeta;
   }
@@ -2984,7 +3291,7 @@ async function getTokenProgramIdForMint(mint: string): Promise<string> {
   }
 
   const normalized = normalizeTokenProgramId(ownerProgram);
-  tokenProgramIdCache.set(mint, normalized);
+  setBoundedMapEntry(tokenProgramIdCache, mint, normalized, TOKEN_PROGRAM_CACHE_MAX_ENTRIES);
   return normalized;
 }
 
@@ -3293,6 +3600,7 @@ let terrainMemoryStore: Record<string, any> = (() => {
 })();
 let terrainMemoryDirty = false;
 let lastTerrainPersistMs = 0;
+let lastHotCachePruneAt = 0;
 
 function persistTerrainMemoryStore(force = false) {
   if (!terrainMemoryDirty) return;
@@ -3321,6 +3629,30 @@ function recordTerrainObservation(mint: string, observation: any) {
   terrainMemoryDirty = true;
   persistTerrainMemoryStore();
   return nextState;
+}
+
+function pruneSniperHotCaches(force = false): void {
+  const now = Date.now();
+  if (!force && now - lastHotCachePruneAt < HOT_CACHE_PRUNE_INTERVAL_MS) return;
+  lastHotCachePruneAt = now;
+  pruneTimedMapEntries(holderCache, HOLDER_CACHE_TTL, HOLDER_CACHE_MAX_ENTRIES, (entry) => Number((entry as any)?.ts || 0), now);
+  pruneTimedMapEntries(dexPairCache, Math.max(DEX_PAIR_CACHE_TTL_MS * 6, 120_000), DEX_PAIR_CACHE_MAX_ENTRIES, (entry) => Number((entry as any)?.ts || 0), now);
+  pruneTimedMapEntries(
+    jupiterTradabilityCache,
+    Math.max(JUPITER_RATE_LIMIT_MAX_BACKOFF_MS * 2, 60_000),
+    JUPITER_TRADABILITY_CACHE_MAX_ENTRIES,
+    (entry) => Number((entry as any)?.ts || 0),
+    now,
+  );
+  pruneTimedMapEntries(gmgnImageDupCache, 10 * 60_000, GMGN_IMAGE_DUP_CACHE_MAX_ENTRIES, (entry) => Number((entry as any)?.fetchedAt || 0), now);
+  pruneOldestMapEntries(tokenProgramIdCache, TOKEN_PROGRAM_CACHE_MAX_ENTRIES);
+  pruneOldestMapEntries(jsonFileCache, JSON_FILE_CACHE_MAX_ENTRIES);
+  if (trendingMapCache && now - trendingMapCache.loadedAt > TRENDING_CACHE_MIN_RELOAD_MS * 4) {
+    trendingMapCache = null;
+  }
+  if (trendingDiscoveryMetaCache && now - trendingDiscoveryMetaCache.loadedAt > TRENDING_CACHE_MIN_RELOAD_MS * 4) {
+    trendingDiscoveryMetaCache = null;
+  }
 }
 
 //  Jupiter helpers
@@ -4003,6 +4335,12 @@ function resolveLossStreakRecoveryMs(consecutiveLosses: number): number {
   return 0;
 }
 
+function isMaterialLossForStreak(pnlSol: number, pnlPct: number, reason: string | null): boolean {
+  if (pnlSol <= -LOSS_STREAK_MIN_MATERIAL_PNL_SOL) return true;
+  if (String(reason || '').startsWith('HARD_STOP') && pnlPct <= -LOSS_STREAK_MIN_MATERIAL_PNL_PCT) return true;
+  return false;
+}
+
 function maybeDecayLossStreak(now = Date.now()): number {
   const consecutiveLosses = getConsecutiveLosses();
   if (consecutiveLosses < LOSS_STREAK_DEFENSIVE_THRESHOLD) return consecutiveLosses;
@@ -4267,6 +4605,7 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
       }
   }
   const isNormalEntry = entryMode === 'normal';
+  const isVelocityArbitrageEntry = entryMode === 'velocity-arbitrage';
   const isMicroDownshiftEntry =
     isNormalEntry &&
     entryOptions?.fixedBuySol !== undefined &&
@@ -4653,14 +4992,19 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
      return;
   }
   const lowLiquidityMicroScoutFloor = Math.max(0, Number(normalLaneConfig.minLiquidityUsd || 0));
+  const earlyGateLiquidityUsd = Math.max(
+    poolLiq,
+    Number(entryOptions?.cachedLiquidityUsd || 0),
+  );
   const lowLiquidityMicroRejectReason = getLowLiquidityMicroRejectReason({
     entryMode,
     sourceLane: entryOptions?.sourceLane,
-    liquidityUsd: poolLiq,
+    liquidityUsd: earlyGateLiquidityUsd,
     minLiquidityUsd: lowLiquidityMicroScoutFloor,
     walletConfirmed: entryOptions?.walletConfirmed,
     routeLiveFastTrack: entryOptions?.routeLiveFastTrack,
     strongRecentFlowConfirmed: entryOptions?.strongRecentFlowConfirmed,
+    allowUnconfirmedMicroProbe: entryOptions?.allowUnconfirmedRouteLiveProbe,
   });
   if (lowLiquidityMicroRejectReason) {
     console.log(`[SNIPER]  LOW LIQ MICRO REJECT: ${symbol} ${lowLiquidityMicroRejectReason}`);
@@ -5021,9 +5365,39 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
   const liveMarketCapUsd = Number(liveMcap?.marketCap || liveMcap?.fdv || 0);
   const liveLiquidityUsd = Number(liveMcap?.liquidity || 0);
   const liveFdvUsd = Number(liveMcap?.fdv || liveMcap?.marketCap || 0);
-  let liveRouteProbe: { routable: boolean; outAmount: string | null } | null = null;
+  if (isVelocityArbitrageEntry) {
+    const effectiveVelocityLiquidityUsd = Math.max(liveLiquidityUsd, poolLiq);
+    const effectiveVelocityVolume1hUsd = Math.max(volume1h, Number(liveMcap?.volume1h || 0));
+    const effectiveVelocityMomentum5m = Number(liveMcap?.priceChange5m ?? momentum5m ?? 0);
+    if (!liveMcap || effectiveVelocityLiquidityUsd < VELOCITY_ARBITRAGE_MIN_LIQUIDITY_USD) {
+      console.log(
+        `[SNIPER]  VELOCITY ARB LIQUIDITY REJECT: ${symbol} ` +
+        `$${effectiveVelocityLiquidityUsd.toFixed(0)} < $${VELOCITY_ARBITRAGE_MIN_LIQUIDITY_USD.toFixed(0)}.`
+      );
+      await setMintCooldownExact(pub, mint, 180, 'VELOCITY_ARB_LIQ');
+      return;
+    }
+    if (effectiveVelocityVolume1hUsd < VELOCITY_ARBITRAGE_MIN_VOLUME_1H_USD || effectiveVelocityMomentum5m <= 0) {
+      console.log(
+        `[SNIPER]  VELOCITY ARB QUALITY REJECT: ${symbol} ` +
+        `vol=$${effectiveVelocityVolume1hUsd.toFixed(0)}, 5m=${effectiveVelocityMomentum5m.toFixed(1)}%.`
+      );
+      await setMintCooldownExact(pub, mint, 120, 'VELOCITY_ARB_QUALITY');
+      return;
+    }
+  }
+  let liveRouteProbe: {
+    routable: boolean;
+    outAmount: string | null;
+    rateLimited?: boolean;
+    retryAfterMs?: number;
+  } | null = null;
   let preRecordedTerrainState = null;
-  if (liveMcap && !isExecutableLivePair(liveMcap)) {
+  const microScoutQualityConfig = loadMicroScoutQualityConfig();
+  const shouldProbeLiveRouteForQuality =
+    microScoutQualityConfig.enabled &&
+    (entryMode === 'micro-scout' || isMicroDownshiftEntry || entryOptions?.fixedBuySol !== undefined || probeLikeEntry);
+  if (liveMcap && (!isExecutableLivePair(liveMcap) || shouldProbeLiveRouteForQuality)) {
     liveRouteProbe = await probeJupiterTradability(
       mint,
       Math.max(1_000_000, Math.floor((entryOptions?.fixedBuySol || 0.001) * 1e9)),
@@ -5048,6 +5422,10 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
         routeLive: true,
         routeOutAmount: liveRouteProbe?.outAmount ? Number(liveRouteProbe.outAmount) : null,
       });
+    }
+  }
+  if (liveMcap && !isExecutableLivePair(liveMcap)) {
+    if (liveRouteProbe?.routable) {
       const routeLiveZeroLiqDecision = evaluateRouteLiveZeroLiquidityEntry(
         {
           priceChange5m: liveMcap?.priceChange5m,
@@ -5062,7 +5440,13 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
         loadRouteLiveZeroLiquidityConfig(),
       );
       if (routeLiveZeroLiqDecision.shouldHold || routeLiveZeroLiqDecision.shouldBlock) {
-        const bypassHunterModeActive = !lossStreakState.restrictionsActive && (store.positions ? store.positions.length < 8 : false);
+        const bypassHunterModeActive =
+          !isVelocityArbitrageEntry &&
+          !lossStreakState.restrictionsActive &&
+          (store.positions ? store.positions.length < 8 : false) &&
+          routeLiveZeroLiqDecision.code === 'route_live_zero_liq_fast_track' &&
+          entryOptions?.walletConfirmed === true &&
+          entryOptions?.strongRecentFlowConfirmed === true;
         const replayRecoveryBypassActive = entryOptions?.replayRecoveryProbe === true && store.positions.length <= 0;
         if (bypassHunterModeActive) {
           console.log(`[SNIPER]  HUNTER MODE BYPASS: ${symbol} overriding ZERO LIQ ROUTE BLOCK.`);
@@ -5458,14 +5842,16 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
     entryMode,
     probeLike: entryMode === 'micro-scout' || isMicroDownshiftEntry || entryOptions?.fixedBuySol !== undefined,
     fastTrackApproved: routeLiveFastTrack,
+    routeProbeRateLimited: liveRouteProbe?.rateLimited === true,
+    routeLive: liveRouteProbe?.routable === true,
     momentum5mPct: Number(liveMcap?.priceChange5m ?? momentum5m ?? 0),
     routeStrengthPct: terrainState?.summary?.routeStrengthPct,
     sampleCount: terrainState?.summary?.sampleCount,
     priceDelta5mPct: terrainState?.summary?.priceDelta5m,
     priceOffPeak5mPct: terrainState?.summary?.priceOffPeak5m,
     strongFlowSamples: terrainState?.summary?.strongFlowSamples,
-  }, loadMicroScoutQualityConfig());
-  if ((microScoutQualityGate.shouldHold || microScoutQualityGate.shouldBlock) && entryMode !== 'velocity-arbitrage') {
+  }, microScoutQualityConfig);
+  if (microScoutQualityGate.shouldHold || microScoutQualityGate.shouldBlock) {
     const terrainSummary = terrainState?.summary || {};
     console.log(
       `[SNIPER] ${microScoutQualityGate.shouldHold ? '' : ''} MICRO SCOUT QUALITY ${microScoutQualityGate.shouldHold ? 'HOLD' : 'BLOCK'}: ` +
@@ -5722,6 +6108,20 @@ async function trySnipe(mint: string, symbol: string, volume1h: number, priceChg
       `ev ${(expectedValueDecision.positionMultiplier * 100).toFixed(0)}%).`
     );
     buySol = scaledBuySol;
+  }
+  const microProbeFloorClampAllowed =
+    (entryMode === 'micro-scout' || isMicroDownshiftEntry || entryOptions?.fixedBuySol !== undefined) &&
+    Number(entryOptions?.fixedBuySol || 0) <= 0.001 &&
+    entryRiskDecision.probeMode &&
+    !entryRiskDecision.reject &&
+    expectedValueDecision.shouldSkip === false &&
+    combinedPositionMultiplier > 0;
+  if (buySol < 0.001 && microProbeFloorClampAllowed) {
+    console.log(
+      `[SNIPER]  MICRO FLOOR CLAMP: ${symbol} risk-scaled probe ${buySol.toFixed(4)} SOL ` +
+      `is below executable floor; using fixed 0.0010 SOL probe size.`
+    );
+    buySol = 0.001;
   }
   if (buySol < 0.001) {
     console.log(
@@ -6128,9 +6528,12 @@ async function checkExits() {
     const hardStopPct = Math.min(8, Math.max(0.5, Number((pos.stopLossPct ?? GLOBAL_SL_PCT) * 100 || 8)));
     // Slopfest: Time stop & ATR extension
     const isSlopfest = pos.entryMode === 'desperation_bypass';
-    const configuredMaxHoldMinutes = Number.isFinite(Number(pos.maxHoldMinutes))
+    let configuredMaxHoldMinutes = Number.isFinite(Number(pos.maxHoldMinutes))
       ? Number(pos.maxHoldMinutes)
       : GLOBAL_HOLD_MIN;
+    if (pos.entryMode === 'velocity-arbitrage' || pos.entryFamily === 'velocity-arbitrage') {
+      configuredMaxHoldMinutes = Math.min(configuredMaxHoldMinutes, VELOCITY_ARBITRAGE_MAX_HOLD_MINUTES);
+    }
     const timeStopHit = elapsedMinutes >= configuredMaxHoldMinutes;
 
     // Approximate ATR for dynamic trailing
@@ -6406,8 +6809,9 @@ async function checkExits() {
 
           const isTimeExit = reason.startsWith('TIME_EXIT');
           const pubPublisher = RedisBus.getPublisher();
+          const materialLossForStreak = isMaterialLossForStreak(effectivePnlSol, pnlPct, reason);
 
-                    if (effectivePnlSol < 0) {
+                    if (materialLossForStreak) {
               const strikes = await pubPublisher.incr(`strikes:${pos.mint}`);
 
               await setMintCooldownExact(pubPublisher, pos.mint, 1800, 'LOCKED');
@@ -6442,6 +6846,12 @@ async function checkExits() {
                   console.log('[SNIPER]  Triggered Gemma4 refinement (loss streak: ' + (store.stats as any).consecutiveLosses + ')');
                 } catch {}
               }
+          } else if (effectivePnlSol < 0) {
+              console.log(
+                `[SNIPER]  LOSS STREAK IGNORE: ${pos.symbol} non-material exit ` +
+                `${effectivePnlSol.toFixed(6)} SOL / ${pnlPct.toFixed(1)}% (${reason}).`
+              );
+              await setMintCooldownExact(pubPublisher, pos.mint, isTimeExit ? 300 : 600, 'LOCKED');
           } else {
               (store.stats as any).consecutiveLosses = 0;
               (store.stats as any).lastLossAt = 0;
@@ -7358,12 +7768,33 @@ async function poll() {
 	    try {
 	        const trendingValues = Array.from(getTrendingMapSnapshot().values());
 	        if (trendingValues.length > 0 && store.positions.length < MAX_POSITIONS) {
-	            const velocityCandidates = trendingValues.filter((t: any) =>
-	                (t.priceChange5m || 0) >= 5.0 &&
-	                (t.volume1h || 0) >= 10000 &&
-	                !store.blacklist.includes(t.mint) &&
-	                !store.positions.find((p: any) => p.mint === t.mint)
-	            );
+            const openVelocityArbPositions = store.positions.filter((position: any) =>
+              position?.entryMode === 'velocity-arbitrage' ||
+              position?.entryFamily === 'velocity-arbitrage'
+            ).length;
+            if (openVelocityArbPositions >= VELOCITY_ARBITRAGE_MAX_OPEN) {
+              console.log(
+                `[SNIPER] VELOCITY_ARBITRAGE HOLD: ${openVelocityArbPositions}/${VELOCITY_ARBITRAGE_MAX_OPEN} velocity-arb slots already open.`
+              );
+            } else {
+	            const velocityCandidates = trendingValues
+                .filter((t: any) => {
+                  const pairCreatedAt = Number(t?.pairCreatedAt || t?.createdAt || 0);
+                  const tokenAgeSec = pairCreatedAt > 0 ? Math.max(0, Math.floor((Date.now() - pairCreatedAt) / 1000)) : Number.POSITIVE_INFINITY;
+                  return (
+	                  (t.priceChange5m || 0) >= 5.0 &&
+	                  (t.volume1h || 0) >= VELOCITY_ARBITRAGE_MIN_VOLUME_1H_USD &&
+                    (t.liquidityUsd || 0) >= VELOCITY_ARBITRAGE_MIN_LIQUIDITY_USD &&
+                    tokenAgeSec <= VELOCITY_ARBITRAGE_MAX_TOKEN_AGE_SEC &&
+	                  !store.blacklist.includes(t.mint) &&
+	                  !store.positions.find((p: any) => p.mint === t.mint)
+                  );
+                })
+                .sort((left: any, right: any) =>
+                  (Number(right?.priceChange5m || 0) - Number(left?.priceChange5m || 0)) ||
+                  (Number(right?.volume1h || 0) - Number(left?.volume1h || 0))
+                )
+                .slice(0, VELOCITY_ARBITRAGE_SCAN_LIMIT);
 	            const velocityArbRanked = annotateCandidatesWithExpectedValue(
 	              velocityCandidates,
 	              (candidate: any) => ({
@@ -7394,8 +7825,17 @@ async function poll() {
 	            );
 	            if (velocityCandidates.length > 0) {
 	                console.log(`[SNIPER] VELOCITY_ARBITRAGE: Identified ${velocityCandidates.length} high-volatility moving tokens.`);
+                  let velocityArbEntriesThisPoll = 0;
 	                for (const candidate of velocityArbRanked) {
 	                    if (store.positions.length >= MAX_POSITIONS) break;
+                    const cooldownState = await getMintCooldownState(candidate.mint);
+                    if (cooldownState.active) {
+                      continue;
+                    }
+                    if ((openVelocityArbPositions + velocityArbEntriesThisPoll) >= VELOCITY_ARBITRAGE_MAX_OPEN) break;
+                    if (velocityArbEntriesThisPoll >= VELOCITY_ARBITRAGE_MAX_PER_POLL) break;
+                    const pairCreatedAt = candidate.pairCreatedAt || candidate.createdAt || undefined;
+                    const tokenAgeSec = pairCreatedAt ? Math.max(0, Math.floor((Date.now() - Number(pairCreatedAt)) / 1000)) : undefined;
 	                    await trySnipe(
 	                        candidate.mint,
                         candidate.symbol || candidate.mint.slice(0, 8),
@@ -7404,11 +7844,30 @@ async function poll() {
                         candidate.buys1h || 10,
                         candidate.sells1h || 0,
                         candidate.buyRatio || 0.8,
-                        undefined, undefined, undefined, undefined, undefined, undefined,
-                        { entryMode: 'velocity-arbitrage' } as any
+                        'VELOCITY_ARBITRAGE',
+                        Math.min(0.99, Math.max(0.45, Number(candidate.buyRatio || 0.8) / 3)),
+                        tokenAgeSec,
+                        Number(candidate.priceChange5m || 0),
+                        Number(candidate.priceChange1m || 0),
+                        pairCreatedAt,
+                        {
+                          entryMode: 'velocity-arbitrage',
+                          sourceLane: 'velocity-first',
+                          entryFamily: 'velocity-arbitrage',
+                          minLiquidityUsd: VELOCITY_ARBITRAGE_MIN_LIQUIDITY_USD,
+                          minVolumeUsd: VELOCITY_ARBITRAGE_MIN_VOLUME_1H_USD,
+                          minMomentum5mPct: 5,
+                          maxHoldMinutes: VELOCITY_ARBITRAGE_MAX_HOLD_MINUTES,
+                          stopLossPct: VELOCITY_ARBITRAGE_STOP_LOSS_PCT,
+                          maxTPpct: 0.04,
+                          trailingActivationPct: 4,
+                          trailingStopPct: 5,
+                        } as any
                     );
+                    velocityArbEntriesThisPoll += 1;
                 }
             }
+          }
         }
     } catch(e) {}
     // PATH 1: VELOCITY-FIRST DISCOVERY (pcp-velocity WebSocket stream)
@@ -7428,6 +7887,7 @@ async function poll() {
 
     let freshVelocityTrackedCount = accelerating.length;
     let freshVelocityEligibleCount = 0;
+    let velocityExecutableAttemptThisPoll = false;
     if (!microScoutConfig.enabled && accelerating.length > 0) {
       console.log(
         `[SNIPER]  MICRO_SCOUT disabled in strategy profile; ignoring ${accelerating.length} accelerating candidate(s) and preserving treasury.`
@@ -7561,6 +8021,18 @@ async function poll() {
           velocitySelectionConfig,
         ) as typeof eligibleAccelerating;
         const syntheticRefinementTrimmed = Math.max(0, uncappedEligibleCount - eligibleAccelerating.length);
+        const velocityAssessmentLimit = Math.max(
+          1,
+          Math.min(
+            VELOCITY_ASSESSMENT_MAX_PER_POLL,
+            pollMicroScoutPacing.maxCandidatesPerPoll,
+            Math.max(1, Number(assessmentBudget.desiredEligibleCandidates || pollMicroScoutPacing.maxCandidatesPerPoll || 1)),
+          ),
+        );
+        const velocityAssessmentTrimmed = Math.max(0, eligibleAccelerating.length - velocityAssessmentLimit);
+        if (velocityAssessmentTrimmed > 0) {
+          eligibleAccelerating = eligibleAccelerating.slice(0, velocityAssessmentLimit) as typeof eligibleAccelerating;
+        }
 
 		      if (eligibleAccelerating.length === 0) {
 		        console.log(
@@ -7579,6 +8051,7 @@ async function poll() {
 	        `${cooldownFiltered > 0 ? ` | skipped ${cooldownFiltered} cooling-down leaders` : ''}` +
 	        `${softCooldownRechecks > 0 ? ` | reused ${softCooldownRechecks} soft-cooling leaders` : ''}` +
           `${syntheticRefinementTrimmed > 0 ? ` | trimmed ${syntheticRefinementTrimmed} synthetic-refine leaders` : ''}` +
+          `${velocityAssessmentTrimmed > 0 ? ` | capped ${velocityAssessmentTrimmed} excess assessments` : ''}` +
 	        `${tempBlacklistFiltered > 0 ? ` | skipped ${tempBlacklistFiltered} temp-blacklisted routes` : ''}`
 	      );
 
@@ -8202,6 +8675,35 @@ async function poll() {
             microScoutContinuationGate.ready;
           const microScoutPacingTag = microScoutPacing.underfilledBookActive ? ' underfilled-book' : '';
 	          if (livePair && !isExecutableLivePair(livePair)) {
+              const routeLivePreflightWalletSignal = freshWalletSignalMap.get(String(v.mint || '').trim()) || null;
+              const allowUnconfirmedRouteProbe =
+                microScoutConfig.enabled &&
+                microScoutDecision.shouldScout &&
+                microScoutEntriesThisPoll < microScoutPacing.maxCandidatesPerPoll &&
+                !lossStreakRestricted &&
+                Number(microScoutConfig.fixedBuySol || 0) <= 0.001;
+              if (
+                livePair.liquidity < loadNormalLaneConfig().minLiquidityUsd &&
+                !isWalletConfirmedSignal(routeLivePreflightWalletSignal) &&
+                !allowUnconfirmedRouteProbe
+              ) {
+                const cooldownSec = livePair.liquidity <= 0 ? 60 : LOW_LIQ_MICRO_REJECT_COOLDOWN_SEC;
+                console.log(
+                  `[SNIPER]  LOW LIQ ROUTE PREFLIGHT HOLD: ${symbol} liq $${livePair.liquidity.toFixed(0)} ` +
+                  `< $${loadNormalLaneConfig().minLiquidityUsd.toFixed(0)} without wallet confirmation - recheck in ${cooldownSec}s.`
+                );
+                await setMintCooldownExact(RedisBus.getPublisher(), v.mint, cooldownSec, 'LOW_LIQ_ROUTE_PREFLIGHT');
+                continue;
+              }
+              if (
+                livePair.liquidity < loadNormalLaneConfig().minLiquidityUsd &&
+                !isWalletConfirmedSignal(routeLivePreflightWalletSignal)
+              ) {
+                console.log(
+                  `[SNIPER]  LOW LIQ ROUTE PROBE: ${symbol} liq $${livePair.liquidity.toFixed(0)} ` +
+                  `< $${loadNormalLaneConfig().minLiquidityUsd.toFixed(0)}, raw flow qualifies for fixed micro route check.`
+                );
+              }
 	            const tradabilityProbe = await probeJupiterTradability(v.mint, tradabilityProbeLamports);
 	            if (tradabilityProbe.rateLimited) {
 	              const cooldownSec = Math.max(5, Math.ceil((Number(tradabilityProbe.retryAfterMs) || JUPITER_RATE_LIMIT_MIN_BACKOFF_MS) / 1000));
@@ -8262,7 +8764,19 @@ async function poll() {
                   loadRouteLiveZeroLiquidityConfig(),
                 );
                 if (routeLiveZeroLiqDecision.shouldHold || routeLiveZeroLiqDecision.shouldBlock) {
-                  const bypassHunterModeActive = !lossStreakRestricted && store.positions.length < 8;
+                  const routeLiveBypassWalletSignal = freshWalletSignalMap.get(String(v.mint || '').trim()) || null;
+                  const routeLiveBypassStrongRecentFlowConfirmed = hasStrongRecentFlowConfirmation({
+                    terrainSummary: preflightTerrainState?.summary,
+                    buys60s: v.buys60s,
+                    solVolume60s: v.solVolume60s,
+                    velocity: v.velocity,
+                  });
+                  const bypassHunterModeActive =
+                    !lossStreakRestricted &&
+                    store.positions.length < 8 &&
+                    routeLiveZeroLiqDecision.code === 'route_live_zero_liq_fast_track' &&
+                    isWalletConfirmedSignal(routeLiveBypassWalletSignal) &&
+                    routeLiveBypassStrongRecentFlowConfirmed;
                   if (bypassHunterModeActive) {
                     console.log(`[SNIPER]  HUNTER MODE BYPASS: ${symbol} overriding ZERO LIQ ROUTE BLOCK.`);
                   } else {
@@ -8392,14 +8906,25 @@ async function poll() {
                   solVolume60s: v.solVolume60s,
                   velocity: v.velocity,
                 });
+                const allowUnconfirmedRouteLiveProbe =
+                  !lossStreakRestricted &&
+                  Number(microScoutConfig.fixedBuySol || 0) <= 0.001 &&
+                  microScoutDecision.shouldScout &&
+                  (
+                    routeLiveFastTrack ||
+                    routeLivePriceResponsePass ||
+                    routeLiveContinuationOverride.allow ||
+                    replayRouteLiveOverride.allowContinuationOverride
+                  );
                 const earlyLowLiquidityMicroRejectReason = getLowLiquidityMicroRejectReason({
                   entryMode: 'micro-scout',
                   sourceLane: 'velocity-first',
                   liquidityUsd: Number(livePair.liquidity || 0),
                   minLiquidityUsd: loadNormalLaneConfig().minLiquidityUsd,
                   walletConfirmed: isWalletConfirmedSignal(routeLiveWalletSignal),
-                  routeLiveFastTrack,
+                  routeLiveFastTrack: routeLiveFastTrack || allowUnconfirmedRouteLiveProbe,
                   strongRecentFlowConfirmed: routeLiveStrongRecentFlowConfirmed,
+                  allowUnconfirmedMicroProbe: allowUnconfirmedRouteLiveProbe,
                 });
                 if (earlyLowLiquidityMicroRejectReason) {
                   console.log(`[SNIPER]  LOW LIQ MICRO REJECT: ${symbol} ${earlyLowLiquidityMicroRejectReason}`);
@@ -8407,6 +8932,7 @@ async function poll() {
                   await setMintCooldownExact(pub, v.mint, LOW_LIQ_MICRO_REJECT_COOLDOWN_SEC, 'LOW_LIQ_MICRO_REJECT');
                   continue;
                 }
+                velocityExecutableAttemptThisPoll = true;
                 await trySnipe(
                   v.mint,
                   symbol,
@@ -8432,9 +8958,10 @@ async function poll() {
 		                  minLiquidityUsd: 0,
 	                    allowRoutableLowLiquidity: true,
 	                    bypassAgeFloor: true,
-	                    routeLiveFastTrack,
+	                    routeLiveFastTrack: routeLiveFastTrack || allowUnconfirmedRouteLiveProbe,
                       walletConfirmed: isWalletConfirmedSignal(routeLiveWalletSignal),
                       strongRecentFlowConfirmed: routeLiveStrongRecentFlowConfirmed,
+                      allowUnconfirmedRouteLiveProbe,
                       ...replayRecoveryEntryOptions,
 	                  }
                 );
@@ -8582,14 +9109,23 @@ async function poll() {
                 solVolume60s: v.solVolume60s,
                 velocity: v.velocity,
               });
+              const allowUnconfirmedRouteLiveProbe =
+                !lossStreakRestricted &&
+                Number(microScoutConfig.fixedBuySol || 0) <= 0.001 &&
+                microScoutDecision.shouldScout &&
+                (
+                  routeLiveContinuationOverride.allow ||
+                  replayRouteLiveOverride.allowContinuationOverride
+                );
               const earlyLowLiquidityMicroRejectReason = getLowLiquidityMicroRejectReason({
                 entryMode: 'micro-scout',
                 sourceLane: 'velocity-first',
                 liquidityUsd: Number(livePair.liquidity || 0),
                 minLiquidityUsd: loadNormalLaneConfig().minLiquidityUsd,
                 walletConfirmed: isWalletConfirmedSignal(routeLiveWalletSignal),
-                routeLiveFastTrack: false,
+                routeLiveFastTrack: allowUnconfirmedRouteLiveProbe,
                 strongRecentFlowConfirmed: routeLiveStrongRecentFlowConfirmed,
+                allowUnconfirmedMicroProbe: allowUnconfirmedRouteLiveProbe,
               });
               if (earlyLowLiquidityMicroRejectReason) {
                 console.log(`[SNIPER]  LOW LIQ MICRO REJECT: ${symbol} ${earlyLowLiquidityMicroRejectReason}`);
@@ -8597,6 +9133,7 @@ async function poll() {
                 await setMintCooldownExact(pub, v.mint, LOW_LIQ_MICRO_REJECT_COOLDOWN_SEC, 'LOW_LIQ_MICRO_REJECT');
                 continue;
               }
+              velocityExecutableAttemptThisPoll = true;
               await trySnipe(
                 v.mint,
                 symbol,
@@ -8624,6 +9161,7 @@ async function poll() {
 	                  bypassAgeFloor: true,
                       walletConfirmed: isWalletConfirmedSignal(routeLiveWalletSignal),
                       strongRecentFlowConfirmed: routeLiveStrongRecentFlowConfirmed,
+                      allowUnconfirmedRouteLiveProbe,
                       ...replayRecoveryEntryOptions,
 	                }
               );
@@ -8661,14 +9199,24 @@ async function poll() {
                   solVolume60s: v.solVolume60s,
                   velocity: v.velocity,
                 });
+                const allowUnconfirmedRouteLiveProbe =
+                  !lossStreakRestricted &&
+                  Number(microScoutConfig.fixedBuySol || 0) <= 0.001 &&
+                  microScoutDecision.shouldScout &&
+                  (
+                    routeLiveContinuationOverride.allow ||
+                    replayRouteLiveOverride.allowContinuationOverride ||
+                    replayRecoveryProbeDecision.allow
+                  );
                 const earlyLowLiquidityMicroRejectReason = getLowLiquidityMicroRejectReason({
                   entryMode: 'micro-scout',
                   sourceLane: 'velocity-first',
                   liquidityUsd: Number(livePair.liquidity || 0),
                   minLiquidityUsd: loadNormalLaneConfig().minLiquidityUsd,
                   walletConfirmed: isWalletConfirmedSignal(routeLiveWalletSignal),
-                  routeLiveFastTrack: false,
+                  routeLiveFastTrack: allowUnconfirmedRouteLiveProbe,
                   strongRecentFlowConfirmed: routeLiveStrongRecentFlowConfirmed,
+                  allowUnconfirmedMicroProbe: allowUnconfirmedRouteLiveProbe,
                 });
                 if (earlyLowLiquidityMicroRejectReason) {
                   console.log(`[SNIPER]  LOW LIQ MICRO REJECT: ${symbol} ${earlyLowLiquidityMicroRejectReason}`);
@@ -8901,6 +9449,7 @@ async function poll() {
                 `(${v.buys60s}B/${v.sells60s}S, ${v.solVolume60s.toFixed(3)} SOL/60s, vel ${v.velocity}; ${noDexDecision.limitingReason}${microScoutPacingTag}). ` +
 	                `Probing with ${describeMicroScoutSizing(microScoutConfig)}.`
               );
+              velocityExecutableAttemptThisPoll = true;
               await trySnipe(
                 v.mint,
                 symbol,
@@ -8942,6 +9491,7 @@ async function poll() {
           }),
           syntheticRefinementOnly,
           syntheticSource: v.syntheticSource,
+          cachedLiquidityUsd: Math.max(Number(livePair?.liquidity || 0), Number(trending?.liquidityUsd || 0)),
           bypassNormalMomentumFloor: true,
           continuationApproved: continuation.hasContinuation,
         };
@@ -8985,6 +9535,15 @@ async function poll() {
           }
           normalEntryOptions.walletConfirmed = isWalletConfirmedSignal(routeLiveWalletSignal);
           normalEntryOptions.strongRecentFlowConfirmed = routeLiveStrongRecentFlowConfirmed;
+          normalEntryOptions.allowUnconfirmedRouteLiveProbe =
+            !lossStreakRestricted &&
+            Number(microScoutConfig.fixedBuySol || 0) <= 0.001 &&
+            microScoutDecision.shouldScout &&
+            (
+              normalEntryOptions.routeLiveFastTrack === true ||
+              routeLiveQualifierThresholdScale !== null ||
+              routeLiveRecoveryEntryOptions !== null
+            );
           const earlyLowLiquidityMicroRejectReason = getLowLiquidityMicroRejectReason({
             entryMode: normalEntryOptions.entryMode,
             sourceLane: normalEntryOptions.sourceLane,
@@ -8993,6 +9552,7 @@ async function poll() {
             walletConfirmed: normalEntryOptions.walletConfirmed,
             routeLiveFastTrack: normalEntryOptions.routeLiveFastTrack,
             strongRecentFlowConfirmed: normalEntryOptions.strongRecentFlowConfirmed,
+            allowUnconfirmedMicroProbe: normalEntryOptions.allowUnconfirmedRouteLiveProbe,
           });
           if (earlyLowLiquidityMicroRejectReason) {
             console.log(`[SNIPER]  LOW LIQ MICRO REJECT: ${symbol} ${earlyLowLiquidityMicroRejectReason}`);
@@ -9002,6 +9562,7 @@ async function poll() {
           }
         }
 
+        velocityExecutableAttemptThisPoll = true;
         await trySnipe(v.mint, symbol, vol1h, pc1h,
                        buys1h, sells1h, buyRatio,
                        ta?.signal, ta?.confidence,
@@ -9018,9 +9579,12 @@ async function poll() {
       if (!matureFallbackConfig.enabled) {
         return;
       }
-      if (shouldDeferMatureFallback({ eligibleVelocityCount: freshVelocityEligibleCount }, matureFallbackConfig)) {
+      const matureFallbackBlockingVelocityCount = velocityExecutableAttemptThisPoll && store.positions.length > 0
+        ? freshVelocityEligibleCount
+        : 0;
+      if (shouldDeferMatureFallback({ eligibleVelocityCount: matureFallbackBlockingVelocityCount }, matureFallbackConfig)) {
         console.log(
-          `[SNIPER]  MATURE TREND DEFER: fresh velocity lane still has ${freshVelocityEligibleCount} eligible candidate(s) ` +
+          `[SNIPER]  MATURE TREND DEFER: fresh velocity lane still has ${matureFallbackBlockingVelocityCount} executable candidate(s) ` +
           `from ${freshVelocityTrackedCount} tracked spike(s); holding older fallback names for terrain refinement.`
         );
         return;
@@ -9032,8 +9596,13 @@ async function poll() {
       const matureTrendingMap = getTrendingMapSnapshot();
 
       if (matureTrendingMap.size === 0) {
+        console.log('[SNIPER]  MATURE TREND PASS: trending map is empty; no fallback candidates available this poll.');
         return;
       }
+      console.log(
+        `[SNIPER]  MATURE TREND SCAN: inspecting ${matureTrendingMap.size} observed/trending row(s) ` +
+        `with velocity executable attempts=${velocityExecutableAttemptThisPoll ? 'yes' : 'no'} and open=${store.positions.length}.`
+      );
 
       const matureCandidates: Array<{
         mint: string;
@@ -9047,7 +9616,9 @@ async function poll() {
         buys1h: number;
         sells1h: number;
         buyRatio: number;
-        tokenAgeSec: number;
+        tokenAgeSec?: number;
+        observedAgeSec?: number;
+        ageKnown: boolean;
         pairCreatedAt?: number;
         score: number;
       }> = [];
@@ -9065,18 +9636,31 @@ async function poll() {
         if (store.positions.find(p => p.mint === trending.mint)) continue;
 
         const pairCreatedAt = trending.pairCreatedAt ? Number(trending.pairCreatedAt) : undefined;
+        const observedAt = getTrendingObservedAtMs(trending);
         const tokenAgeSec = pairCreatedAt ? Math.max(0, Math.floor((Date.now() - pairCreatedAt) / 1000)) : undefined;
-        if (
-          tokenAgeSec === undefined ||
-          tokenAgeSec < matureFallbackConfig.minCandidateAgeSec ||
-          tokenAgeSec > matureFallbackConfig.maxCandidateAgeSec
-        ) {
+        const observedAgeSec = observedAt ? Math.max(0, Math.floor((Date.now() - observedAt) / 1000)) : undefined;
+        const ageKnown = tokenAgeSec !== undefined;
+        const trustedObservedTrend =
+          !ageKnown &&
+          observedAgeSec !== undefined &&
+          observedAgeSec <= OBSERVED_TREND_MAX_AGE_SEC &&
+          isTrustedObservedTrendSource(trending);
+        if (ageKnown) {
+          if (
+            tokenAgeSec < matureFallbackConfig.minCandidateAgeSec ||
+            tokenAgeSec > matureFallbackConfig.maxCandidateAgeSec
+          ) {
+            matureAgeFiltered += 1;
+            continue;
+          }
+        } else if (!trustedObservedTrend) {
           matureAgeFiltered += 1;
           continue;
         }
 
         const marketCapUsd = Math.max(Number(trending.marketCapUsd || 0), Number(trending.fdvUsd || 0));
         const volume1h = Number(trending.volume1h || 0);
+        const volume5m = Number(trending.volume5m || 0);
         const liquidityUsd = Number(trending.liquidityUsd || 0);
         if (
           marketCapUsd < normalLaneConfig.minMarketCapUsd ||
@@ -9091,21 +9675,43 @@ async function poll() {
         const priceChange5m = Number(trending.priceChange5m || 0);
         const priceChange1h = Number(trending.priceChange1h || 0);
         const candidateBuyRatio = Number(trending.buyRatio || 0);
+        const buys1h = Number(trending.buys1h || 0);
+        const sells1h = Number(trending.sells1h || 0);
+        const observedTrendFlowConfirmed =
+          trustedObservedTrend &&
+          volume1h >= normalLaneConfig.minVolume1hUsd &&
+          volume5m >= Math.min(normalLaneConfig.minVolume1hUsd, Math.max(1000, normalLaneConfig.minVolume1hUsd * 0.2)) &&
+          buys1h >= OBSERVED_TREND_MIN_BUYS_1H &&
+          candidateBuyRatio >= OBSERVED_TREND_MIN_BUY_RATIO;
         const momentumOkay =
           priceChange5m >= normalLaneConfig.minMomentum5mPct ||
-          (priceChange1h > 0 && priceChange5m >= Math.max(1, normalLaneConfig.minMomentum5mPct * 0.5));
+          (priceChange1h > 0 && priceChange5m >= Math.max(1, normalLaneConfig.minMomentum5mPct * 0.5)) ||
+          observedTrendFlowConfirmed;
         if (!momentumOkay) {
           matureMomentumFiltered += 1;
           continue;
         }
 
         if (
+          ageKnown &&
           !shouldAllowMatureFallbackCandidate({
             buyRatio: candidateBuyRatio,
             tokenAgeSec,
             priceChange5m,
             priceChange1h,
           }, matureFallbackConfig)
+        ) {
+          matureBuyRatioFiltered += 1;
+          continue;
+        }
+        if (
+          !ageKnown &&
+          (
+            candidateBuyRatio < OBSERVED_TREND_MIN_BUY_RATIO ||
+            buys1h < OBSERVED_TREND_MIN_BUYS_1H ||
+            priceChange5m > matureFallbackConfig.maxCandidateMomentum5mPct ||
+            priceChange1h > matureFallbackConfig.maxCandidateMomentum1hPct
+          )
         ) {
           matureBuyRatioFiltered += 1;
           continue;
@@ -9137,16 +9743,18 @@ async function poll() {
           liquidityUsd,
           priceChange1h,
           priceChange5m,
-          buys1h: Number(trending.buys1h || 0),
-          sells1h: Number(trending.sells1h || 0),
+          buys1h,
+          sells1h,
           buyRatio: candidateBuyRatio,
           tokenAgeSec,
+          observedAgeSec,
+          ageKnown,
           pairCreatedAt,
           score: scoreMatureFallbackCandidate({
             volume1hUsd: volume1h,
             liquidityUsd,
             buyRatio: candidateBuyRatio,
-            tokenAgeSec,
+            tokenAgeSec: tokenAgeSec ?? observedAgeSec,
             priceChange5m,
           }, matureFallbackConfig),
         });
@@ -9206,8 +9814,11 @@ async function poll() {
       for (const candidate of matureShortlist) {
         if (store.positions.length >= MAX_POSITIONS) break;
         const ta = loadSignal(candidate.mint);
+        const candidateAgeLabel = candidate.ageKnown
+          ? `age ${(Number(candidate.tokenAgeSec || 0) / 60).toFixed(1)}m`
+          : `observed ${(Number(candidate.observedAgeSec || 0) / 60).toFixed(1)}m ago`;
 	        console.log(
-	          `[SNIPER]  MATURE TREND CANDIDATE: ${candidate.symbol} | age ${(candidate.tokenAgeSec / 60).toFixed(1)}m | ` +
+	          `[SNIPER]  MATURE TREND CANDIDATE: ${candidate.symbol} | ${candidateAgeLabel} | ` +
 	          `mcap $${candidate.marketCapUsd.toFixed(0)} | liq $${candidate.liquidityUsd.toFixed(0)} | ` +
 	          `vol $${candidate.volume1h.toFixed(0)} | 5m ${candidate.priceChange5m >= 0 ? '+' : ''}${candidate.priceChange5m.toFixed(1)}%` +
 	          ` | EV=${Number(candidate?.expectedValueDecision?.expectedPnlSol || 0).toFixed(6)}` +
@@ -9234,11 +9845,13 @@ async function poll() {
               microScoutConfig,
             }),
             sourceLane: 'mature-fallback',
-            continuationApproved: candidate.priceChange1h > 0 || candidate.priceChange5m >= normalLaneConfig.minMomentum5mPct,
+            continuationApproved: !candidate.ageKnown || candidate.priceChange1h > 0 || candidate.priceChange5m >= normalLaneConfig.minMomentum5mPct,
+            bypassNormalMomentumFloor: !candidate.ageKnown,
             buyRatioThresholdScale: matureFallbackConfig.buyRatioThresholdScale,
             buyCountThresholdScale: matureFallbackConfig.buyCountThresholdScale,
             minTokenAgeSec: matureFallbackConfig.minCandidateAgeSec,
             maxTokenAgeSec: matureFallbackConfig.maxCandidateAgeSec,
+            cachedLiquidityUsd: candidate.liquidityUsd,
             minLiquidityUsd: normalLaneConfig.minLiquidityUsd,
             minVolumeUsd: normalLaneConfig.minVolume1hUsd,
             minMomentum5mPct: normalLaneConfig.minMomentum5mPct,
@@ -9258,6 +9871,7 @@ async function poll() {
   } catch (e: any) {
     console.error('[SNIPER] Poll error:', e.message);
   } finally {
+    pruneSniperHotCaches();
     pollInFlight = false;
     if (pollQueued) {
       pollQueued = false;
@@ -9361,9 +9975,16 @@ async function main() {
           return;
         }
         const spikeCount = payloadKind.spikeCount;
-        console.log('[SNIPER]  VELOCITY SPIKE:', spikeCount, 'mints');
-        if (!shouldTriggerVelocityPoll(spikeCount)) {
-          console.log(`[SNIPER] VELOCITY DEBOUNCE: coalescing ${spikeCount} mint spike into the next scan window.`);
+        const shouldPoll = shouldTriggerVelocityPoll(spikeCount);
+        const shouldLogSpike = shouldPoll || Date.now() - lastVelocitySpikeLogAt >= VELOCITY_SPIKE_LOG_INTERVAL_MS;
+        if (shouldLogSpike) {
+          console.log('[SNIPER]  VELOCITY SPIKE:', spikeCount, 'mints');
+          lastVelocitySpikeLogAt = Date.now();
+        }
+        if (!shouldPoll) {
+          if (shouldLogSpike) {
+            console.log(`[SNIPER] VELOCITY DEBOUNCE: coalescing ${spikeCount} mint spike into the next scan window.`);
+          }
           return;
         }
         poll().catch(() => {}); // Uses cached velocity data, no extra RPC refill sweep  burns RPC on every spike. Velocity data saved, poll picks it up on next coalesced cycle
@@ -9423,6 +10044,10 @@ async function main() {
      }
   }, 15000); // Reduced from 3s to 15s to conserve Chainstack RPC quota
 
+  setInterval(() => {
+    pruneSniperHotCaches();
+  }, HOT_CACHE_PRUNE_INTERVAL_MS);
+
   // Fallback Interval if Velocity stalls
   const runDynamicPollLoop = async () => {
     try {
@@ -9437,7 +10062,7 @@ async function main() {
       const posCount = storeState.positions.length;
       if (posCount < 8) {
         const ratio = (8 - posCount) / 8;
-        delayMs = Math.max(2000, POLL_MS * (1 - ratio));
+        delayMs = Math.max(UNDERFILLED_POLL_MIN_MS, POLL_MS * (1 - ratio));
         if (Date.now() % 60000 < 5000) {
           console.log(`[SNIPER]  HUNTER PACING: ${posCount}/8 positions. Accelerating scan to ${Math.round(delayMs)}ms`);
         }

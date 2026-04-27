@@ -32,6 +32,11 @@ export interface MicroScoutQualityConfig {
   maxMomentum5mPctForEarlyPriceProbePass: number;
   minPriceDelta5mPctForEarlyPriceProbePass: number;
   maxPriceOffPeak5mPctForEarlyPriceProbePass: number;
+  minSamplesForRouteLiveContinuationPass: number;
+  minMomentum5mPctForRouteLiveContinuationPass: number;
+  maxMomentum5mPctForRouteLiveContinuationPass: number;
+  minPriceDelta5mPctForRouteLiveContinuationPass: number;
+  maxPriceOffPeak5mPctForRouteLiveContinuationPass: number;
   minPriceDelta5mPctForPass: number;
   maxPriceOffPeak5mPctForPass: number;
   minRouteStrengthPctForLatePass: number;
@@ -76,6 +81,11 @@ export function normalizeMicroScoutQualityConfig(raw: any = {}): MicroScoutQuali
     maxMomentum5mPctForEarlyPriceProbePass: clampNumber(raw.maxMomentum5mPctForEarlyPriceProbePass, 45, 1, 1000),
     minPriceDelta5mPctForEarlyPriceProbePass: clampNumber(raw.minPriceDelta5mPctForEarlyPriceProbePass, 10, -500, 500),
     maxPriceOffPeak5mPctForEarlyPriceProbePass: clampNumber(raw.maxPriceOffPeak5mPctForEarlyPriceProbePass, 4, 0, 500),
+    minSamplesForRouteLiveContinuationPass: Math.round(clampNumber(raw.minSamplesForRouteLiveContinuationPass, 2, 1, 12)),
+    minMomentum5mPctForRouteLiveContinuationPass: clampNumber(raw.minMomentum5mPctForRouteLiveContinuationPass, 12, 0, 500),
+    maxMomentum5mPctForRouteLiveContinuationPass: clampNumber(raw.maxMomentum5mPctForRouteLiveContinuationPass, 55, 1, 1000),
+    minPriceDelta5mPctForRouteLiveContinuationPass: clampNumber(raw.minPriceDelta5mPctForRouteLiveContinuationPass, -2, -500, 500),
+    maxPriceOffPeak5mPctForRouteLiveContinuationPass: clampNumber(raw.maxPriceOffPeak5mPctForRouteLiveContinuationPass, 4, 0, 500),
     minPriceDelta5mPctForPass: clampNumber(raw.minPriceDelta5mPctForPass, 0, -500, 500),
     maxPriceOffPeak5mPctForPass: clampNumber(raw.maxPriceOffPeak5mPctForPass, 18, 0, 500),
     minRouteStrengthPctForLatePass: clampNumber(raw.minRouteStrengthPctForLatePass, 45, 0, 100),
@@ -93,6 +103,8 @@ export function evaluateMicroScoutQualityGate(
     entryMode?: string | null;
     probeLike?: boolean | null;
     fastTrackApproved?: boolean | null;
+    routeProbeRateLimited?: boolean | null;
+    routeLive?: boolean | null;
     momentum5mPct?: MaybeNumber;
     routeStrengthPct?: MaybeNumber;
     sampleCount?: MaybeNumber;
@@ -111,12 +123,24 @@ export function evaluateMicroScoutQualityGate(
     return { allowEntry: true, shouldHold: false, shouldBlock: false, cooldownSeconds: 0, code: 'micro_scout_quality_fast_track', reason: null };
   }
 
+  if (input.routeProbeRateLimited === true) {
+    return {
+      allowEntry: false,
+      shouldHold: true,
+      shouldBlock: false,
+      cooldownSeconds: config.cooldownHoldSeconds,
+      code: 'micro_scout_quality_wait',
+      reason: 'route-quality probe is temporarily rate-limited',
+    };
+  }
+
   const momentum5mPct = toFiniteNumber(input.momentum5mPct, 0);
   const routeStrengthPct = Number.isFinite(input.routeStrengthPct) ? Number(input.routeStrengthPct) : null;
   const sampleCount = Math.max(0, Math.round(toFiniteNumber(input.sampleCount, 0)));
   const priceDelta5mPct = Number.isFinite(input.priceDelta5mPct) ? Number(input.priceDelta5mPct) : null;
   const priceOffPeak5mPct = Number.isFinite(input.priceOffPeak5mPct) ? Number(input.priceOffPeak5mPct) : null;
   const strongFlowSamples = Math.max(0, Math.round(toFiniteNumber(input.strongFlowSamples, 0)));
+  const routeLive = input.routeLive === true;
 
   const routeStrengthPass =
     routeStrengthPct !== null &&
@@ -147,8 +171,24 @@ export function evaluateMicroScoutQualityGate(
     (priceDelta5mPct === null || priceDelta5mPct >= config.minPriceDelta5mPctForEarlyPriceProbePass) &&
     (priceOffPeak5mPct === null || priceOffPeak5mPct <= config.maxPriceOffPeak5mPctForEarlyPriceProbePass);
 
+  const routeLiveContinuationPass =
+    routeLive &&
+    sampleCount >= config.minSamplesForRouteLiveContinuationPass &&
+    momentum5mPct >= config.minMomentum5mPctForRouteLiveContinuationPass &&
+    momentum5mPct <= config.maxMomentum5mPctForRouteLiveContinuationPass &&
+    (priceDelta5mPct === null || priceDelta5mPct >= config.minPriceDelta5mPctForRouteLiveContinuationPass) &&
+    (priceOffPeak5mPct === null || priceOffPeak5mPct <= config.maxPriceOffPeak5mPctForRouteLiveContinuationPass);
+
+  if (routeLiveContinuationPass) {
+    return { allowEntry: true, shouldHold: false, shouldBlock: false, cooldownSeconds: 0, code: null, reason: null };
+  }
+
+  const materialPricePullback =
+    priceDelta5mPct !== null &&
+    priceDelta5mPct < config.minPriceDelta5mPctForPass &&
+    (priceOffPeak5mPct === null || priceOffPeak5mPct > config.maxPriceOffPeak5mPctForRouteLiveContinuationPass);
   const lateTerrain =
-    (priceDelta5mPct !== null && priceDelta5mPct < config.minPriceDelta5mPctForPass) ||
+    materialPricePullback ||
     (priceOffPeak5mPct !== null && priceOffPeak5mPct > config.maxPriceOffPeak5mPctForPass);
 
   const lateTerrainRecoveryPass =
