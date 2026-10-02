@@ -30,14 +30,20 @@ const POLICY = Object.freeze({ id: 'pcp-three-lane-v7', minAgeSeconds: 3600,
   minDeepVolume5mUsd: 10000, minDeepSwaps1m: 8, maxEntryFromFloor: 0.12,
   maxRoundTripLoss: 0.05, maxQuoteReserveFraction: 0.001 });
 const finite = n => typeof n === 'number' && Number.isFinite(n);
+const LANES = ['retrace', 'acceleration', 'conviction', 'flow_momentum'];
 function qualityIssues(e, lane = 'retrace') {
   const out = [];
-  if (!['retrace', 'acceleration', 'conviction', 'flow_momentum'].includes(lane)) out.push('quality_unknown_entry_lane');
+  // 'discovery' is the lane-agnostic screen used while a candidate is being enriched,
+  // before a lane is selected. It reports only the gates every lane shares; asserting
+  // the retrace migration/age requirement here would label young acceleration and
+  // flow_momentum candidates as migration-blocked when they are not.
+  const laneAgnostic = lane === 'discovery';
+  if (!laneAgnostic && !LANES.includes(lane)) out.push('quality_unknown_entry_lane');
   if (lane === 'retrace' || lane === 'conviction') {
     if (Number(e.migration?.status) !== 1 || typeof e.migration?.migratedPool !== 'string' || !e.migration.migratedPool) out.push('quality_migration_unconfirmed');
     else if (typeof e.pool !== 'string' || !e.pool || e.migration.migratedPool !== e.pool) out.push('quality_migrated_pool_mismatch');
   }
-  const minAge = lane === 'acceleration' ? POLICY.minAccelerationAgeSeconds : lane === 'conviction' ? POLICY.minConvictionAgeSeconds : lane === 'flow_momentum' ? POLICY.minFlowMomentumAgeSeconds : POLICY.minAgeSeconds;
+  const minAge = laneAgnostic ? 0 : lane === 'acceleration' ? POLICY.minAccelerationAgeSeconds : lane === 'conviction' ? POLICY.minConvictionAgeSeconds : lane === 'flow_momentum' ? POLICY.minFlowMomentumAgeSeconds : POLICY.minAgeSeconds;
   for (const [key, floor] of [['ageSeconds', minAge], ['liquidityUsd', POLICY.minLiquidityUsd], ['holderCount', POLICY.minHolders]]) {
     if (!finite(e[key]) || e[key] < floor) out.push(`quality_${key}_below_${floor}`);
   }

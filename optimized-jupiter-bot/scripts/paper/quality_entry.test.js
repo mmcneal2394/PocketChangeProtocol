@@ -42,6 +42,17 @@ test('both fresh-launch and retrace lanes use the 100-holder minimum', () => {
   fresh.holderCount = 99;
   assert.ok(qualityIssues(fresh, 'acceleration').includes('quality_holderCount_below_100'));
 });
+test('the discovery screen reports shared floors without asserting the retrace gate', () => {
+  // A young, unmigrated candidate that clears every lane-agnostic floor must not be
+  // labeled migration-blocked before a lane is chosen.
+  const fresh = evidence();
+  fresh.ageSeconds = 600;
+  fresh.migration = { status: 0, migratedPool: null };
+  assert.deepEqual(qualityIssues(fresh, 'discovery'), []);
+  assert.ok(qualityIssues(fresh, 'retrace').includes('quality_migration_unconfirmed'));
+  fresh.holderCount = 99;
+  assert.ok(qualityIssues(fresh, 'discovery').includes('quality_holderCount_below_100'));
+});
 test('migrated floor retrace with bullish reclaim passes regardless of response order', () => {
   assert.equal(supportPattern(candles(), now).floorUsd, 100);
   assert.deepEqual(supportPattern(candles().reverse(), now), supportPattern(candles(), now));

@@ -239,7 +239,10 @@ async function main() {
         if (!e.candles) e.candles = { source: 'gmgn_not_independent', historyStatus: 'unavailable' };
         else if (!e.candles.historyStatus.startsWith('available')) e.candles.historyStatus = 'invalid_or_insufficient';
       }
-      e.issues = [...admissionIssues(e, Date.now()), ...qualityIssues(e, e.entryLane || 'retrace')];
+      // Report the lane-agnostic gates here; the lane-specific floors are reported by
+      // the lane actually selected (e.entryLane), so a candidate blocked before a lane
+      // is chosen is not mislabeled as failing the retrace migration/age requirement.
+      e.issues = [...admissionIssues(e, Date.now()), ...qualityIssues(e, e.entryLane || 'discovery')];
       if (!e.pattern) e.issues.push(e.patternIssue || 'pattern_unavailable');
       if (reserveIssue) e.issues.push(reserveIssue);
       atomic(evidenceFile, e);
