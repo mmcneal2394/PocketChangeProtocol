@@ -7,7 +7,10 @@ const POLICY = Object.freeze({ id: 'pcp-three-lane-v7', minAgeSeconds: 3600,
   minVolume1mUsd: 1000, minVolume5mUsd: 5000, minSwaps1m: 5,
   minAccelerationAgeSeconds: 600, accelerationCandleCount: 6,
   minAccelerationGain: 0.05, maxAccelerationPullback: 0.05,
-  minAccelerationVolume1mUsd: 2000, minAccelerationVolume5mUsd: 8000,
+  // Lane floors match the global turnover floors (1000/5000): a candidate that clears
+  // admission should not be re-rejected by a lane floor it already passed, or the
+  // extra 2000/8000 margin halves the fill rate without adding real protection.
+  minAccelerationVolume1mUsd: 1000, minAccelerationVolume5mUsd: 5000,
   minAccelerationSwaps1m: 12, minAccelerationBuys1m: 8, minAccelerationBuyRatio: 0.60,
   minAccelerationBuyVolumeRatio: 0.65,
   minConvictionAgeSeconds: 86400, minConvictionLiquidityUsd: 250000,
@@ -19,7 +22,7 @@ const POLICY = Object.freeze({ id: 'pcp-three-lane-v7', minAgeSeconds: 3600,
   // when GMGN returns no candle history at all. The edge is unvalidated, so every
   // safety and execution check below still applies; only the OHLC pattern is waived.
   minFlowMomentumAgeSeconds: 600, minFlowMomentumGain: 0.01,
-  minFlowMomentumVolume1mUsd: 2000, minFlowMomentumVolume5mUsd: 8000,
+  minFlowMomentumVolume1mUsd: 1000, minFlowMomentumVolume5mUsd: 5000,
   minFlowMomentumSwaps1m: 12, minFlowMomentumBuys1m: 8,
   minFlowMomentumBuyRatio: 0.60, minFlowMomentumBuyVolumeRatio: 0.65,
   candleCount: 90, maxHistorySpanMinutes: 120, floorTolerance: 0.03, floorBreakTolerance: 0.05,
@@ -100,6 +103,16 @@ function recentClosedCandles(raw, now, count, options = {}) {
   return closed;
 }
 function closedCandles(raw, now) { return recentClosedCandles(raw, now, POLICY.candleCount, { requireContiguous: false }); }
+// A candle lane needs a bar closed in the minute right before `now` (see the
+// pattern_stale_history rule); a window whose newest bar is older than that cannot
+// confirm a candle entry, but must not veto the candle-free flow_momentum lane.
+function staleCandleHistory(raw, now) {
+  if (!Array.isArray(raw) || !raw.length) return false;
+  const current = Math.floor(now / 60000) * 60;
+  let newest = 0;
+  for (const row of raw) { const t = Number(row && row.time); if (Number.isFinite(t) && t > newest) newest = t; }
+  return newest > 0 && newest < current - 60;
+}
 function accelerationPattern(raw, now) {
   const closed = recentClosedCandles(raw, now, POLICY.accelerationCandleCount);
   const first = closed[0], last = closed.at(-1), prior = closed.at(-2);
@@ -170,12 +183,16 @@ function flowMomentumPattern(e, now) {
 function selectEntryPattern(e, raw, now) {
   let retraceIssue = null;
   const migrated = Number(e.migration?.status) === 1 && e.migration?.migratedPool === e.pool;
+  // When the candle window has gone stale, candle lanes cannot confirm an entry but
+  // must not veto the candle-free flow lane; drop the window so only flow_momentum
+  // can match.
+  const candles = staleCandleHistory(raw, now) ? [] : raw;
   if (migrated && e.ageSeconds >= POLICY.minAgeSeconds) {
-    try { return { pattern: supportPattern(raw, now), entryLane: 'retrace' }; }
+    try { return { pattern: supportPattern(candles, now), entryLane: 'retrace' }; }
     catch (error) { retraceIssue = error.message; }
   }
   let accelerationIssue = null;
-  try { return { pattern: accelerationPattern(raw, now), entryLane: 'acceleration' }; }
+  try { return { pattern: accelerationPattern(candles, now), entryLane: 'acceleration' }; }
   catch (error) { accelerationIssue = error.message; }
   let convictionIssue = null;
   try { return { pattern: convictionPattern(e, now), entryLane: 'conviction' }; }
@@ -215,4 +232,4 @@ function executionIssues(e, stake, proceeds, feeBps) {
   if (!finite(e.reserves?.quoteSol) || e.reserves.quoteSol <= 0 || stake / e.reserves.quoteSol > POLICY.maxQuoteReserveFraction) issues.push('quality_position_exceeds_quote_reserve_limit');
   return issues;
 }
-module.exports = { POLICY, qualityIssues, supportPattern, accelerationPattern, convictionPattern, flowMomentumPattern, selectEntryPattern, executionIssues, closedCandles };
+module.exports = { POLICY, qualityIssues, supportPattern, accelerationPattern, convictionPattern, flowMomentumPattern, selectEntryPattern, executionIssues, closedCandles, staleCandleHistory };

@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { qualityIssues, supportPattern, accelerationPattern, convictionPattern, flowMomentumPattern, selectEntryPattern, executionIssues, closedCandles } = require('./quality_entry');
+const { qualityIssues, supportPattern, accelerationPattern, convictionPattern, flowMomentumPattern, selectEntryPattern, executionIssues, closedCandles, staleCandleHistory } = require('./quality_entry');
 const now = 1800000000000;
 function candles() {
   return Array.from({ length: 90 }, (_, i) => {
@@ -117,16 +117,16 @@ test('acceleration accepts strong dollar-weighted buying when trade counts are m
   e.flow.windows['1m'] = { volumeUsd: 3000, buyVolumeUsd: 1500, sellVolumeUsd: 1500 };
   assert.ok(qualityIssues(e, 'acceleration').includes('acceleration_order_flow_below_threshold'));
 });
-test('acceleration volume floors are the relaxed 2000/8000 thresholds', () => {
+test('acceleration volume floors match the global 1000/5000 thresholds', () => {
   const e = evidence();
   e.ageSeconds = 600;
   e.migration = { status: 0, migratedPool: null };
-  e.flow = { volume1mUsd: 2100, volume5mUsd: 8500, swaps1m: 12, buys1m: 8, sells1m: 4 };
+  e.flow = { volume1mUsd: 1100, volume5mUsd: 5500, swaps1m: 12, buys1m: 8, sells1m: 4 };
   assert.deepEqual(qualityIssues(e, 'acceleration'), []);
-  e.flow.volume1mUsd = 1900;
-  assert.ok(qualityIssues(e, 'acceleration').includes('acceleration_volume1mUsd_below_2000'));
-  e.flow.volume1mUsd = 2100; e.flow.volume5mUsd = 7900;
-  assert.ok(qualityIssues(e, 'acceleration').includes('acceleration_volume5mUsd_below_8000'));
+  e.flow.volume1mUsd = 900;
+  assert.ok(qualityIssues(e, 'acceleration').includes('acceleration_volume1mUsd_below_1000'));
+  e.flow.volume1mUsd = 1100; e.flow.volume5mUsd = 4900;
+  assert.ok(qualityIssues(e, 'acceleration').includes('acceleration_volume5mUsd_below_5000'));
 });
 test('short-window acceleration requires sustained gains near the local high', () => {
   const c = candles().slice(-6);
@@ -202,7 +202,7 @@ test('flow-only momentum lane admits an actively-traded token with no candle his
 test('flow-only momentum lane rejects flat momentum, thin flow and weak buy pressure', () => {
   let e = flowMomentumEvidence(); e.flow.windows['1m'].priceUsd = 1.00;
   assert.throws(() => flowMomentumPattern(e, now), /gain_below_threshold/);
-  e = flowMomentumEvidence(); e.flow.volume5mUsd = 5000; e.flow.windows['5m'].volumeUsd = 5000;
+  e = flowMomentumEvidence(); e.flow.volume5mUsd = 4000; e.flow.windows['5m'].volumeUsd = 4000;
   assert.throws(() => flowMomentumPattern(e, now), /turnover_below_threshold/);
   e = flowMomentumEvidence(); e.flow.swaps1m = 10; e.flow.buys1m = 6; e.flow.sells1m = 4;
   assert.throws(() => flowMomentumPattern(e, now), /swaps_below_threshold/);
@@ -231,6 +231,21 @@ test('the flow-only lane never preempts the retrace or conviction lanes', () => 
   mature.flow.volume1mUsd = 2500; mature.flow.volume5mUsd = 10000; mature.flow.swaps1m = 20; mature.flow.buys1m = 13;
   mature.flow.windows['1m'] = { priceUsd: 1.02, volumeUsd: 2500, buyVolumeUsd: 1800, sellVolumeUsd: 700 };
   assert.equal(selectEntryPattern(mature, [], now).entryLane, 'conviction');
+});
+test('stale candle windows stop vetoing the candle-free flow lane', () => {
+  const nowMs = now;
+  const stale = candles().map(c => ({ ...c, time: c.time - 300 })); // newest bar 5 min old
+  assert.equal(staleCandleHistory(stale, nowMs), true);
+  assert.equal(staleCandleHistory(candles(), nowMs), false);
+  assert.equal(staleCandleHistory([], nowMs), false);
+  const e = flowMomentumEvidence();
+  // With a freshly-closed window and no flow, no lane matches.
+  const flat = { ...e, flow: { ...e.flow, volume1mUsd: 0, volume5mUsd: 0, swaps1m: 0, buys1m: 0, sells1m: 0,
+    windows: { '1m': { priceUsd: 1.02, volumeUsd: 0 }, '5m': { priceUsd: 1.00, volumeUsd: 0 } } } };
+  assert.throws(() => selectEntryPattern(flat, stale, nowMs));
+  // With live flow, the stale window no longer blocks: flow_momentum confirms it.
+  const selected = selectEntryPattern(flowMomentumEvidence(), stale, nowMs);
+  assert.equal(selected.entryLane, 'flow_momentum');
 });
 test('deep retraces remain eligible only with stronger continuing flow', () => {
   const deep = candles();

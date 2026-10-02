@@ -130,6 +130,10 @@ async function main() {
       state.run = { ...state.run, previousStrategy: state.run?.strategy || null, strategy: POLICY.id, strategyTransitionAt: Date.now() };
     }
     state.config.rotationTrigger = 'inactivity';
+    // Standing concurrency quota: hold up to 10 open paper positions so the book
+    // can actually fill. The state seed defaults to 4, so pin it here or a reset
+    // would silently halve the quota.
+    state.config.maxOpenPositions = 10;
     // Exit policy: arm the stop at entry once a position banks +3% net, then trail
     // 4% below its peak. A winner that fades exits near flat instead of riding the
     // full 8% base stop back down, which is what most acceleration stop-outs did.
@@ -372,13 +376,13 @@ async function main() {
       if (Date.now() - discoveredAt >= 30000) {
         await serviceExits();
         const rows = [];
-        try {
-          const launches = await providers.call('bags', '/token-launch/feed');
-          rows.push(...launches.map(r => ({ mint: r.tokenMint, symbol: r.symbol, source: 'bags', image: r.image || r.logo, pool: r.dbcPoolKey, launchStatus: r.status, discoveredAt: Date.now() })));
-        } catch (e) { state.live.bagsDiscoveryIssue = e.message; }
+        // The Bags launch feed is unfiltered and dead-on-arrival: of 64 Bags-only
+        // candidates it produced a single one with any 1m volume, yet it filled half
+        // the enrichment budget while GMGN rank contributed nothing but live tokens.
+        // Drop it as a discovery source; the Bags provider is still used for quotes.
         await serviceExits();
         try {
-          const fastRank = await providers.call('gmgn', '/v1/market/rank', { chain: 'sol', interval: '1m', limit: 40, order_by: 'volume', direction: 'desc', min_liquidity: POLICY.minLiquidityUsd });
+          const fastRank = await providers.call('gmgn', '/v1/market/rank', { chain: 'sol', interval: '1m', limit: 100, order_by: 'volume', direction: 'desc', min_liquidity: POLICY.minLiquidityUsd });
           rows.push(...fastRank.map(r => ({ mint: r.address, symbol: r.symbol, source: 'gmgn-1m', image: r.logo, liquidityUsd: Number(r.liquidity), discoveredAt: Date.now() })));
           delete state.live.discoveryIssue;
         } catch (e) { state.live.discoveryIssue = e.message; }
