@@ -10,7 +10,7 @@ test('keeps aggregate provider rates below published ceilings', () => {
   assert.equal(HELIUS_REQUEST_GAP_MS, 125);
   assert.equal(GECKO_REQUEST_GAP_MS, 2100);
 });
-test('gecko pool OHLCV fallback parses and normalizes bar rows without leaking the pool URL', async () => {
+test('gecko pool OHLCV fallback parses, dedupes repeated minutes, and never leaks the pool URL', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'paper-gecko-'));
   const seen = [];
   const opts = { keys: {}, fetch: async url => {
@@ -18,6 +18,7 @@ test('gecko pool OHLCV fallback parses and normalizes bar rows without leaking t
     return { ok: true, status: 200, headers: { get: () => null }, json: async () => ({ data: { attributes: { ohlcv_list: [
       [1800000000, '1.0', '1.2', '0.9', '1.1', '5000'],
       [1800000060, '1.1', '1.3', '1.0', '1.25', '7000'],
+      [1800000060, '1.1', '1.3', '1.0', '1.30', '7100'],
       [1800000120, 'bad'],
     ] } } }) };
   } };
@@ -25,7 +26,7 @@ test('gecko pool OHLCV fallback parses and normalizes bar rows without leaking t
     const candles = await new Providers(dir, opts).geckoCandles('PoolAddress1111111111111111111111111111111');
     assert.deepEqual(candles, [
       { time: 1800000000, open: '1.0', high: '1.2', low: '0.9', close: '1.1', volume: '5000' },
-      { time: 1800000060, open: '1.1', high: '1.3', low: '1.0', close: '1.25', volume: '7000' },
+      { time: 1800000060, open: '1.1', high: '1.3', low: '1.0', close: '1.30', volume: '7100' },
     ]);
     assert.match(seen[0], /networks\/solana\/pools\/PoolAddress/);
     assert.match(seen[0], /ohlcv\/minute/);

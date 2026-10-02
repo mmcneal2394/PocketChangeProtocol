@@ -345,8 +345,14 @@ class Providers {
       const list = j?.data?.attributes?.ohlcv_list;
       if (!Array.isArray(list)) throw new Error('response_error');
       p.successes++; p.lastSuccess = Date.now(); p.status = 'ok'; p.lastError = undefined;
-      return list.filter(row => Array.isArray(row) && row.length >= 6)
+      const rows = list.filter(row => Array.isArray(row) && row.length >= 6)
         .map(([time, open, high, low, close, volume]) => ({ time, open, high, low, close, volume }));
+      // Gecko repeats the closing bar for pools with a single minute of history,
+      // which the candle contract rejects as a duplicate; collapse to one bar per
+      // minute, keeping the latest reading, so a repeated bar cannot veto a window.
+      const byTime = new Map();
+      for (const row of rows) byTime.set(row.time, row);
+      return [...byTime.values()].sort((a, b) => Number(a.time) - Number(b.time));
     } catch (e) {
       p.errors++; p.status = 'error';
       // Never persist a provider body, URL, or raw fetch exception message.
