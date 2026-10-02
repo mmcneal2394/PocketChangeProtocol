@@ -18,7 +18,7 @@ const DIR = path.join(ROOT, 'artifacts/paper');
 const STATE = process.env.PAPER_STATE_FILE ? path.resolve(process.env.PAPER_STATE_FILE) : path.join(DIR, 'local-paper-trader-state.json');
 const LOCK = path.join(DIR, 'live-worker.lock');
 const USDC = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
-const CANDIDATES_PER_CYCLE = 12;
+const CANDIDATES_PER_CYCLE = 20;
 const IDLE_TICKS_PER_CYCLE = 3;
 // Coalesce synchronous whole-ledger checkpoints so a cycle performs one durable
 // write instead of one per apply()/serviceExits() hop.
@@ -135,6 +135,11 @@ async function main() {
     // full 8% base stop back down, which is what most acceleration stop-outs did.
     state.config.breakevenAtPct = 3;
     state.config.trailingStopPct = 4;
+    // Recycle capital on live winners: once a position is ten minutes old and up at
+    // least +5% net, harvest 75% now instead of waiting on the +15% take-profit while
+    // fresh candidates go untaken. Quiet positions still clear via inactivity, and a
+    // 25% runner rides on toward the take-profit or the four-hour cap.
+    state.config.rotationMinGainPct = 5;
     const trafficByMint = {};
     let queue = [], offset = 0, discoveredAt = 0;
     let healthCheckedAt = 0;
@@ -324,13 +329,22 @@ async function main() {
     async function refreshTraffic(target) {
       for (const position of [target]) {
         if (stop) break;
+        const previous = trafficByMint[position.mint];
+        // One GMGN call per position per 20 seconds. serviceExits fires several times
+        // per candidate check, so an unthrottled re-check spends most of the host-wide
+        // GMGN budget re-marking positions that already have a fresh exit quote; 20s
+        // also stays inside the 30s freshness and 60s quiet-chain windows.
+        if (previous && Number.isFinite(previous.checkedAt) && Date.now() - previous.checkedAt < 20000) {
+          position.traffic = previous;
+          continue;
+        }
         try {
           const now = Date.now();
           const info = await providers.call('gmgn', '/v1/token/info', { chain: 'sol', address: position.mint });
           if (info.address !== position.mint) throw new Error('traffic_mint_conflict');
           position.marketCap = marketCap(info, position.mint, Date.now());
           const numeric = key => info.price?.[key] == null || info.price[key] === '' ? null : Number(info.price[key]);
-          trafficByMint[position.mint] = updateTraffic(trafficByMint[position.mint], { buys1m: numeric('buys_1m'), sells1m: numeric('sells_1m'), swaps1m: numeric('swaps_1m'), volume1mUsd: numeric('volume_1m') }, now);
+          trafficByMint[position.mint] = updateTraffic(previous, { buys1m: numeric('buys_1m'), sells1m: numeric('sells_1m'), swaps1m: numeric('swaps_1m'), volume1mUsd: numeric('volume_1m') }, now);
         } catch { trafficByMint[position.mint] = { checkedAt: Date.now(), quietSince: null }; }
         position.traffic = trafficByMint[position.mint];
         apply({ marksByMint: state.marksByMint, candidates: [] });
@@ -353,9 +367,6 @@ async function main() {
         try {
           const fastRank = await providers.call('gmgn', '/v1/market/rank', { chain: 'sol', interval: '1m', limit: 40, order_by: 'volume', direction: 'desc', min_liquidity: POLICY.minLiquidityUsd });
           rows.push(...fastRank.map(r => ({ mint: r.address, symbol: r.symbol, source: 'gmgn-1m', image: r.logo, liquidityUsd: Number(r.liquidity), discoveredAt: Date.now() })));
-          await serviceExits();
-          const retraceRank = await providers.call('gmgn', '/v1/market/rank', { chain: 'sol', interval: '1h', limit: 40, order_by: 'volume', direction: 'desc', min_liquidity: POLICY.minLiquidityUsd });
-          rows.push(...retraceRank.map(r => ({ mint: r.address, symbol: r.symbol, source: 'gmgn-1h', image: r.logo, liquidityUsd: Number(r.liquidity), discoveredAt: Date.now() })));
           delete state.live.discoveryIssue;
         } catch (e) { state.live.discoveryIssue = e.message; }
         await serviceExits();

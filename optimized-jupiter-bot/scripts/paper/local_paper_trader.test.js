@@ -67,3 +67,34 @@ test('does not rotate or force-close against a stale mark', () => {
   assert.equal(next.positions[0].closedAt, null);
   assert.equal(next.events[0].type, 'mark_stale');
 });
+
+test('harvests 75 percent of an active winner at the rotation age even when its traffic is loud', () => {
+  const state = runLocalPaperTrader(createLocalPaperTraderState({ startingCapitalSol: 1, initialPositionSol: 0.1, modeledFeeBps: 0, rotationTrigger: 'inactivity', rotationMinGainPct: 5 }), snapshot(START));
+  // +2% is below the profit gate and loud traffic blocks the inactivity rule, so the position stays open.
+  const belowGate = runLocalPaperTrader(state, snapshot(START + 10 * 60_000, {
+    candidates: [],
+    marksByMint: { [MINT]: { priceSol: 0.0102, updatedAt: START + 10 * 60_000, fresh: true } },
+    trafficByMint: { [MINT]: { checkedAt: START + 10 * 60_000, quietSince: null } },
+  }));
+  assert.equal(belowGate.positions[0].rotationAt, null);
+  // +10% clears the gate, so 75% is harvested even though the traffic is still loud.
+  const harvested = runLocalPaperTrader(belowGate, snapshot(START + 10 * 60_000 + 1, {
+    candidates: [],
+    marksByMint: { [MINT]: { priceSol: 0.011, updatedAt: START + 10 * 60_000 + 1, fresh: true } },
+    trafficByMint: { [MINT]: { checkedAt: START + 10 * 60_000 + 1, quietSince: null } },
+  }));
+  assert.equal(harvested.positions[0].rotationAt, START + 10 * 60_000 + 1);
+  assert.equal(harvested.positions[0].remainingTokenAmount, harvested.positions[0].originalTokenAmount * 0.25);
+  assert.equal(harvested.events[0].type, 'rotation_75');
+  assert.match(harvested.events[0].detail, /Harvested 75%/);
+});
+
+test('leaves the profit rotation disabled when rotationMinGainPct is unset', () => {
+  const state = runLocalPaperTrader(createLocalPaperTraderState({ startingCapitalSol: 1, initialPositionSol: 0.1, modeledFeeBps: 0, rotationTrigger: 'inactivity' }), snapshot(START));
+  const next = runLocalPaperTrader(state, snapshot(START + 10 * 60_000, {
+    candidates: [],
+    marksByMint: { [MINT]: { priceSol: 0.011, updatedAt: START + 10 * 60_000, fresh: true } },
+    trafficByMint: { [MINT]: { checkedAt: START + 10 * 60_000, quietSince: null } },
+  }));
+  assert.equal(next.positions[0].rotationAt, null);
+});

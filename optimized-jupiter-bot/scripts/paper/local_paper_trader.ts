@@ -93,6 +93,10 @@ export interface LocalPaperTraderState {
     rotationMs: number;
     maxHoldMs: number;
     rotationTrigger?: 'position_age' | 'inactivity';
+    // Time-boxed profit harvest: once a position is rotationMs old and up at least
+    // this net %, rotate 75% even while its traffic is active. 0/undefined disables
+    // the gate, leaving only the inactivity/position_age rule.
+    rotationMinGainPct?: number;
     stopLossPct?: number;
     takeProfitPct?: number;
     // Net return at which the stop moves to entry (0), disabling the breakeven step.
@@ -161,6 +165,7 @@ export function createLocalPaperTraderState(config: Partial<LocalPaperTraderStat
       rotationMs: ROTATION_MS,
       maxHoldMs: MAX_HOLD_MS,
       rotationTrigger: config.rotationTrigger || 'position_age',
+      ...(config.rotationMinGainPct !== undefined ? { rotationMinGainPct: config.rotationMinGainPct } : {}),
       ...(config.stopLossPct !== undefined ? { stopLossPct: config.stopLossPct } : {}),
       ...(config.takeProfitPct !== undefined ? { takeProfitPct: config.takeProfitPct } : {}),
       ...(config.breakevenAtPct !== undefined ? { breakevenAtPct: config.breakevenAtPct } : {}),
@@ -300,7 +305,16 @@ function applyPositionLifecycle(state: LocalPaperTraderState, now: number, marks
       continue;
     }
 
-    if (position.rotationAt === null && heldMs < state.config.maxHoldMs && rotationDue(state, position, now, trafficByMint?.[position.mint])) {
+    // Time-boxed profit harvest: a winner that is old enough and up enough frees
+    // 75% of its capital now, even while its traffic is loud, instead of waiting on
+    // the full take-profit or the four-hour cap. The inactivity/position_age rule
+    // still handles quiet positions.
+    const profitGate = state.config.rotationMinGainPct;
+    const profitRotation = position.rotationAt === null && heldMs >= state.config.rotationMs
+      && typeof profitGate === 'number' && Number.isFinite(profitGate) && profitGate > 0
+      && ratio - 1 >= profitGate / 100;
+    if (position.rotationAt === null && heldMs < state.config.maxHoldMs
+      && (profitRotation || rotationDue(state, position, now, trafficByMint?.[position.mint]))) {
       const rotationTokens = position.originalTokenAmount * 0.75;
       const rotationProceeds = quotedValue(rotationTokens, mark, state.config.modeledFeeBps);
       if (rotationProceeds === null) continue;
@@ -313,7 +327,8 @@ function applyPositionLifecycle(state: LocalPaperTraderState, now: number, marks
         'rotation_75',
         position,
         now,
-        state.config.rotationTrigger === 'inactivity' ? 'Rotated 75% after 10 minutes of verified inactivity; 25% runner remains.' : 'Rotated 75% of the original position after 10 minutes; 25% runner remains.',
+        profitRotation ? `Harvested 75% after 10 minutes at +${((ratio - 1) * 100).toFixed(2)}% net; 25% runner remains.`
+          : state.config.rotationTrigger === 'inactivity' ? 'Rotated 75% after 10 minutes of verified inactivity; 25% runner remains.' : 'Rotated 75% of the original position after 10 minutes; 25% runner remains.',
         rotationPnl,
       ));
     }
