@@ -15,6 +15,9 @@ const READ_ONLY_RPC_METHODS = new Set(['getSlot', 'getMultipleAccounts', 'getTok
 // rolling minute. Keep one host-wide slot every 1.1 seconds to avoid bans.
 const GMGN_REQUEST_GAP_MS = 1100;
 const HELIUS_REQUEST_GAP_MS = 125;
+// GeckoTerminal free tier allows roughly 30 requests/minute; keep one host-wide
+// slot every 2.1s so the candle fallback never bursts into a 429.
+const GECKO_REQUEST_GAP_MS = 2100;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 // Network failures worth one bounded retry; a plain thrown Error is not retried
 // so callers that simulate failures with plain errors stay deterministic.
@@ -314,6 +317,47 @@ class Providers {
     const { result, provider } = await this.rpcWithProvider('getTokenLargestAccounts', [address, { commitment: 'confirmed' }], validate);
     return { ...result, rpcProvider: provider };
   }
+  // Pool OHLCV fallback for tokens GMGN will not chart. GMGN's token_kline only
+  // returns bars for tokens with recent on-chain activity, so a quiet-but-live
+  // launch comes back empty and no candle pattern can evaluate. GeckoTerminal
+  // serves pool OHLCV across every Solana DEX, which restores the pattern path.
+  async geckoCandles(poolAddress, now = Date.now()) {
+    if (typeof poolAddress !== 'string' || !poolAddress) throw new Error('gecko_missing_pool');
+    const provider = 'gecko';
+    const p = this.state.providers[provider] ||= { requests: 0, successes: 0, errors: 0, latencyTotalMs: 0, lastAttempt: 0, cooldownUntil: 0, role: 'pool_ohlcv_fallback' };
+    if (p.cooldownUntil > Date.now()) throw new Error('gecko_cooldown');
+    await this.reserveSharedProviderSlot(provider, GECKO_REQUEST_GAP_MS);
+    const attemptNow = Date.now();
+    p.requests++; p.lastAttempt = attemptNow;
+    try {
+      const url = new URL(`https://api.geckoterminal.com/api/v2/networks/solana/pools/${poolAddress}/ohlcv/minute`);
+      url.searchParams.set('aggregate', '1'); url.searchParams.set('limit', '100'); url.searchParams.set('currency', 'usd');
+      const r = await this.fetch(String(url), { headers: { accept: 'application/json' }, agent: this.agent, redirect: 'error', timeout: 8000, size: 2000000 });
+      if (r.status === 429) {
+        const retry = r.headers.get('retry-after');
+        const reset = Number(r.headers.get('x-ratelimit-reset')) * 1000;
+        const hinted = Math.max(Number.isFinite(Number(retry)) ? attemptNow + Number(retry) * 1000 : 0, Number.isFinite(reset) ? reset : 0);
+        p.cooldownUntil = hinted > attemptNow ? hinted : attemptNow + 60000;
+        throw new Error('http_429');
+      }
+      if (!r.ok) throw new Error(`http_${r.status}`);
+      const j = await r.json();
+      const list = j?.data?.attributes?.ohlcv_list;
+      if (!Array.isArray(list)) throw new Error('response_error');
+      p.successes++; p.lastSuccess = Date.now(); p.status = 'ok'; p.lastError = undefined;
+      return list.filter(row => Array.isArray(row) && row.length >= 6)
+        .map(([time, open, high, low, close, volume]) => ({ time, open, high, low, close, volume }));
+    } catch (e) {
+      p.errors++; p.status = 'error';
+      // Never persist a provider body, URL, or raw fetch exception message.
+      p.lastError = /^http_\d+$|^response_error$/.test(e.message) ? e.message : 'request_failed';
+      throw new Error(`gecko_${p.lastError}`);
+    } finally {
+      p.latencyTotalMs += Date.now() - attemptNow;
+      p.averageLatencyMs = Math.round(p.latencyTotalMs / Math.max(1, p.requests));
+      atomic(this.file, this.state);
+    }
+  }
   async quote(input, output, amount) {
     // Bags is the preferred entry venue, but a Bags cooldown must not zero entry
     // throughput while an equivalent direct Jupiter route is available.
@@ -336,4 +380,4 @@ class Providers {
     return { ...this.state, monthlyCap: MONTH_CAP, dailyCap: DAY_CAP, estimatedCredits: this.state.buckets.reduce((s, b) => s + b.credits, 0), accountCredits: null, billingReset: null };
   }
 }
-module.exports = { Providers, SOL, TOKEN, GMGN_REQUEST_GAP_MS, HELIUS_REQUEST_GAP_MS, validateMint, validateQuote, sanitizeError };
+module.exports = { Providers, SOL, TOKEN, GMGN_REQUEST_GAP_MS, HELIUS_REQUEST_GAP_MS, GECKO_REQUEST_GAP_MS, validateMint, validateQuote, sanitizeError };

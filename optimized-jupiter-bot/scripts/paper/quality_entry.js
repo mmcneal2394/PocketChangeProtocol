@@ -15,6 +15,13 @@ const POLICY = Object.freeze({ id: 'pcp-three-lane-v7', minAgeSeconds: 3600,
   minConvictionVolume24hUsd: 1000000, minConvictionBuyVolumeRatio: 0.55,
   minConvictionShortMomentum: 0.002, minConvictionMediumMomentum: -0.01,
   minConvictionScore: 75,
+  // No-candle lane: admits a young, actively-traded token from window flow alone
+  // when GMGN returns no candle history at all. The edge is unvalidated, so every
+  // safety and execution check below still applies; only the OHLC pattern is waived.
+  minFlowMomentumAgeSeconds: 600, minFlowMomentumGain: 0.01,
+  minFlowMomentumVolume1mUsd: 2000, minFlowMomentumVolume5mUsd: 8000,
+  minFlowMomentumSwaps1m: 12, minFlowMomentumBuys1m: 8,
+  minFlowMomentumBuyRatio: 0.60, minFlowMomentumBuyVolumeRatio: 0.65,
   candleCount: 90, maxHistorySpanMinutes: 120, floorTolerance: 0.03, floorBreakTolerance: 0.05,
   minPostHypeDrawdown: 0.15, maxPostHypeDrawdown: 0.85, deepRetraceThreshold: 0.60,
   minDeepVolume5mUsd: 10000, minDeepSwaps1m: 8, maxEntryFromFloor: 0.12,
@@ -22,12 +29,12 @@ const POLICY = Object.freeze({ id: 'pcp-three-lane-v7', minAgeSeconds: 3600,
 const finite = n => typeof n === 'number' && Number.isFinite(n);
 function qualityIssues(e, lane = 'retrace') {
   const out = [];
-  if (!['retrace', 'acceleration', 'conviction'].includes(lane)) out.push('quality_unknown_entry_lane');
+  if (!['retrace', 'acceleration', 'conviction', 'flow_momentum'].includes(lane)) out.push('quality_unknown_entry_lane');
   if (lane === 'retrace' || lane === 'conviction') {
     if (Number(e.migration?.status) !== 1 || typeof e.migration?.migratedPool !== 'string' || !e.migration.migratedPool) out.push('quality_migration_unconfirmed');
     else if (typeof e.pool !== 'string' || !e.pool || e.migration.migratedPool !== e.pool) out.push('quality_migrated_pool_mismatch');
   }
-  const minAge = lane === 'acceleration' ? POLICY.minAccelerationAgeSeconds : lane === 'conviction' ? POLICY.minConvictionAgeSeconds : POLICY.minAgeSeconds;
+  const minAge = lane === 'acceleration' ? POLICY.minAccelerationAgeSeconds : lane === 'conviction' ? POLICY.minConvictionAgeSeconds : lane === 'flow_momentum' ? POLICY.minFlowMomentumAgeSeconds : POLICY.minAgeSeconds;
   for (const [key, floor] of [['ageSeconds', minAge], ['liquidityUsd', POLICY.minLiquidityUsd], ['holderCount', POLICY.minHolders]]) {
     if (!finite(e[key]) || e[key] < floor) out.push(`quality_${key}_below_${floor}`);
   }
@@ -55,6 +62,18 @@ function qualityIssues(e, lane = 'retrace') {
       if (!finite(e[key]) || e[key] < floor) out.push(`conviction_${key}_below_${floor}`);
     }
     if (!finite(e.pattern?.score) || e.pattern.score < POLICY.minConvictionScore) out.push(`conviction_score_below_${POLICY.minConvictionScore}`);
+  }
+  if (lane === 'flow_momentum') {
+    for (const [key, floor] of [['volume1mUsd', POLICY.minFlowMomentumVolume1mUsd], ['volume5mUsd', POLICY.minFlowMomentumVolume5mUsd], ['swaps1m', POLICY.minFlowMomentumSwaps1m], ['buys1m', POLICY.minFlowMomentumBuys1m], ['sells1m', 1]]) {
+      if (!finite(e.flow?.[key]) || e.flow[key] < floor) out.push(`flow_momentum_${key}_below_${floor}`);
+    }
+    const one = e.flow?.windows?.['1m'], five = e.flow?.windows?.['5m'];
+    if (!finite(one?.priceUsd) || one.priceUsd <= 0 || !finite(five?.priceUsd) || five.priceUsd <= 0) out.push('flow_momentum_prices_unavailable');
+    else if (one.priceUsd / five.priceUsd - 1 < POLICY.minFlowMomentumGain) out.push(`flow_momentum_gain_below_${POLICY.minFlowMomentumGain}`);
+    const swaps = e.flow?.swaps1m, buys = e.flow?.buys1m;
+    const countPressure = finite(swaps) && swaps > 0 && finite(buys) && buys / swaps >= POLICY.minFlowMomentumBuyRatio;
+    const volumePressure = finite(one?.volumeUsd) && one.volumeUsd > 0 && finite(one?.buyVolumeUsd) && one.buyVolumeUsd / one.volumeUsd >= POLICY.minFlowMomentumBuyVolumeRatio;
+    if (!countPressure && !volumePressure) out.push('flow_momentum_order_flow_below_threshold');
   }
   return out;
 }
@@ -127,6 +146,27 @@ function convictionPattern(e, now) {
     observedAt: now, source: 'gmgn_multi_window_snapshot_not_independent_ohlc',
     caveat: 'probabilistic fallback used only when strict paper safety and execution checks still pass' };
 }
+function flowMomentumPattern(e, now) {
+  const windows = e.flow?.windows || {};
+  const one = windows['1m'] || {}, five = windows['5m'] || {};
+  const required = [e.ageSeconds, e.liquidityUsd, e.holderCount, one.priceUsd, five.priceUsd, one.volumeUsd, one.buyVolumeUsd];
+  if (required.some(value => !finite(value) || value < 0) || one.priceUsd <= 0 || five.priceUsd <= 0 || one.volumeUsd <= 0) throw new Error('flow_momentum_evidence_incomplete');
+  if (e.ageSeconds < POLICY.minFlowMomentumAgeSeconds) throw new Error('flow_momentum_age_below_threshold');
+  if (e.liquidityUsd < POLICY.minLiquidityUsd) throw new Error('flow_momentum_liquidity_below_threshold');
+  if (e.holderCount < POLICY.minHolders) throw new Error('flow_momentum_holders_below_threshold');
+  if (!finite(e.flow?.volume1mUsd) || e.flow.volume1mUsd < POLICY.minFlowMomentumVolume1mUsd
+    || !finite(e.flow?.volume5mUsd) || e.flow.volume5mUsd < POLICY.minFlowMomentumVolume5mUsd) throw new Error('flow_momentum_turnover_below_threshold');
+  if (!finite(e.flow?.swaps1m) || e.flow.swaps1m < POLICY.minFlowMomentumSwaps1m || !finite(e.flow?.buys1m) || e.flow.buys1m < POLICY.minFlowMomentumBuys1m) throw new Error('flow_momentum_swaps_below_threshold');
+  const momentum = one.priceUsd / five.priceUsd - 1;
+  if (momentum < POLICY.minFlowMomentumGain) throw new Error('flow_momentum_gain_below_threshold');
+  const buyVolumeRatio = one.buyVolumeUsd / one.volumeUsd;
+  const countPressure = e.flow.swaps1m > 0 && e.flow.buys1m / e.flow.swaps1m >= POLICY.minFlowMomentumBuyRatio;
+  const volumePressure = buyVolumeRatio >= POLICY.minFlowMomentumBuyVolumeRatio;
+  if (!countPressure && !volumePressure) throw new Error('flow_momentum_order_flow_below_threshold');
+  return { name: 'flow_only_momentum', regime: 'flow_momentum', momentumPct: momentum, buyVolumeRatio,
+    lastClosedAt: null, observedAt: now, source: 'gmgn_window_flow_not_independent_ohlc',
+    caveat: 'no candle history; edge unvalidated, admitted on window flow alone' };
+}
 function selectEntryPattern(e, raw, now) {
   let retraceIssue = null;
   const migrated = Number(e.migration?.status) === 1 && e.migration?.migratedPool === e.pool;
@@ -137,8 +177,13 @@ function selectEntryPattern(e, raw, now) {
   let accelerationIssue = null;
   try { return { pattern: accelerationPattern(raw, now), entryLane: 'acceleration' }; }
   catch (error) { accelerationIssue = error.message; }
+  let convictionIssue = null;
   try { return { pattern: convictionPattern(e, now), entryLane: 'conviction' }; }
-  catch (error) { throw new Error([retraceIssue, accelerationIssue, error.message].filter(Boolean).join('; ')); }
+  catch (error) { convictionIssue = error.message; }
+  // Least-specific fallback: a mature conviction token also clears these flow
+  // floors, so this lane is tried last to leave the conviction contract intact.
+  try { return { pattern: flowMomentumPattern(e, now), entryLane: 'flow_momentum' }; }
+  catch (error) { throw new Error([retraceIssue, accelerationIssue, convictionIssue, error.message].filter(Boolean).join('; ')); }
 }
 function supportPattern(raw, now) {
   const closed = closedCandles(raw, now);
@@ -170,4 +215,4 @@ function executionIssues(e, stake, proceeds, feeBps) {
   if (!finite(e.reserves?.quoteSol) || e.reserves.quoteSol <= 0 || stake / e.reserves.quoteSol > POLICY.maxQuoteReserveFraction) issues.push('quality_position_exceeds_quote_reserve_limit');
   return issues;
 }
-module.exports = { POLICY, qualityIssues, supportPattern, accelerationPattern, convictionPattern, selectEntryPattern, executionIssues, closedCandles };
+module.exports = { POLICY, qualityIssues, supportPattern, accelerationPattern, convictionPattern, flowMomentumPattern, selectEntryPattern, executionIssues, closedCandles };

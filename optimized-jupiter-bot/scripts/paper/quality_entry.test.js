@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { qualityIssues, supportPattern, accelerationPattern, convictionPattern, selectEntryPattern, executionIssues, closedCandles } = require('./quality_entry');
+const { qualityIssues, supportPattern, accelerationPattern, convictionPattern, flowMomentumPattern, selectEntryPattern, executionIssues, closedCandles } = require('./quality_entry');
 const now = 1800000000000;
 function candles() {
   return Array.from({ length: 90 }, (_, i) => {
@@ -176,6 +176,61 @@ test('conviction lane rejects weak buy pressure, fading momentum, and shallow ma
   assert.throws(() => convictionPattern(e, now), /momentum/);
   e = convictionEvidence(); e.liquidityUsd = 100000;
   assert.throws(() => convictionPattern(e, now), /liquidity/);
+});
+function flowMomentumEvidence() {
+  const e = evidence();
+  e.ageSeconds = 600;
+  e.migration = { status: 0, migratedPool: null };
+  e.flow = { volume1mUsd: 2500, volume5mUsd: 10000, swaps1m: 20, buys1m: 13, sells1m: 7,
+    windows: {
+      '1m': { priceUsd: 1.02, volumeUsd: 2500, buyVolumeUsd: 1800, sellVolumeUsd: 700 },
+      '5m': { priceUsd: 1.00, volumeUsd: 10000, buyVolumeUsd: 6000, sellVolumeUsd: 4000 },
+    } };
+  return e;
+}
+test('flow-only momentum lane admits an actively-traded token with no candle history', () => {
+  const e = flowMomentumEvidence();
+  const pattern = flowMomentumPattern(e, now);
+  assert.equal(pattern.regime, 'flow_momentum');
+  assert.ok(pattern.momentumPct >= .01);
+  const selected = selectEntryPattern(e, [], now);
+  assert.equal(selected.entryLane, 'flow_momentum');
+  e.pattern = selected.pattern; e.entryLane = 'flow_momentum';
+  assert.deepEqual(qualityIssues(e, 'flow_momentum'), []);
+  assert.deepEqual(selectEntryPattern(e, null, now).entryLane, 'flow_momentum');
+});
+test('flow-only momentum lane rejects flat momentum, thin flow and weak buy pressure', () => {
+  let e = flowMomentumEvidence(); e.flow.windows['1m'].priceUsd = 1.00;
+  assert.throws(() => flowMomentumPattern(e, now), /gain_below_threshold/);
+  e = flowMomentumEvidence(); e.flow.volume5mUsd = 5000; e.flow.windows['5m'].volumeUsd = 5000;
+  assert.throws(() => flowMomentumPattern(e, now), /turnover_below_threshold/);
+  e = flowMomentumEvidence(); e.flow.swaps1m = 10; e.flow.buys1m = 6; e.flow.sells1m = 4;
+  assert.throws(() => flowMomentumPattern(e, now), /swaps_below_threshold/);
+  e = flowMomentumEvidence();
+  e.flow.buys1m = 11; e.flow.sells1m = 9;
+  e.flow.windows['1m'] = { priceUsd: 1.02, volumeUsd: 2500, buyVolumeUsd: 1000, sellVolumeUsd: 1500 };
+  assert.throws(() => flowMomentumPattern(e, now), /order_flow_below_threshold/);
+});
+test('flow-only momentum lane keeps the shared age, liquidity and concentration floors', () => {
+  let e = flowMomentumEvidence(); e.ageSeconds = 599;
+  assert.ok(qualityIssues(e, 'flow_momentum').includes('quality_ageSeconds_below_600'));
+  e = flowMomentumEvidence(); e.liquidityUsd = 6999;
+  assert.ok(qualityIssues(e, 'flow_momentum').includes('quality_liquidityUsd_below_7000'));
+  e = flowMomentumEvidence(); e.concentration.top10 = .31;
+  assert.ok(qualityIssues(e, 'flow_momentum').includes('quality_holder_concentration'));
+  e = flowMomentumEvidence(); e.flow.windows['1m'].priceUsd = null;
+  assert.ok(qualityIssues(e, 'flow_momentum').includes('flow_momentum_prices_unavailable'));
+});
+test('the flow-only lane never preempts the retrace or conviction lanes', () => {
+  const retrace = qualityIssues(evidence());
+  assert.deepEqual(retrace, []);
+  assert.equal(selectEntryPattern(evidence(), candles(), now).entryLane, 'retrace');
+  const mature = convictionEvidence();
+  assert.equal(selectEntryPattern(mature, [], now).entryLane, 'conviction');
+  // A mature token that also clears the flow floors still resolves to conviction.
+  mature.flow.volume1mUsd = 2500; mature.flow.volume5mUsd = 10000; mature.flow.swaps1m = 20; mature.flow.buys1m = 13;
+  mature.flow.windows['1m'] = { priceUsd: 1.02, volumeUsd: 2500, buyVolumeUsd: 1800, sellVolumeUsd: 700 };
+  assert.equal(selectEntryPattern(mature, [], now).entryLane, 'conviction');
 });
 test('deep retraces remain eligible only with stronger continuing flow', () => {
   const deep = candles();

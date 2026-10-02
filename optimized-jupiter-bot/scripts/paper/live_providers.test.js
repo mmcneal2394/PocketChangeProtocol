@@ -3,11 +3,72 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { Providers, TOKEN, GMGN_REQUEST_GAP_MS, HELIUS_REQUEST_GAP_MS, validateMint, validateQuote, SOL } = require('./live_providers');
+const { Providers, TOKEN, GMGN_REQUEST_GAP_MS, HELIUS_REQUEST_GAP_MS, GECKO_REQUEST_GAP_MS, validateMint, validateQuote, SOL } = require('./live_providers');
 
 test('keeps aggregate provider rates below published ceilings', () => {
   assert.equal(GMGN_REQUEST_GAP_MS, 1100);
   assert.equal(HELIUS_REQUEST_GAP_MS, 125);
+  assert.equal(GECKO_REQUEST_GAP_MS, 2100);
+});
+test('gecko pool OHLCV fallback parses and normalizes bar rows without leaking the pool URL', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'paper-gecko-'));
+  const seen = [];
+  const opts = { keys: {}, fetch: async url => {
+    seen.push(String(url));
+    return { ok: true, status: 200, headers: { get: () => null }, json: async () => ({ data: { attributes: { ohlcv_list: [
+      [1800000000, '1.0', '1.2', '0.9', '1.1', '5000'],
+      [1800000060, '1.1', '1.3', '1.0', '1.25', '7000'],
+      [1800000120, 'bad'],
+    ] } } }) };
+  } };
+  try {
+    const candles = await new Providers(dir, opts).geckoCandles('PoolAddress1111111111111111111111111111111');
+    assert.deepEqual(candles, [
+      { time: 1800000000, open: '1.0', high: '1.2', low: '0.9', close: '1.1', volume: '5000' },
+      { time: 1800000060, open: '1.1', high: '1.3', low: '1.0', close: '1.25', volume: '7000' },
+    ]);
+    assert.match(seen[0], /networks\/solana\/pools\/PoolAddress/);
+    assert.match(seen[0], /ohlcv\/minute/);
+    const usage = new Providers(dir, opts).usage();
+    assert.equal(usage.providers.gecko.successes, 1);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+test('gecko 429 backs off with the provider signal and blocks the next attempt across restart', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'paper-gecko-429-'));
+  let calls = 0;
+  const opts = { keys: {}, fetch: async () => { calls++; return { status: 429, ok: false, headers: { get: name => name === 'retry-after' ? '2' : null }, json: async () => ({}) }; } };
+  try {
+    const before = Date.now();
+    await assert.rejects(new Providers(dir, opts).geckoCandles('pool'), /gecko_http_429/);
+    const cooled = new Providers(dir, opts);
+    assert.ok(cooled.state.providers.gecko.cooldownUntil - before <= 60000);
+    await assert.rejects(cooled.geckoCandles('pool'), /gecko_cooldown/);
+    assert.equal(calls, 1);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+test('gecko missing-pool and malformed-body errors are sanitized and prefixed once', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'paper-gecko-bad-'));
+  const opts = { keys: {}, fetch: async () => ({ ok: true, status: 200, headers: { get: () => null }, json: async () => ({ data: { attributes: {} } }) }) };
+  try {
+    const providers = new Providers(dir, opts);
+    await assert.rejects(providers.geckoCandles(''), /gecko_missing_pool/);
+    await assert.rejects(providers.geckoCandles('pool'), (error) => error.message === 'gecko_response_error');
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+test('the gecko lease is host-wide and shared with other local services', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'paper-gecko-lease-'));
+  try {
+    const first = new Providers(dir, { keys: {} });
+    const second = new Providers(dir, { keys: {} });
+    const startedAt = Date.now();
+    await Promise.all([
+      first.reserveSharedProviderSlot('gecko', GECKO_REQUEST_GAP_MS),
+      second.reserveSharedProviderSlot('gecko', GECKO_REQUEST_GAP_MS),
+    ]);
+    assert.ok(Date.now() - startedAt >= GECKO_REQUEST_GAP_MS - 20);
+    const lease = JSON.parse(fs.readFileSync(path.join(dir, '.gecko-rate-lease.json'), 'utf8'));
+    assert.equal(lease.provider, 'gecko');
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 test('separate workers share one host-wide provider lease', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'paper-shared-rate-'));

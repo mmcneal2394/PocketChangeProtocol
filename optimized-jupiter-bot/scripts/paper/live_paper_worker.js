@@ -1,6 +1,6 @@
 'use strict';
 const { marketCap } = require('./market_cap');
-const { POLICY, qualityIssues, supportPattern, accelerationPattern, convictionPattern, selectEntryPattern, executionIssues } = require('./quality_entry');
+const { POLICY, qualityIssues, supportPattern, accelerationPattern, convictionPattern, flowMomentumPattern, selectEntryPattern, executionIssues } = require('./quality_entry');
 const { candleRequest, normalizeCandles } = require('./candle_data');
 const { exitQuote, retryDelay, nextExit } = require('./exit_quotes');
 const fs = require('fs');
@@ -199,19 +199,32 @@ async function main() {
       } catch (error) { reserveIssue = error.message; }
       try {
         const now = Date.now();
-        let candles = candleCacheByMint.get(mint);
-        if (!candles) {
+        let cached = candleCacheByMint.get(mint);
+        if (!cached) {
           await serviceExits();
-          candles = normalizeCandles(await providers.call('gmgn', '/v1/market/token_kline', candleRequest(mint, now)), now);
-          candleCacheByMint.set(mint, candles);
+          let candles = normalizeCandles(await providers.call('gmgn', '/v1/market/token_kline', candleRequest(mint, now)), now);
+          let source = 'gmgn';
+          // GMGN only charts tokens with recent activity, so a quiet launch comes
+          // back empty; the pool OHLCV fallback restores the candle-pattern path.
+          if (!candles.length && validAddress(pool.pool_address)) {
+            await serviceExits();
+            try {
+              const gecko = normalizeCandles(await providers.geckoCandles(pool.pool_address, now), now);
+              if (gecko.length) { candles = gecko; source = 'gecko'; }
+            } catch { /* GMGN returned empty and no pool OHLCV is available either. */ }
+          }
+          cached = { candles, source };
+          candleCacheByMint.set(mint, cached);
           while (candleCacheByMint.size > 300) candleCacheByMint.delete(candleCacheByMint.keys().next().value);
         }
-        e.candles = { source: 'gmgn_not_independent', observedAt: Date.now(), count: candles.length, latest: candles, historyStatus: 'unvalidated', timestampUnit: 'seconds' };
+        const candles = cached.candles;
+        e.candles = { source: cached.source === 'gecko' ? 'gecko_pool_ohlcv' : 'gmgn_not_independent', observedAt: Date.now(), count: candles.length, latest: candles, historyStatus: 'unvalidated', timestampUnit: 'seconds' };
         try {
           const selected = selectEntryPattern(e, candles, Date.now());
           e.pattern = selected.pattern;
           e.entryLane = selected.entryLane;
-          e.candles.historyStatus = selected.entryLane === 'conviction' ? 'available_no_strict_candle_pattern_conviction_fallback' : 'available';
+          e.candles.historyStatus = selected.entryLane === 'conviction' ? 'available_no_strict_candle_pattern_conviction_fallback'
+            : selected.entryLane === 'flow_momentum' ? 'available_no_candle_history_flow_momentum_fallback' : 'available';
           if (selected.pattern.lastClosedAt) e.candles.lastClosedAt = selected.pattern.lastClosedAt;
         } catch (error) {
           e.patternIssue = error.message;
@@ -220,7 +233,7 @@ async function main() {
       } catch (error) {
         e.patternIssue = error.message;
         if (!e.candles) e.candles = { source: 'gmgn_not_independent', historyStatus: 'unavailable' };
-        else if (e.candles.historyStatus !== 'available') e.candles.historyStatus = 'invalid_or_insufficient';
+        else if (!e.candles.historyStatus.startsWith('available')) e.candles.historyStatus = 'invalid_or_insufficient';
       }
       e.issues = [...admissionIssues(e, Date.now()), ...qualityIssues(e, e.entryLane || 'retrace')];
       if (!e.pattern) e.issues.push(e.patternIssue || 'pattern_unavailable');
@@ -261,7 +274,7 @@ async function main() {
       state.pipeline.candles = {
         status: !latestCandle ? 'missing' : latestCandle.historyStatus === 'available' && Date.now() - latestCandle.observedAt < 90000 ? 'fresh' : 'stale',
         updatedAt: latestCandle?.observedAt || 0,
-        detail: latestCandle ? `${latestCandle.historyStatus}; ${latestCandle.count || 0} completed candles received. GMGN token-level, not independent pool OHLC.` : 'Awaiting a candidate that passes liquidity and security gates',
+        detail: latestCandle ? `${latestCandle.historyStatus}; ${latestCandle.count || 0} completed candles received. ${latestCandle.source === 'gecko_pool_ohlcv' ? 'GeckoTerminal independent pool OHLC fallback (GMGN returned no history).' : 'GMGN token-level, not independent pool OHLC.'}` : 'Awaiting a candidate that passes liquidity and security gates',
       };
       pendingPersist = true;
       if (!persistTimer) persistTimer = setTimeout(() => flushPersist(), PERSIST_DEBOUNCE_MS);
@@ -413,6 +426,7 @@ async function main() {
           const finalIssues = [...admissionIssues(discovery, Date.now()), ...executionIssues(discovery, state.config.initialPositionSol, Number(sell.outAmount) / 1e9, state.config.modeledFeeBps)];
           if (discovery.entryLane === 'acceleration') accelerationPattern(discovery.candles.latest, Date.now());
           else if (discovery.entryLane === 'conviction') convictionPattern(discovery, Date.now());
+          else if (discovery.entryLane === 'flow_momentum') flowMomentumPattern(discovery, Date.now());
           else supportPattern(discovery.candles.latest, Date.now());
           if (finalIssues.length) throw new Error(finalIssues.join(', '));
           const mark = { priceSol: Number(sell.outAmount) / 1e9 / tokenAmount, updatedAt: started, fresh: true, exitQuotes: [{ tokenAmount, proceedsSol: Number(sell.outAmount) / 1e9 }] };
