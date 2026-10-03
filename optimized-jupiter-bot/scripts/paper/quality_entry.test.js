@@ -1,6 +1,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { qualityIssues, supportPattern, accelerationPattern, convictionPattern, flowMomentumPattern, selectEntryPattern, executionIssues, closedCandles, staleCandleHistory } = require('./quality_entry');
+const { qualityIssues, supportPattern, accelerationPattern, convictionPattern, flowMomentumPattern, confirmFollowThrough, selectEntryPattern, executionIssues, closedCandles, staleCandleHistory } = require('./quality_entry');
+const { POLICY } = require('./quality_entry');
 const now = 1800000000000;
 function candles() {
   return Array.from({ length: 90 }, (_, i) => {
@@ -199,6 +200,20 @@ function flowMomentumEvidence() {
     } };
   return e;
 }
+test('flow_momentum stands down unless the price holds the signal level', () => {
+  const e = flowMomentumEvidence();
+  const signal = flowMomentumPattern(e, now);
+  // Before the follow-through delay elapses the check is not due.
+  assert.equal(confirmFollowThrough(signal, e, now + 5000), null);
+  // Price below the signal after the delay -> stand down.
+  const dropped = { ...e, flow: { ...e.flow, windows: { ...e.flow.windows, '1m': { ...e.flow.windows['1m'], priceUsd: 1.00 } } } };
+  assert.throws(() => confirmFollowThrough(signal, dropped, now + 25000), /follow_through_price_lost/);
+  // Price holding or extending the level -> confirmed, carrying the fresh price.
+  const held = { ...e, flow: { ...e.flow, windows: { ...e.flow.windows, '1m': { ...e.flow.windows['1m'], priceUsd: 1.03 } } } };
+  const ok = confirmFollowThrough(signal, held, now + 25000);
+  assert.equal(ok.followThroughPriceUsd, 1.03);
+  assert.ok(ok.followThroughMs >= POLICY.minFlowMomentumFollowThroughMs);
+});
 test('flow-only momentum lane admits an actively-traded token with no candle history', () => {
   const e = flowMomentumEvidence();
   const pattern = flowMomentumPattern(e, now);

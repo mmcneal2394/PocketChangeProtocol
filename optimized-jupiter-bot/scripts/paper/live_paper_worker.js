@@ -1,6 +1,6 @@
 'use strict';
 const { marketCap } = require('./market_cap');
-const { POLICY, qualityIssues, supportPattern, accelerationPattern, convictionPattern, flowMomentumPattern, selectEntryPattern, executionIssues } = require('./quality_entry');
+const { POLICY, qualityIssues, supportPattern, accelerationPattern, convictionPattern, flowMomentumPattern, confirmFollowThrough, selectEntryPattern, executionIssues } = require('./quality_entry');
 const { candleRequest, normalizeCandles } = require('./candle_data');
 const { exitQuote, retryDelay, nextExit } = require('./exit_quotes');
 const fs = require('fs');
@@ -151,6 +151,9 @@ async function main() {
     // Completed 1m candles only change once per minute, so reuse a mint's candle
     // window within the same minute instead of re-paying the GMGN lease per re-check.
     const candleCacheByMint = new Map();
+    // flow_momentum confirms a 1m momentum reading; record it and only enter if the
+    // price still holds the level after POLICY.minFlowMomentumFollowThroughMs.
+    const pendingFollowThrough = new Map();
     let persistTimer = null, pendingPersist = false;
     const evidenceDir = path.join(DIR, 'discovery-evidence');
     fs.mkdirSync(evidenceDir, { recursive: true });
@@ -416,6 +419,23 @@ async function main() {
           row.discovery = discovery;
           row.liquidityUsd = discovery.liquidityUsd;
           if (discovery.issues.length) throw new Error(discovery.issues.join(', '));
+          if (discovery.entryLane === 'flow_momentum') {
+            // Anti-chase: stage the signal and enter only once the price has held it
+            // for minFlowMomentumFollowThroughMs. The signal snapshot is held across
+            // cycles and confirmed against the live price; a lost level restages fresh.
+            const prior = pendingFollowThrough.get(row.mint);
+            const signal = prior && prior.lane === 'flow_momentum' ? prior : { lane: 'flow_momentum', pattern: discovery.pattern };
+            let confirmed = null;
+            try { confirmed = confirmFollowThrough(signal.pattern, discovery, Date.now()); }
+            catch (error) { pendingFollowThrough.delete(row.mint); throw error; }
+            if (!confirmed) {
+              pendingFollowThrough.set(row.mint, signal);
+              if (pendingFollowThrough.size > 500) pendingFollowThrough.delete(pendingFollowThrough.keys().next().value);
+              throw new Error('flow_momentum_follow_through_pending');
+            }
+            pendingFollowThrough.delete(row.mint);
+            discovery.pattern = confirmed;
+          }
           if (state.positions.filter(p => p.closedAt === null).length >= state.config.maxOpenPositions || state.availableCapitalSol < state.config.initialPositionSol) throw new Error('paper_capacity_full');
           const a = await providers.accounts([row.mint]);
           const decimals = validateMint(a.value[0]);

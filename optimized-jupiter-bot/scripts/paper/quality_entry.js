@@ -25,6 +25,12 @@ const POLICY = Object.freeze({ id: 'pcp-three-lane-v7', minAgeSeconds: 3600,
   minFlowMomentumVolume1mUsd: 1000, minFlowMomentumVolume5mUsd: 5000,
   minFlowMomentumSwaps1m: 12, minFlowMomentumBuys1m: 8,
   minFlowMomentumBuyRatio: 0.60, minFlowMomentumBuyVolumeRatio: 0.65,
+  // flow_momentum buys a 1m momentum top; on thin young tokens ~70% of those are
+  // already below entry the moment they fill (verified 2026-10-02: 18/26 trades never
+  // printed a green mark, perfect-exit ceiling +0.003). Require the price to still
+  // hold the signal level after a short delay, else stand down. Measured on the 26
+  // live trades this flips the lane from -0.143 to ~breakeven while keeping ~2/26.
+  minFlowMomentumFollowThroughMs: 20000,
   candleCount: 90, maxHistorySpanMinutes: 120, floorTolerance: 0.03, floorBreakTolerance: 0.05,
   minPostHypeDrawdown: 0.15, maxPostHypeDrawdown: 0.85, deepRetraceThreshold: 0.60,
   minDeepVolume5mUsd: 10000, minDeepSwaps1m: 8, maxEntryFromFloor: 0.12,
@@ -182,9 +188,22 @@ function flowMomentumPattern(e, now) {
   const countPressure = e.flow.swaps1m > 0 && e.flow.buys1m / e.flow.swaps1m >= POLICY.minFlowMomentumBuyRatio;
   const volumePressure = buyVolumeRatio >= POLICY.minFlowMomentumBuyVolumeRatio;
   if (!countPressure && !volumePressure) throw new Error('flow_momentum_order_flow_below_threshold');
-  return { name: 'flow_only_momentum', regime: 'flow_momentum', momentumPct: momentum, buyVolumeRatio,
+  return { name: 'flow_only_momentum', regime: 'flow_momentum', momentumPct: momentum, buyVolumeRatio, signalPriceUsd: one.priceUsd,
     lastClosedAt: null, observedAt: now, source: 'gmgn_window_flow_not_independent_ohlc',
     caveat: 'no candle history; edge unvalidated, admitted on window flow alone' };
+}
+
+// Anti-chase: flow_momentum signals a 1m top, so wait a short beat and enter only if
+// the price has not given the level back. Returns a normalized pattern carrying the
+// fresh price, or null when the follow-through check is not yet due.
+function confirmFollowThrough(pattern, e, now) {
+  const dueAt = Number(pattern.observedAt) + POLICY.minFlowMomentumFollowThroughMs;
+  if (!Number.isFinite(dueAt) || now < dueAt) return null;
+  const signalPrice = Number(pattern.signalPriceUsd);
+  const currentPrice = Number(e.flow?.windows?.['1m']?.priceUsd);
+  if (!Number.isFinite(signalPrice) || signalPrice <= 0 || !Number.isFinite(currentPrice) || currentPrice <= 0) throw new Error('follow_through_price_unavailable');
+  if (currentPrice < signalPrice) throw new Error('follow_through_price_lost');
+  return { ...pattern, signalPriceUsd: signalPrice, followThroughPriceUsd: currentPrice, followThroughMs: now - pattern.observedAt, observedAt: now };
 }
 function selectEntryPattern(e, raw, now) {
   let retraceIssue = null;
@@ -238,4 +257,4 @@ function executionIssues(e, stake, proceeds, feeBps) {
   if (!finite(e.reserves?.quoteSol) || e.reserves.quoteSol <= 0 || stake / e.reserves.quoteSol > POLICY.maxQuoteReserveFraction) issues.push('quality_position_exceeds_quote_reserve_limit');
   return issues;
 }
-module.exports = { POLICY, qualityIssues, supportPattern, accelerationPattern, convictionPattern, flowMomentumPattern, selectEntryPattern, executionIssues, closedCandles, staleCandleHistory };
+module.exports = { POLICY, qualityIssues, supportPattern, accelerationPattern, convictionPattern, flowMomentumPattern, confirmFollowThrough, selectEntryPattern, executionIssues, closedCandles, staleCandleHistory };
